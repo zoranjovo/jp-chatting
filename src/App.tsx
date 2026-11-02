@@ -70,13 +70,16 @@ function Shell({ loadError }: { loadError: string | null }) {
     }).catch(() => {});
   }, [select]);
 
-  const setBusy = (id: string, busy: boolean) =>
-    setWaiting((w) => {
-      const next = new Set(w);
-      if (busy) next.add(id);
-      else next.delete(id);
-      return next;
-    });
+  const setBusy = useCallback(
+    (id: string, busy: boolean) =>
+      setWaiting((w) => {
+        const next = new Set(w);
+        if (busy) next.add(id);
+        else next.delete(id);
+        return next;
+      }),
+    [],
+  );
 
   const requestReply = useCallback(async (id: string) => {
     setBusy(id, true);
@@ -89,7 +92,7 @@ function Shell({ loadError }: { loadError: string | null }) {
       setBusy(id, false);
       refreshList();
     }
-  }, [show, refreshList]);
+  }, [show, refreshList, setBusy]);
 
   const startChat = async (topic: string) => {
     setDialog(null);

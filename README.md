@@ -1,5 +1,7 @@
 # jp-chatting
 
+[![CI](https://github.com/zoranjovo/jp-chatting/actions/workflows/ci.yml/badge.svg)](https://github.com/zoranjovo/jp-chatting/actions/workflows/ci.yml)
+
 A local-only app for practising Japanese typing and conversation with an LLM of your choice.
 
 Yes, it is 100% vibecoded.
@@ -45,7 +47,8 @@ The kanji-by-WaniKani-level list (`shared/wanikani-kanji.json`) isn't in the rep
 
 - `pnpm test` — unit tests (server, AI runners with fakes, prompts, store, romaji, kanji, i18n, components)
 - `pnpm test:ui` — Playwright UI tests against the built app and a scripted mock model (first time: `pnpm exec playwright install chromium`)
-- `pnpm test:all` — typecheck + both
+- `pnpm lint` — Biome, React hooks rules only
+- `pnpm test:all` — typecheck, lint and both test suites (CI runs everything except the UI tests on every push)
 - `pnpm check:claude` — tries every listed Claude model through the CLI
 
 See [AGENTS.md](AGENTS.md) for how the code fits together.

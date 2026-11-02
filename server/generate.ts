@@ -52,7 +52,7 @@ export async function generateReply(callAi: CallAi, settings: Settings, chat: Pi
 }
 
 export async function generateBreakdown(callAi: CallAi, settings: Settings, message: Message): Promise<Breakdown> {
-  const b = toBreakdown(await callAi({ ...breakdownRequest(settings, message), schema: BREAKDOWN_SCHEMA }, settings));
+  const b = toBreakdown(await callAi({ ...breakdownRequest(message), schema: BREAKDOWN_SCHEMA }, settings));
   for (const line of b.lines) {
     line.japanese = dropKanaFurigana(line.japanese);
     for (const w of line.words) w.text = dropKanaFurigana(w.text);

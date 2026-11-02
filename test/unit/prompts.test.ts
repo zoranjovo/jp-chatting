@@ -106,7 +106,7 @@ describe('rewriteRequest', () => {
 
 describe('breakdownRequest', () => {
   test('sends the message without furigana markup', () => {
-    const req = breakdownRequest(settings(), msg('assistant', '{今日|きょう}は{暑|あつ}い'));
+    const req = breakdownRequest(msg('assistant', '{今日|きょう}は{暑|あつ}い'));
     assert.match(req.turns[0].content, /今日は暑い$/);
     assert.match(req.system, /line by line/);
   });
@@ -206,7 +206,7 @@ describe('toFeedback', () => {
 describe('English in breakdowns and feedback', () => {
   test('both prompts ask for Japanese without 「」 and allow markdown emphasis', () => {
     const m = msg('assistant', 'はい');
-    for (const req of [breakdownRequest(settings(), m), feedbackRequest(settings(), msg('user', 'はい'), m)]) {
+    for (const req of [breakdownRequest(m), feedbackRequest(settings(), msg('user', 'はい'), m)]) {
       assert.match(req.system, /no 「」 brackets or quotation marks/);
       assert.match(req.system, /\*\*bold\*\* or \*italic\*/);
     }

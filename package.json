@@ -12,11 +12,12 @@
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test \"test/unit/**/*.test.ts\" \"test/unit/**/*.test.tsx\"",
     "test:ui": "playwright test",
-    "test:all": "pnpm typecheck && pnpm test && pnpm test:ui",
+    "test:all": "pnpm typecheck && pnpm lint && pnpm test && pnpm test:ui",
     "check:claude": "tsx scripts/check-claude-models.ts",
     "eval": "tsx scripts/eval-prompts.ts",
     "kanji": "tsx scripts/build-kanji.ts",
-    "postinstall": "tsx scripts/build-kanji.ts --if-missing"
+    "postinstall": "tsx scripts/build-kanji.ts --if-missing",
+    "lint": "biome lint"
   },
   "engines": {
     "node": ">=20"
@@ -27,6 +28,7 @@
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.6.4",
     "@playwright/test": "1.63.0",
     "@types/express": "^5.0.3",
     "@types/node": "^22.15.0",
@@ -37,5 +39,6 @@
     "tsx": "^4.19.0",
     "typescript": "^5.8.0",
     "vite": "^6.3.0"
-  }
+  },
+  "packageManager": "pnpm@12.6.0"
 }

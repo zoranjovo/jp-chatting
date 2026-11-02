@@ -42,6 +42,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   }, []);
 
   // Fetch the list when the dialog opens and when the provider changes; the endpoint URL waits for "Refresh".
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refetching on every keystroke of the URL is what we avoid
   useEffect(() => {
     loadModels(draft.provider, draft.endpoint);
   }, [draft.provider, loadModels]);

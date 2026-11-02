@@ -102,7 +102,7 @@ export const FEEDBACK_SCHEMA = object({
 /** For the English parts of a breakdown or feedback, which the UI renders with inline markdown. */
 const ENGLISH_RULE = 'In the English text, write Japanese words and phrases as they are, with no 「」 brackets or quotation marks around them. For emphasis you may use **bold** or *italic*.';
 
-export function breakdownRequest(settings: Settings, message: Message): { system: string; turns: ChatTurn[] } {
+export function breakdownRequest(message: Message): { system: string; turns: ChatTurn[] } {
   return {
     system: `You are a patient Japanese teacher. An English-speaking beginner wants to understand a Japanese message line by line.
 

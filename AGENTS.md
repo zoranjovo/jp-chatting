@@ -8,10 +8,11 @@ A local-only web app for an English speaker to practise Japanese conversation an
 |---|---|
 | `pnpm dev` | API (tsx watch, port 5174) + Vite UI (port 5173, proxies `/api`) |
 | `pnpm build && pnpm start` | built UI served by the API on 5174 |
-| `pnpm typecheck` | `tsc --noEmit` over everything, tests included |
+| `pnpm typecheck` | `tsc --noEmit` over everything, tests included (strict, plus no unused locals/parameters) |
+| `pnpm lint` | Biome, React hooks rules only, `src/` only — a few ms |
 | `pnpm test` | unit tests (`node:test` via tsx), ~1s |
 | `pnpm test:ui` | Playwright UI tests, ~20s; builds the UI first |
-| `pnpm test:all` | all three — run this before calling work done |
+| `pnpm test:all` | typecheck, lint, unit and UI tests — run this before calling work done |
 | `pnpm kanji` | rebuild the git-ignored `shared/wanikani-kanji.json` (also runs on install when missing) |
 | `pnpm check:claude [models…]` | live check of the Claude CLI models (needs `claude auth login`) |
 | `pnpm eval --label X <provider:model>…` | prompt eval on real models — see Prompt changes |
@@ -84,6 +85,7 @@ test/ui/           Playwright specs, fixtures.ts, mock-llm.ts (scripted model se
 - TypeScript strict, ES modules, imports with explicit `.ts`/`.tsx` extensions. No linter is configured; follow the surrounding style (2 spaces, single quotes, semicolons, trailing commas, ~140 col).
 - **i18n:** every UI string lives in `src/i18n.tsx` in **both** `en` and `ja`; `ja` is typed as `Strings`, so a missing key fails `tsc`, and `test/unit/i18n.test.ts` checks shape parity, emptiness and untranslated copies. Breakdown/feedback explanations from the model stay in English by design.
 - **Styling:** plain CSS in `src/styles.css` with tokens on `:root` and a `prefers-color-scheme: dark` override; Japanese text uses `--font-jp`. Must work at phone width (sidebar slides over below 760px; the top bar has a menu button and a new-chat button there).
+- **Linting is deliberately scarce.** TypeScript does the heavy lifting; `biome.json` enables only `useHookAtTopLevel` and `useExhaustiveDependencies` (unnecessary dependencies allowed — effects keyed on a trigger value are fine). The formatter is off. Add a rule only for a class of bug it would have caught, never for style. A deliberate hook-dependency omission gets a `// biome-ignore lint/correctness/useExhaustiveDependencies: <why>` comment.
 - Keep dependencies minimal — no SDKs for the AI calls (plain `fetch` / `spawn`), no UI framework beyond React.
 - Prompts are part of behaviour: if you change a prompt's wording that tests match on (e.g. "You edit Japanese", "Start the conversation"), update the tests and the UI mock (`test/ui/mock-llm.ts` routes on `response_format` and on the rewrite system prompt's opening words).
 
@@ -108,6 +110,7 @@ Replies are sampled twice per scenario at the model's normal temperature, so exp
 - **Unit** (`test/unit/*.test.ts[x]`): `node:test` + `assert/strict`. Each file runs in its own process; `useTempData()` points `JP_CHATTING_DATA` at a temp dir — never let a test touch `data/`. `helpers.ts` provides `mockServer()` (HTTP fake for the endpoint), `fakeSpawn()` (scripted `claude` process: stream-json events, stderr, spawn error, hang), and the API tests run `createApp({ callAi: fake })` on port 0. Components are tested with `renderToStaticMarkup`.
 - **UI** (`test/ui/*.spec.ts`): Playwright, Chromium, one worker. `playwright.config.ts` starts `test/ui/mock-llm.ts` on 5199 and the built app on 5198 with data in `.cache/ui-test-data`. The `app` fixture resets chats/settings and the mock before each test. Use `startChat()` from fixtures — it waits for the new chat to exist and the opener to land, avoiding races with the previous chat. `mockControl(request, { fail, delayMs })` simulates outages/latency; `mockCalls()` shows what the app asked the model.
 - If Playwright says the browser executable is missing, run `pnpm exec playwright install chromium` (the version must match `@playwright/test`).
+- **CI** (`.github/workflows/ci.yml`) runs on every push and PR: one Ubuntu job — typecheck, lint, unit tests. The Playwright UI tests are **local only**: run `pnpm test:ui` (or `pnpm test:all`) before pushing UI changes. Windows-specific behaviour (spawning `claude`, file renames) isn't covered in CI either, so check it locally.
 - Run `pnpm test:all` before finishing. Unit tests should stay fast and deterministic; no test may call a real model.
 
 ## Gotchas
