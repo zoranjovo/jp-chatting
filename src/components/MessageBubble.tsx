@@ -9,7 +9,20 @@ import { JpText } from './JpText.tsx';
 /** Matches the open/close transition in styles.css. */
 const SLIDE_MS = 260;
 
-export function MessageBubble({ chatId, message, onUpdated }: { chatId: string; message: Message; onUpdated: (m: Message) => void }) {
+export function MessageBubble({
+  chatId,
+  message,
+  onUpdated,
+  onRewind,
+  rewindDisabled = false,
+}: {
+  chatId: string;
+  message: Message;
+  onUpdated: (m: Message) => void;
+  /** Only on the learner's messages. */
+  onRewind?: () => void;
+  rewindDisabled?: boolean;
+}) {
   const t = useT();
   const [open, setOpen] = useState(false);
   // The panel stays mounted once opened, so closing can animate; `shown` is set
@@ -60,6 +73,11 @@ export function MessageBubble({ chatId, message, onUpdated }: { chatId: string; 
           <JpText text={message.content} highlight={!mine} />
         </div>
         <div className="bubble-actions">
+          {onRewind && (
+            <button type="button" className="chip" onClick={onRewind} disabled={rewindDisabled} title={t.rewindTitle}>
+              ↶ {t.rewind}
+            </button>
+          )}
           <button
             type="button"
             className={`chip ${open ? 'active' : ''}`}

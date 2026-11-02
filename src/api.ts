@@ -25,6 +25,7 @@ export const api = {
   deleteChat: (id: string) => request<{ ok: true }>('DELETE', `/api/chats/${id}`),
   send: (id: string, content: string) => request<Chat>('POST', `/api/chats/${id}/messages`, { content }),
   reply: (id: string) => request<Chat>('POST', `/api/chats/${id}/reply`),
+  rewind: (id: string, messageId: string) => request<Chat>('POST', `/api/chats/${id}/messages/${messageId}/rewind`),
   analyze: (id: string, messageId: string, refresh = false) =>
     request<Message>('POST', `/api/chats/${id}/messages/${messageId}/analyze${refresh ? '?refresh=1' : ''}`),
 };

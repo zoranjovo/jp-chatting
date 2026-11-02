@@ -128,6 +128,20 @@ function Shell({ loadError }: { loadError: string | null }) {
     }
   };
 
+  /** Deletes the message and everything after it; ChatView then puts its text back in the composer. */
+  const rewind = async (m: Message) => {
+    if (!chat) return false;
+    const id = chat.id;
+    try {
+      show(await api.rewind(id, m.id));
+      setErrors((e) => ({ ...e, [id]: null }));
+      return true;
+    } catch (err) {
+      setErrors((e) => ({ ...e, [id]: (err as Error).message }));
+      return false;
+    }
+  };
+
   const rename = async (id: string, title: string) => {
     show(await api.renameChat(id, title));
     refreshList();
@@ -186,6 +200,7 @@ function Shell({ loadError }: { loadError: string | null }) {
             onSend={send}
             onRetry={() => requestReply(chat.id)}
             onMessageUpdated={messageUpdated}
+            onRewind={rewind}
           />
         ) : (
           <div className="empty">

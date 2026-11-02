@@ -168,7 +168,7 @@ button:disabled {
   visibility: hidden;
 }
 
-.chip:hover,
+.chip:hover:not(:disabled),
 .chip.active {
   border-color: var(--accent);
   color: var(--accent);
@@ -422,6 +422,7 @@ button:disabled {
 .bubble-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 6px;
   margin-top: 2px;
 }
 
@@ -430,7 +431,7 @@ button:disabled {
   border-color: color-mix(in srgb, var(--mine-ink) 30%, transparent);
 }
 
-.mine .chip:hover,
+.mine .chip:hover:not(:disabled),
 .mine .chip.active {
   color: var(--mine-ink);
   border-color: var(--mine-ink);

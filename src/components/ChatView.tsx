@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { Chat, Message } from '../../shared/types.ts';
 import { useT } from '../i18n.tsx';
-import { Composer } from './Composer.tsx';
+import { Composer, type ComposerHandle } from './Composer.tsx';
 import { MessageBubble } from './MessageBubble.tsx';
 
 export function ChatView({
@@ -11,6 +11,7 @@ export function ChatView({
   onSend,
   onRetry,
   onMessageUpdated,
+  onRewind,
 }: {
   chat: Chat;
   waiting: boolean;
@@ -18,9 +19,16 @@ export function ChatView({
   onSend: (text: string) => void;
   onRetry: () => void;
   onMessageUpdated: (m: Message) => void;
+  /** Resolves true once the message and everything after it are gone. */
+  onRewind: (m: Message) => Promise<boolean>;
 }) {
   const t = useT();
   const end = useRef<HTMLDivElement>(null);
+  const composer = useRef<ComposerHandle>(null);
+
+  const rewind = async (m: Message) => {
+    if (await onRewind(m)) composer.current?.prepend(m.content);
+  };
   const last = chat.messages.at(-1);
   const needsReply = !waiting && (!last || last.role === 'user');
 
@@ -33,7 +41,14 @@ export function ChatView({
       <div className="messages">
         {chat.topic && <div className="topic-banner">{chat.topic}</div>}
         {chat.messages.map((m) => (
-          <MessageBubble key={m.id} chatId={chat.id} message={m} onUpdated={onMessageUpdated} />
+          <MessageBubble
+            key={m.id}
+            chatId={chat.id}
+            message={m}
+            onUpdated={onMessageUpdated}
+            onRewind={m.role === 'user' ? () => rewind(m) : undefined}
+            rewindDisabled={waiting}
+          />
         ))}
         {waiting && (
           <div className="message theirs">
@@ -56,7 +71,7 @@ export function ChatView({
         )}
         <div ref={end} />
       </div>
-      <Composer disabled={waiting} onSend={onSend} />
+      <Composer disabled={waiting} onSend={onSend} handle={composer} />
     </div>
   );
 }

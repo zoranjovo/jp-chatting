@@ -40,6 +40,8 @@ const en = {
 
   breakdown: 'Breakdown',
   check: 'Check',
+  rewind: 'Rewind',
+  rewindTitle: 'Delete this message and everything after it, and put it back in the message box to edit and resend',
   hide: 'Hide',
   analyzing: 'Thinking…',
   redo: 'Redo',
@@ -160,6 +162,8 @@ const ja: Strings = {
 
   breakdown: '解説',
   check: 'チェック',
+  rewind: '巻き戻す',
+  rewindTitle: 'このメッセージとそれ以降をすべて削除し、編集して送り直せるように入力欄に戻します',
   hide: '閉じる',
   analyzing: '考え中…',
   redo: 'やり直す',

@@ -23,6 +23,7 @@ export interface AppDeps {
 }
 
 class NotFound extends Error {}
+class BadRequest extends Error {}
 
 const asPoliteness = (v: unknown): Politeness | undefined => (v === 'polite' || v === 'casual' ? v : undefined);
 
@@ -179,12 +180,31 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
       const id = String(req.params.id);
       const settings = await store.getSettings();
       const chat = await loadChat(id);
+      const answering = chat.messages.at(-1)?.id;
       const content = await generateReply(deps.callAi, settings, chat);
       const message: Message = { id: store.newId(), role: 'assistant', content, createdAt: store.now(), context: contextOf(settings, chat.politeness) };
       res.json(
         await updateChat(id, (chat) => {
+          // Rewound while the reply was being written: it answers a history that is gone.
+          if (chat.messages.at(-1)?.id !== answering) return;
           chat.messages.push(message);
           if (!chat.title) chat.title = titleFrom(content);
+        }),
+      );
+    }),
+  );
+
+  /** Deletes one of the learner's messages and everything after it; the UI puts its text back in the composer. */
+  app.post(
+    '/api/chats/:id/messages/:mid/rewind',
+    route(async (req, res) => {
+      const mid = String(req.params.mid);
+      res.json(
+        await updateChat(String(req.params.id), (chat) => {
+          const index = chat.messages.findIndex((m) => m.id === mid);
+          if (index < 0) throw new NotFound('message not found');
+          if (chat.messages[index].role !== 'user') throw new BadRequest("only the learner's messages can be rewound to");
+          chat.messages.splice(index);
         }),
       );
     }),
@@ -217,7 +237,9 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
         const m = c.messages.find((x) => x.id === mid);
         if (m) Object.assign(m, patch);
       });
-      res.json(saved.messages.find((m) => m.id === mid));
+      const analysed = saved.messages.find((m) => m.id === mid);
+      if (!analysed) throw new NotFound('message not found -- rewound while it was being analysed');
+      res.json(analysed);
     }),
   );
 
@@ -229,7 +251,7 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
   }
 
   app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err instanceof NotFound ? 404 : err instanceof AiError ? 502 : 500;
+    const status = err instanceof NotFound ? 404 : err instanceof BadRequest ? 400 : err instanceof AiError ? 502 : 500;
     if (status === 500) console.error(err);
     else if (status === 502) console.warn(`[api] ${err.message}`);
     res.status(status).json({ error: err.message });

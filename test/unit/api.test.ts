@@ -618,3 +618,70 @@ describe('message context', () => {
     assert.match(calls[0].request.system, /The chat is in casual plain form/);
   });
 });
+
+describe('rewind', () => {
+  const rewind = (id: string, mid: string) => api<Chat>('POST', `/api/chats/${id}/messages/${mid}/rewind`);
+
+  async function conversation() {
+    const chat = await newChat();
+    await reply(chat.id);
+    await send(chat.id, 'one');
+    await reply(chat.id);
+    await send(chat.id, 'two');
+    return (await reply(chat.id)).body;
+  }
+
+  test('deletes the learner\'s message and everything after it', async () => {
+    const chat = await conversation();
+    assert.equal(chat.messages.length, 5);
+    const res = await rewind(chat.id, chat.messages[1].id);
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.messages.map((m) => m.id), [chat.messages[0].id]);
+    assert.deepEqual((await api<Chat>('GET', `/api/chats/${chat.id}`)).body.messages.length, 1);
+  });
+
+  test('rewinding to the last message removes just that one', async () => {
+    const chat = await newChat();
+    await reply(chat.id);
+    const sent = (await send(chat.id, 'hi')).body;
+    assert.equal((await rewind(chat.id, sent.messages[1].id)).body.messages.length, 1);
+  });
+
+  test('the partner\'s messages can\'t be rewound to, and unknown ones are 404s', async () => {
+    const chat = await conversation();
+    const bad = await api<{ error: string }>('POST', `/api/chats/${chat.id}/messages/${chat.messages[2].id}/rewind`);
+    assert.equal(bad.status, 400);
+    assert.match(bad.body.error, /only the learner's messages/);
+    assert.equal((await rewind(chat.id, 'nope')).status, 404);
+    assert.equal((await api<Chat>('GET', `/api/chats/${chat.id}`)).body.messages.length, 5, 'nothing deleted');
+  });
+
+  test('a reply that finishes after a rewind is dropped, not added to the new history', async () => {
+    const chat = await newChat();
+    await reply(chat.id);
+    const sent = (await send(chat.id, 'hi')).body;
+    let finish!: () => void;
+    answers.chat = () => new Promise((r) => (finish = () => r('おそい')));
+    const late = reply(chat.id);
+    await new Promise((r) => setTimeout(r, 20));
+    await rewind(chat.id, sent.messages[1].id);
+    finish();
+    const res = await late;
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.messages.map((m) => m.content), [sent.messages[0].content]);
+  });
+
+  test('an analysis that finishes after its message was rewound is a 404 and saves nothing', async () => {
+    const chat = await newChat();
+    await reply(chat.id);
+    const sent = (await send(chat.id, 'hi')).body;
+    let finish!: () => void;
+    answers.feedback = () => new Promise((r) => (finish = () => r(DEFAULT_ANSWERS.feedback({} as AiRequest))));
+    const late = analyze(chat.id, sent.messages[1].id);
+    await new Promise((r) => setTimeout(r, 20));
+    await rewind(chat.id, sent.messages[1].id);
+    finish();
+    assert.equal((await late).status, 404);
+    assert.equal((await api<Chat>('GET', `/api/chats/${chat.id}`)).body.messages.length, 1);
+  });
+});

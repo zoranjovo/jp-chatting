@@ -225,3 +225,49 @@ test('the next message after a change is stamped with the new settings', async (
   await expect(app.locator('.message-meta')).toHaveText(['mock-small · Polite · WK 10', 'mock-small · Casual · WK 10', 'mock-small · Casual · WK 10']);
   expect((await chatsOnDisk(request))[0].messages.map((m) => m.context?.politeness)).toEqual(['polite', 'casual', 'casual']);
 });
+
+async function sendAndWait(app: Page, text: string) {
+  const replies = await theirs(app).count();
+  await composer(app).fill(text);
+  await composer(app).press('Enter');
+  await expect(theirs(app)).toHaveCount(replies + 1);
+}
+
+test('rewind deletes my message and everything after it, and puts it back in the box', async ({ app, request }) => {
+  await startChat(app);
+  await sendAndWait(app, 'コーヒーをください');
+  await sendAndWait(app, 'ありがとう');
+  await expect(theirs(app).first().getByRole('button', { name: /Rewind/ })).toHaveCount(0);
+
+  await mine(app).first().getByRole('button', { name: /Rewind/ }).click();
+  await expect(mine(app)).toHaveCount(0);
+  await expect(theirs(app)).toHaveCount(1);
+  await expect(composer(app)).toHaveValue('コーヒーをください');
+  await expect(composer(app)).toBeFocused();
+  expect((await chatsOnDisk(request))[0].messages).toHaveLength(1);
+
+  await composer(app).press('Enter');
+  await expect(mine(app)).toHaveCount(1);
+  await expect(theirs(app)).toHaveCount(2);
+});
+
+test('rewinding with something already typed puts the message above it, with a blank line between', async ({ app }) => {
+  await startChat(app);
+  await sendAndWait(app, 'もも');
+  await composer(app).fill('おいしいトマト');
+  await mine(app).first().getByRole('button', { name: /Rewind/ }).click();
+  await expect(mine(app)).toHaveCount(0);
+  await expect(composer(app)).toHaveValue('もも\n\nおいしいトマト');
+});
+
+test('rewind waits while a reply is on its way', async ({ app, request }) => {
+  await startChat(app);
+  await sendAndWait(app, 'はい');
+  await mockControl(request, { delayMs: 1500 });
+  await composer(app).fill('もういちど');
+  await composer(app).press('Enter');
+  await expect(app.locator('.typing')).toBeVisible();
+  await expect(mine(app).first().getByRole('button', { name: /Rewind/ })).toBeDisabled();
+  await expect(app.locator('.typing')).toHaveCount(0);
+  await expect(mine(app).first().getByRole('button', { name: /Rewind/ })).toBeEnabled();
+});

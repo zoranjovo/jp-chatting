@@ -11,6 +11,7 @@ There are a lot of Japanese specific features in the app, but you should be able
 - **Chats** — multiple chats, each optionally with a topic or scenario ("ordering at a café"). The partner sends the first message.
 - **Breakdown** — on any partner message: line-by-line English translation, a short explanation of how each line is built, and a word-by-word gloss.
 - **Check** — on any of your messages: what you seem to mean, whether it's right, a natural Japanese version, and line-by-line notes. Works on English input too (you get the translation).
+- **Rewind** — on any of your messages: deletes it and everything after it and puts it back in the message box (above anything you'd already typed), so you can edit it and send again.
 - **Kanji limit** — set your WaniKani level; the partner only uses kanji up to that level and writes everything else in kana. Replies are checked, and any slip is rewritten once; anything left over is highlighted (hover any kanji for its level, meaning and readings).
 - **Genki lesson** — set the last Genki lesson you've studied; the partner mostly uses grammar from lessons up to it (a guide, not a strict limit), feedback corrects within it and names the lesson for anything later, and breakdowns say which lesson teaches each grammar point.
 - **JLPT level** — optional N5–N1, a rough guide to how your partner pitches its Japanese (not a strict limit like the kanji level).
