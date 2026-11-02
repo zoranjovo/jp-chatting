@@ -47,3 +47,7 @@ The kanji-by-WaniKani-level list (`shared/wanikani-kanji.json`) isn't in the rep
 - `pnpm check:claude` — tries every listed Claude model through the CLI
 
 See [AGENTS.md](AGENTS.md) for how the code fits together.
+
+## License
+
+[MIT](LICENSE). The kanji data downloaded on install comes from [davidluzgouveia/kanji-data](https://github.com/davidluzgouveia/kanji-data), also MIT.
