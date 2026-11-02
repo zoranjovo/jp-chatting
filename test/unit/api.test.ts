@@ -481,3 +481,50 @@ describe('test model', () => {
     assert.match(res.body.error, /could not reach/);
   });
 });
+
+describe('speech style per chat', () => {
+  test('a new chat takes the style it is given, polite by default, and ignores junk', async () => {
+    assert.equal((await api<Chat>('POST', '/api/chats', { topic: '', politeness: 'casual' })).body.politeness, 'casual');
+    assert.equal((await newChat()).politeness, 'polite');
+    assert.equal((await api<Chat>('POST', '/api/chats', { politeness: 'rude' })).body.politeness, 'polite');
+  });
+
+  test('the reply uses the chat\'s style, and changing it applies to the next reply', async () => {
+    const chat = (await api<Chat>('POST', '/api/chats', { topic: '', politeness: 'casual' })).body;
+    const titled = (await reply(chat.id)).body;
+    assert.match(calls[0].request.system, /casual plain form/);
+    const patched = await api<Chat>('PATCH', `/api/chats/${chat.id}`, { politeness: 'polite' });
+    assert.equal(patched.body.politeness, 'polite');
+    assert.equal(patched.body.title, titled.title, 'changing the style leaves the title alone');
+    calls.length = 0;
+    await send(chat.id, 'はい');
+    await reply(chat.id);
+    assert.match(calls[0].request.system, /polite です\/ます form/);
+  });
+
+  test('feedback follows the chat\'s style', async () => {
+    const chat = (await api<Chat>('POST', '/api/chats', { topic: '', politeness: 'casual' })).body;
+    await reply(chat.id);
+    const sent = await send(chat.id, 'げんき');
+    calls.length = 0;
+    await analyze(chat.id, sent.body.messages[1].id);
+    assert.match(calls[0].request.system, /The chat is in casual plain form/);
+  });
+
+  test('a rename leaves the style alone', async () => {
+    const chat = (await api<Chat>('POST', '/api/chats', { topic: 'x', politeness: 'casual' })).body;
+    const renamed = await api<Chat>('PATCH', `/api/chats/${chat.id}`, { title: 'New' });
+    assert.equal(renamed.body.politeness, 'casual');
+    assert.equal(renamed.body.title, 'New');
+  });
+});
+
+describe('Genki lesson in the prompts', () => {
+  test('the saved Genki lesson reaches the conversation prompt', async () => {
+    await api('PUT', '/api/settings', { genkiLesson: 5 });
+    const chat = await newChat();
+    await reply(chat.id);
+    assert.match(calls[0].request.system, /covered lessons 1-5/);
+    await api('PUT', '/api/settings', { genkiLesson: 0 });
+  });
+});

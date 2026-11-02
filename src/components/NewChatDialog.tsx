@@ -1,14 +1,16 @@
 import { useState, type FormEvent } from 'react';
+import type { Politeness } from '../../shared/types.ts';
 import { useT } from '../i18n.tsx';
 import { Dialog } from './Dialog.tsx';
 
-export function NewChatDialog({ onStart, onClose }: { onStart: (topic: string) => void; onClose: () => void }) {
+export function NewChatDialog({ onStart, onClose }: { onStart: (topic: string, politeness: Politeness) => void; onClose: () => void }) {
   const t = useT();
   const [topic, setTopic] = useState('');
+  const [politeness, setPoliteness] = useState<Politeness>('polite');
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    onStart(topic.trim());
+    onStart(topic.trim(), politeness);
   };
 
   return (
@@ -26,6 +28,11 @@ export function NewChatDialog({ onStart, onClose }: { onStart: (topic: string) =
           ))}
         </div>
         <p className="muted small">{t.topicHint}</p>
+        <div className="field">
+          <span>{t.politeness}</span>
+          <StyleSwitch value={politeness} onChange={setPoliteness} long />
+          <small className="muted">{t.speechStyleHint}</small>
+        </div>
         <div className="dialog-actions">
           <button type="button" className="secondary" onClick={onClose}>
             {t.cancel}
@@ -36,5 +43,24 @@ export function NewChatDialog({ onStart, onClose }: { onStart: (topic: string) =
         </div>
       </form>
     </Dialog>
+  );
+}
+
+/** Polite / casual as a two-way switch; `long` uses the labels that spell out です/ます and plain form. */
+export function StyleSwitch({ value, onChange, long = false }: { value: Politeness; onChange: (p: Politeness) => void; long?: boolean }) {
+  const t = useT();
+  const options: [Politeness, string][] = [
+    ['polite', long ? t.polite : t.politeShort],
+    ['casual', long ? t.casual : t.casualShort],
+  ];
+  return (
+    <div className={`segmented ${long ? '' : 'segmented-small'}`} role="radiogroup" aria-label={t.politeness}>
+      {options.map(([p, label]) => (
+        <label key={p} className={value === p ? 'active' : ''}>
+          <input type="radio" checked={value === p} onChange={() => onChange(p)} />
+          {label}
+        </label>
+      ))}
+    </div>
   );
 }

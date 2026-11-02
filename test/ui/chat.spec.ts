@@ -121,3 +121,36 @@ test('a failed reply keeps the learner\'s message', async ({ app, request }) => 
   await app.getByRole('button', { name: 'Get a reply' }).click();
   await expect(theirs(app)).toHaveCount(2);
 });
+
+test('a new chat takes the speech style chosen when starting it', async ({ app, request }) => {
+  await app.getByRole('button', { name: '+ New chat' }).first().click();
+  const dialog = app.getByRole('dialog');
+  await expect(dialog.getByRole('radio', { name: 'Polite (です/ます)' })).toBeChecked();
+  await dialog.getByText('Casual (plain form)').click();
+  await dialog.getByRole('button', { name: 'Start' }).click();
+  await expect(theirs(app)).toHaveCount(1);
+  await expect(app.locator('.topbar').getByRole('radio', { name: 'Casual' })).toBeChecked();
+  expect((await chatsOnDisk(request))[0].politeness).toBe('casual');
+});
+
+test('the top bar switches the open chat\'s speech style', async ({ app, request }) => {
+  await startChat(app, 'Style');
+  const topbar = app.locator('.topbar');
+  await expect(topbar.getByRole('radio', { name: 'Polite' })).toBeChecked();
+  await topbar.getByText('Casual', { exact: true }).click();
+  await expect(topbar.getByRole('radio', { name: 'Casual' })).toBeChecked();
+  await expect.poll(async () => (await chatsOnDisk(request))[0].politeness).toBe('casual');
+  await app.reload();
+  await expect(app.locator('.topbar').getByRole('radio', { name: 'Casual' })).toBeChecked();
+});
+
+test('each chat keeps its own speech style', async ({ app }) => {
+  await startChat(app, 'Polite one');
+  await app.getByRole('button', { name: '+ New chat' }).first().click();
+  await app.getByRole('dialog').getByText('Casual (plain form)').click();
+  await app.getByRole('dialog').getByRole('button', { name: 'Start' }).click();
+  await expect(app.locator('.topbar h1')).not.toHaveText('Polite one');
+  await expect(app.locator('.topbar').getByRole('radio', { name: 'Casual' })).toBeChecked();
+  await app.locator('.chat-item', { hasText: 'Polite one' }).locator('.chat-item-main').click();
+  await expect(app.locator('.topbar').getByRole('radio', { name: 'Polite' })).toBeChecked();
+});

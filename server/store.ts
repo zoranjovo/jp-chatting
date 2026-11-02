@@ -6,7 +6,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { DEFAULT_SETTINGS, type Chat, type ChatSummary, type Settings } from '../shared/types.ts';
+import { MAX_GENKI_LESSON } from '../shared/genki.ts';
+import { DEFAULT_SETTINGS, type Chat, type ChatSummary, type Politeness, type Settings } from '../shared/types.ts';
 
 const DEFAULT_DATA_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
 
@@ -68,15 +69,32 @@ async function writeJson(file: string, value: unknown): Promise<void> {
 const CLAUDE_ALIASES: Record<string, string> = { haiku: 'claude-haiku-5-5', sonnet: 'claude-sonnet-5-5', opus: 'claude-opus-5-5' };
 
 /** Fills in fields a settings file from an older version lacks. */
-function withDefaults(saved: Partial<Settings> | null): Settings {
+function withDefaults(saved: (Partial<Settings> & { politeness?: unknown }) | null): Settings {
   const claude = { ...DEFAULT_SETTINGS.claude, ...saved?.claude };
   claude.model = CLAUDE_ALIASES[claude.model] ?? claude.model;
+  // politeness moved to each chat; migrateLegacy() hands it to the chats that predate that.
+  const { politeness: _moved, ...rest } = saved ?? {};
   return {
     ...DEFAULT_SETTINGS,
-    ...saved,
+    ...rest,
     endpoint: { ...DEFAULT_SETTINGS.endpoint, ...saved?.endpoint },
     claude,
   };
+}
+
+/**
+ * Data from before politeness was a per-chat choice: chats without one get the
+ * style the old settings had, and the setting is dropped. Runs at startup;
+ * a no-op once done.
+ */
+export async function migrateLegacy(): Promise<void> {
+  const raw = await readJson<{ politeness?: unknown }>(settingsFile());
+  const legacy: Politeness = raw?.politeness === 'casual' ? 'casual' : 'polite';
+  for (const summary of await listChats()) {
+    const chat = await getChat(summary.id);
+    if (chat && !chat.politeness) await saveChat({ ...chat, politeness: legacy });
+  }
+  if (raw && 'politeness' in raw) await saveSettings({});
 }
 
 export async function getSettings(): Promise<Settings> {
@@ -94,6 +112,7 @@ export function saveSettings(patch: Partial<Settings>): Promise<Settings> {
       claude: { ...current.claude, ...patch.claude },
     });
     next.wkLevel = Math.max(0, Math.min(60, Math.round(Number(next.wkLevel) || 0)));
+    next.genkiLesson = Math.max(0, Math.min(MAX_GENKI_LESSON, Math.round(Number(next.genkiLesson) || 0)));
     await writeJson(settingsFile(), next);
     return next;
   });

@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stripFurigana } from '../shared/kanji.ts';
-import type { Chat, Message, ModelTest, ProviderKind, Settings } from '../shared/types.ts';
+import type { Chat, Message, ModelTest, Politeness, ProviderKind, Settings } from '../shared/types.ts';
 import { AiError, callAi as realCallAi, listModels as realListModels, type AiRequest } from './ai/index.ts';
 import { generateBreakdown, generateFeedback, generateReply } from './generate.ts';
 import { testRequest } from './prompts.ts';
@@ -22,6 +22,8 @@ export interface AppDeps {
 }
 
 class NotFound extends Error {}
+
+const asPoliteness = (v: unknown): Politeness | undefined => (v === 'polite' || v === 'casual' ? v : undefined);
 
 /**
  * Listening on 127.0.0.1 keeps the network out but not web pages: a site can
@@ -74,6 +76,7 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
   async function loadChat(id: string): Promise<Chat> {
     const chat = store.isChatId(id) ? await store.getChat(id) : null;
     if (!chat) throw new NotFound('chat not found');
+    chat.politeness ??= 'polite';
     return chat;
   }
 
@@ -117,19 +120,27 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
     '/api/chats',
     route(async (req, res) => {
       const topic = String(req.body?.topic ?? '').trim();
+      const politeness = asPoliteness(req.body?.politeness) ?? 'polite';
       const time = store.now();
-      const chat: Chat = { id: store.newId(), title: topic, topic, createdAt: time, updatedAt: time, messages: [] };
+      const chat: Chat = { id: store.newId(), title: topic, topic, politeness, createdAt: time, updatedAt: time, messages: [] };
       res.json(await store.saveChat(chat));
     }),
   );
 
   app.get('/api/chats/:id', route(async (req, res) => res.json(await loadChat(String(req.params.id)))));
 
+  /** Rename, or change the speech style; each only when sent. */
   app.patch(
     '/api/chats/:id',
     route(async (req, res) => {
-      const title = String(req.body?.title ?? '').trim();
-      res.json(await updateChat(String(req.params.id), (chat) => void (chat.title = title)));
+      const title = typeof req.body?.title === 'string' ? req.body.title.trim() : undefined;
+      const politeness = asPoliteness(req.body?.politeness);
+      res.json(
+        await updateChat(String(req.params.id), (chat) => {
+          if (title) chat.title = title;
+          if (politeness) chat.politeness = politeness;
+        }),
+      );
     }),
   );
 
@@ -190,7 +201,7 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
         patch = { breakdown: await generateBreakdown(deps.callAi, settings, message) };
       } else {
         const previous = chat.messages.slice(0, index).findLast((m) => m.role === 'assistant');
-        patch = { feedback: await generateFeedback(deps.callAi, settings, message, previous) };
+        patch = { feedback: await generateFeedback(deps.callAi, settings, chat.politeness, message, previous) };
       }
       const saved = await updateChat(id, (c) => {
         const m = c.messages.find((x) => x.id === mid);

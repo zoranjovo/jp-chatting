@@ -13,42 +13,43 @@ import {
   toFeedback,
 } from '../../server/prompts.ts';
 import { allowedKanji } from '../../shared/kanji.ts';
-import { DEFAULT_SETTINGS, type Message, type Settings } from '../../shared/types.ts';
+import { DEFAULT_SETTINGS, type Message, type Politeness, type Settings } from '../../shared/types.ts';
 
 const settings = (patch: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, ...patch });
 const msg = (role: Message['role'], content: string): Message => ({ id: content, role, content, createdAt: '' });
+const chat = (topic = '', politeness: Politeness = 'polite') => ({ topic, politeness });
 
 describe('conversationSystem', () => {
   test('lists exactly the kanji up to the level', () => {
-    const system = conversationSystem(settings({ wkLevel: 3 }), '');
+    const system = conversationSystem(settings({ wkLevel: 3 }), chat(''));
     assert.ok(system.includes(allowedKanji(3).join('')));
     assert.ok(!system.includes(allowedKanji(4).join('')));
     assert.match(system, /levels 1-3/);
   });
 
   test('level 0 forbids kanji entirely', () => {
-    const system = conversationSystem(settings({ wkLevel: 0 }), '');
+    const system = conversationSystem(settings({ wkLevel: 0 }), chat(''));
     assert.match(system, /Do not use any kanji at all/);
   });
 
   test('follows the speech style setting', () => {
-    assert.match(conversationSystem(settings({ politeness: 'polite' }), ''), /です\/ます/);
-    assert.match(conversationSystem(settings({ politeness: 'casual' }), ''), /casual plain form/);
+    assert.match(conversationSystem(settings(), chat('', 'polite')), /です\/ます/);
+    assert.match(conversationSystem(settings(), chat('', 'casual')), /casual plain form/);
   });
 
   test('includes the topic when there is one', () => {
-    assert.match(conversationSystem(settings(), '  Ordering at a café '), /scenario for this chat.*Ordering at a café\./);
-    assert.match(conversationSystem(settings(), '   '), /No topic was chosen/);
+    assert.match(conversationSystem(settings(), chat('  Ordering at a café ')), /scenario for this chat.*Ordering at a café\./);
+    assert.match(conversationSystem(settings(), chat('   ')), /No topic was chosen/);
   });
 
   test('asks for furigana markup with hiragana readings, and none on kana', () => {
-    const system = conversationSystem(settings(), '');
+    const system = conversationSystem(settings(), chat(''));
     assert.match(system, /\{kanji\|reading\}\. The reading is always hiragana -- never romaji, never katakana/);
     assert.match(system, /Words written only in kana \(コーヒー, カフェ, ありがとう\) never get markup/);
   });
 
   test('asks for Japanese only, shown verbatim, with no comments on its own writing', () => {
-    const system = conversationSystem(settings(), '');
+    const system = conversationSystem(settings(), chat(''));
     assert.match(system, /Write only in Japanese/);
     assert.match(system, /shown to the learner exactly as written/);
     assert.match(system, /Never comment on your own writing/);
@@ -114,18 +115,18 @@ describe('breakdownRequest', () => {
 
 describe('feedbackRequest', () => {
   test('includes the message being replied to, without markup', () => {
-    const req = feedbackRequest(settings(), msg('user', 'はい'), msg('assistant', '{元気|げんき}ですか？'));
+    const req = feedbackRequest(settings(), 'polite', msg('user', 'はい'), msg('assistant', '{元気|げんき}ですか？'));
     assert.match(req.turns[0].content, /replying to:\n元気ですか？/);
     assert.match(req.turns[0].content, /Their message:\nはい$/);
   });
 
   test('works for a first message with nothing before it', () => {
-    const req = feedbackRequest(settings(), msg('user', 'hello'), undefined);
+    const req = feedbackRequest(settings(), 'polite', msg('user', 'hello'), undefined);
     assert.ok(!req.turns[0].content.includes('replying to'));
   });
 
   test('corrections follow the chat\'s speech style and kanji level', () => {
-    const req = feedbackRequest(settings({ politeness: 'casual', wkLevel: 0 }), msg('user', 'x'), undefined);
+    const req = feedbackRequest(settings({ wkLevel: 0 }), 'casual', msg('user', 'x'), undefined);
     assert.match(req.system, /casual plain form/);
     assert.match(req.system, /Do not use any kanji/);
   });
@@ -206,7 +207,7 @@ describe('toFeedback', () => {
 describe('English in breakdowns and feedback', () => {
   test('both prompts ask for Japanese without 「」 and allow markdown emphasis', () => {
     const m = msg('assistant', 'はい');
-    for (const req of [breakdownRequest(m), feedbackRequest(settings(), msg('user', 'はい'), m)]) {
+    for (const req of [breakdownRequest(m), feedbackRequest(settings(), 'polite', msg('user', 'はい'), m)]) {
       assert.match(req.system, /no 「」 brackets or quotation marks/);
       assert.match(req.system, /\*\*bold\*\* or \*italic\*/);
     }
@@ -217,7 +218,7 @@ describe('feedback with a translation of what the learner wrote', () => {
   test('the schema and prompt ask for it', () => {
     const items = (FEEDBACK_SCHEMA as any).properties.lines.items;
     assert.ok(items.required.includes('originalTranslation'));
-    const req = feedbackRequest(settings(), msg('user', 'x'), undefined);
+    const req = feedbackRequest(settings(), 'polite', msg('user', 'x'), undefined);
     assert.match(req.system, /originalTranslation \(what the original literally says in English, mistakes and all/);
   });
 
@@ -232,5 +233,55 @@ describe('testRequest', () => {
     assert.equal(req.turns.length, 1);
     assert.equal(req.turns[0].role, 'user');
     assert.match(req.turns[0].content, /^Hi!.*test response/);
+  });
+});
+
+describe('Genki lessons', () => {
+  test('not using Genki adds nothing about it', () => {
+    const s = settings({ genkiLesson: 0 });
+    assert.ok(!conversationSystem(s, chat()).includes('Genki'));
+    assert.ok(!feedbackRequest(s, 'polite', msg('user', 'x'), undefined).system.includes('Genki'));
+    assert.ok(!breakdownRequest(msg('assistant', 'x'), 0).system.includes('Genki'));
+  });
+
+  test('the conversation keeps to the grammar of lessons 1..N, listed', () => {
+    const system = conversationSystem(settings({ genkiLesson: 6 }), chat());
+    assert.match(system, /covered lessons 1-6 \(Genki I\)/);
+    assert.match(system, /L1: X は Y です/);
+    assert.match(system, /L6: te-form/);
+    assert.ok(!system.includes('L7:'), 'nothing from later lessons');
+    assert.match(system, /Do not use grammar from later lessons/);
+  });
+
+  test('Genki II from lesson 13', () => {
+    assert.match(conversationSystem(settings({ genkiLesson: 13 }), chat()), /lessons 1-13 \(Genki II\)/);
+  });
+
+  test('casual speech before lesson 8 is kept very simple', () => {
+    assert.match(conversationSystem(settings({ genkiLesson: 5 }), chat('', 'casual')), /Plain \(casual\) forms come in lesson 8/);
+    assert.ok(!conversationSystem(settings({ genkiLesson: 5 }), chat('', 'polite')).includes('Plain (casual) forms come in lesson 8'));
+    assert.ok(!conversationSystem(settings({ genkiLesson: 9 }), chat('', 'casual')).includes('Plain (casual) forms come in lesson 8'));
+  });
+
+  test('feedback keeps corrections to known grammar and names the lesson for anything later', () => {
+    const req = feedbackRequest(settings({ genkiLesson: 4 }), 'polite', msg('user', 'x'), undefined);
+    assert.match(req.system, /covered lessons 1-4\. Corrected Japanese should use grammar from those lessons/);
+    assert.match(req.system, /which Genki lesson teaches it/);
+  });
+
+  test('breakdowns name the Genki lesson for grammar points', () => {
+    assert.match(breakdownRequest(msg('assistant', 'x'), 6).system, /te-form \(Genki L6\)/);
+  });
+});
+
+describe('citing Genki lessons', () => {
+  test('breakdowns and feedback get the whole syllabus to cite from, only when using Genki', () => {
+    const withGenki = [breakdownRequest(msg('assistant', 'x'), 3).system, feedbackRequest(settings({ genkiLesson: 3 }), 'polite', msg('user', 'x'), undefined).system];
+    for (const system of withGenki) {
+      assert.match(system, /cite only these lessons/);
+      assert.match(system, /L7: 〜ている/);
+      assert.match(system, /L23: causative-passive/);
+    }
+    assert.ok(!breakdownRequest(msg('assistant', 'x'), 0).system.includes('cite only these lessons'));
   });
 });

@@ -8,3 +8,6 @@ playwright-report/
 
 # Built from davidluzgouveia/kanji-data by `pnpm kanji` (runs on install)
 shared/wanikani-kanji.json
+
+# Worktrees made by Claude Code sessions
+.claude/worktrees/

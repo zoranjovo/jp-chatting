@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { DEFAULT_SETTINGS, type Chat, type ChatSummary, type Message, type Settings } from '../shared/types.ts';
+import { DEFAULT_SETTINGS, type Chat, type ChatSummary, type Message, type Politeness, type Settings } from '../shared/types.ts';
 import { api } from './api.ts';
 import { ChatView } from './components/ChatView.tsx';
-import { NewChatDialog } from './components/NewChatDialog.tsx';
+import { NewChatDialog, StyleSwitch } from './components/NewChatDialog.tsx';
 import { SettingsDialog } from './components/SettingsDialog.tsx';
 import { Sidebar } from './components/Sidebar.tsx';
 import { LanguageProvider, useT } from './i18n.tsx';
@@ -94,9 +94,9 @@ function Shell({ loadError }: { loadError: string | null }) {
     }
   }, [show, refreshList, setBusy]);
 
-  const startChat = async (topic: string) => {
+  const startChat = async (topic: string, politeness: Politeness) => {
     setDialog(null);
-    const created = await api.createChat(topic);
+    const created = await api.createChat(topic, politeness);
     activeId.current = created.id;
     setChat(created);
     setNavOpen(false);
@@ -113,6 +113,12 @@ function Shell({ loadError }: { loadError: string | null }) {
     } catch (err) {
       setErrors((e) => ({ ...e, [id]: (err as Error).message }));
     }
+  };
+
+  /** Applies to the partner's next reply and to feedback from now on; earlier messages stay as they were. */
+  const changeStyle = async (politeness: Politeness) => {
+    if (!chat) return;
+    show(await api.setPoliteness(chat.id, politeness));
   };
 
   const rename = async (id: string, title: string) => {
@@ -150,6 +156,7 @@ function Shell({ loadError }: { loadError: string | null }) {
             ☰
           </button>
           <h1 className="jp">{chat ? chat.title || t.untitled : t.appName}</h1>
+          {chat && <StyleSwitch value={chat.politeness} onChange={changeStyle} />}
           <button type="button" className="icon-button topbar-new" onClick={() => setDialog('new')} aria-label={t.newChat} title={t.newChat}>
             +
           </button>

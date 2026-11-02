@@ -8,7 +8,7 @@ export const TEST_SETTINGS: Partial<Settings> = {
   uiLanguage: 'en',
   wkLevel: 10,
   furigana: true,
-  politeness: 'polite',
+  genkiLesson: 0,
   romajiInput: true,
   provider: 'endpoint',
   endpoint: { baseUrl: `${MOCK_URL}/v1`, apiKey: '', model: 'mock-small' },

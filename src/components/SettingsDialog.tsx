@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { genkiBook, MAX_GENKI_LESSON } from '../../shared/genki.ts';
 import { allowedKanji, MAX_WK_LEVEL } from '../../shared/kanji.ts';
 import { DEFAULT_SETTINGS, type ClaudeEffort, type ModelList, type Settings } from '../../shared/types.ts';
 import { api } from '../api.ts';
@@ -107,11 +108,16 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
         </label>
 
         <label className="field">
-          <span>{t.politeness}</span>
-          <select value={draft.politeness} onChange={(e) => set('politeness', e.target.value as Settings['politeness'])}>
-            <option value="polite">{t.polite}</option>
-            <option value="casual">{t.casual}</option>
+          <span>{t.genkiLabel}</span>
+          <select value={draft.genkiLesson} onChange={(e) => set('genkiLesson', Number(e.target.value))}>
+            <option value={0}>{t.genkiNone}</option>
+            {Array.from({ length: MAX_GENKI_LESSON }, (_, i) => i + 1).map((lesson) => (
+              <option key={lesson} value={lesson}>
+                {t.genkiLesson(genkiBook(lesson), lesson)}
+              </option>
+            ))}
           </select>
+          <small className="muted">{draft.genkiLesson > 0 ? t.genkiHint(draft.genkiLesson) : t.genkiNoneHint}</small>
         </label>
 
         <label className="check">

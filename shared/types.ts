@@ -9,8 +9,9 @@ export interface Settings {
   uiLanguage: UiLanguage;
   /** Highest WaniKani level whose kanji the AI may use. 0 means kana only. */
   wkLevel: number;
+  /** The Genki lesson the learner has studied up to; the AI keeps to grammar from lessons 1..N. 0 means not using Genki. */
+  genkiLesson: number;
   furigana: boolean;
-  politeness: Politeness;
   /** Convert romaji to kana while typing in the chat box. */
   romajiInput: boolean;
   provider: ProviderKind;
@@ -32,8 +33,8 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   uiLanguage: 'en',
   wkLevel: 5,
+  genkiLesson: 0,
   furigana: true,
-  politeness: 'polite',
   romajiInput: true,
   provider: 'endpoint',
   endpoint: { baseUrl: 'http://localhost:1234/v1', apiKey: '', model: '' },
@@ -83,6 +84,8 @@ export interface Chat {
   id: string;
   title: string;
   topic: string;
+  /** The partner's speech style in this chat. */
+  politeness: Politeness;
   createdAt: string;
   updatedAt: string;
   messages: Message[];

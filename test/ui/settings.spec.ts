@@ -79,11 +79,21 @@ test('Cancel discards changes', async ({ app, request }) => {
   expect(s.uiLanguage).toBe('en');
 });
 
-test('speech style is saved', async ({ app, request }) => {
+test('the Genki lesson is saved, and its hint follows the choice', async ({ app, request }) => {
   const dialog = await openSettings(app);
-  await dialog.getByLabel('Partner’s speech style').selectOption('casual');
+  const genki = dialog.getByLabel('Genki lesson');
+  await expect(genki).toHaveValue('0');
+  await expect(dialog).toContainText('Pick the last Genki lesson you’ve studied');
+  await expect(genki.locator('option')).toHaveCount(24);
+  await genki.selectOption({ label: 'Genki II · Lesson 14' });
+  await expect(dialog).toContainText('grammar from Genki lessons 1–14');
   await dialog.getByRole('button', { name: 'Save' }).click();
-  await expect.poll(async () => (await saved(request)).politeness).toBe('casual');
+  await expect.poll(async () => (await saved(request)).genkiLesson).toBe(14);
+});
+
+test('speech style is no longer a setting', async ({ app }) => {
+  const dialog = await openSettings(app);
+  await expect(dialog.getByText('Partner’s speech style')).toHaveCount(0);
 });
 
 test('the endpoint\'s models are listed and the choice is saved', async ({ app, request }) => {

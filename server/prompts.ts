@@ -4,7 +4,8 @@
 
 import { allowedKanji, stripFurigana } from '../shared/kanji.ts';
 import type { ReplyProblems } from '../shared/quality.ts';
-import type { Breakdown, Feedback, Message, Settings } from '../shared/types.ts';
+import { genkiBook, genkiGrammarThrough, MAX_GENKI_LESSON } from '../shared/genki.ts';
+import type { Breakdown, Chat, Feedback, Message, Politeness, Settings } from '../shared/types.ts';
 import type { ChatTurn } from './ai/index.ts';
 
 /** Stands in for the learner's first turn, so every history starts with a user message. */
@@ -19,22 +20,44 @@ ${allowedKanji(level).join('')}
 Use no other kanji at all. Any word that needs a kanji outside that list must be written in hiragana instead (katakana for loanwords). Check every kanji you write against the list; if you are unsure about one, write that word in hiragana.`;
 }
 
-function styleRule(settings: Settings): string {
-  return settings.politeness === 'casual'
+function styleRule(politeness: Politeness): string {
+  return politeness === 'casual'
     ? 'Speech style: casual plain form (だ/る form, like talking with a friend). No です/ます.'
     : 'Speech style: polite です/ます form.';
 }
 
-export function conversationSystem(settings: Settings, topic: string): string {
+/** For citing lessons: the whole syllabus, so the model names the right one instead of guessing. */
+function genkiSyllabus(): string {
+  return `Genki's grammar by lesson -- cite only these lessons:
+${genkiGrammarThrough(MAX_GENKI_LESSON)}`;
+}
+
+/** Plain forms are taught in Genki lesson 8. */
+const PLAIN_FORM_LESSON = 8;
+
+/** Grammar limited to the Genki lessons studied so far; empty when the learner isn't using Genki. */
+function genkiRule(lesson: number, politeness: Politeness): string {
+  if (lesson <= 0) return '';
+  const early = politeness === 'casual' && lesson < PLAIN_FORM_LESSON
+    ? ` Plain (casual) forms come in lesson ${PLAIN_FORM_LESSON}, which they haven't reached, but they chose casual speech for this chat: keep casual sentences very short and simple.`
+    : '';
+  return `Grammar: the learner studies with the Genki textbooks and has covered lessons 1-${lesson} (Genki ${genkiBook(lesson)}). Use only grammar from those lessons:
+${genkiGrammarThrough(lesson)}
+Do not use grammar from later lessons -- if an idea needs it, say it more simply with grammar they know. Choose vocabulary a Genki student at this point would know.${early}`;
+}
+
+export function conversationSystem(settings: Settings, chat: Pick<Chat, 'topic' | 'politeness'>): string {
+  const topic = chat.topic;
+  const genki = genkiRule(settings.genkiLesson, chat.politeness);
   return `You are a friendly Japanese conversation partner for an English speaker who is learning Japanese. You are chatting by text message.
 
 Rules:
 - Write only in Japanese. Never write English or romaji, even when the learner writes in English -- then just answer in simple Japanese as if they had said it in Japanese.
 - Keep each message short: one to three short sentences with beginner-level grammar and vocabulary. Usually end with something easy to answer, such as a simple question.
-- ${styleRule(settings)}
+- ${styleRule(chat.politeness)}
 - Do not correct the learner's mistakes or explain grammar; a separate tool does that. Keep the conversation going naturally, guessing what they meant if needed.
 - ${topic.trim() ? `Topic or scenario for this chat, chosen by the learner: ${topic.trim()}. Stay in it (play a role if it calls for one).` : 'No topic was chosen: start with an everyday topic and follow wherever the learner takes it.'}
-- ${kanjiRule(settings.wkLevel)}
+- ${kanjiRule(settings.wkLevel)}${genki ? `\n- ${genki}` : ''}
 - ${FURIGANA_RULE}
 - Your output is shown to the learner exactly as written, as your chat message. Write only the message itself: no name label, quotes, translation, romaji, English or notes. Never comment on your own writing -- if you notice a mistake, just write the corrected message.`;
 }
@@ -102,18 +125,20 @@ export const FEEDBACK_SCHEMA = object({
 /** For the English parts of a breakdown or feedback, which the UI renders with inline markdown. */
 const ENGLISH_RULE = 'In the English text, write Japanese words and phrases as they are, with no 「」 brackets or quotation marks around them. For emphasis you may use **bold** or *italic*.';
 
-export function breakdownRequest(message: Message): { system: string; turns: ChatTurn[] } {
+export function breakdownRequest(message: Message, genkiLesson = 0): { system: string; turns: ChatTurn[] } {
   return {
     system: `You are a patient Japanese teacher. An English-speaking beginner wants to understand a Japanese message line by line.
 
 Split the message into lines -- usually one sentence each, but join short sentences or split long ones wherever that makes the translation and explanation clearer. Cover the whole message, in order, without skipping anything. For each line give:
 - japanese: the Japanese text of the line, copied exactly as in the message -- never turn kana into kanji or change any wording.
 - translation: a natural English translation.
-- explanation: a brief explanation in English of how the line is built -- the grammar, particles, conjugations and set phrases that matter, in one to three sentences. Keep it beginner-friendly.
+- explanation: a brief explanation in English of how the line is built -- the grammar, particles, conjugations and set phrases that matter, in one to three sentences. Keep it beginner-friendly.${genkiLesson > 0 ? ' The learner studies with Genki: when a grammar point is taught in a Genki lesson, name it, e.g. "te-form (Genki L6)" -- take the lesson from the list below.' : ''}
 - words: each word or particle in the line, in order: text (as written in the message), reading (in hiragana -- never romaji; a katakana word keeps its katakana), meaning (a short English gloss or the particle's role).
 
 ${FURIGANA_RULE.replace('Furigana: give', 'In japanese and words.text, give')}
-
+${genkiLesson > 0 ? `
+${genkiSyllabus()}
+` : ''}
 ${ENGLISH_RULE}
 
 Answer with JSON only, matching the schema.`,
@@ -121,7 +146,7 @@ Answer with JSON only, matching the schema.`,
   };
 }
 
-export function feedbackRequest(settings: Settings, message: Message, previous: Message | undefined): { system: string; turns: ChatTurn[] } {
+export function feedbackRequest(settings: Settings, politeness: Politeness, message: Message, previous: Message | undefined): { system: string; turns: ChatTurn[] } {
   return {
     system: `You are a kind but honest Japanese teacher. An English-speaking beginner is practising Japanese by chatting, and wants feedback on a message they wrote. They may have written in Japanese, in English, or a mix.
 
@@ -132,8 +157,10 @@ Give:
 - summary: one or two encouraging sentences in English about how they did and the most important thing to learn.
 - lines: the message split into lines (usually one sentence each). For each: original (what they wrote), originalTranslation (what the original literally says in English, mistakes and all, so they can see what they actually said; for English input, repeat it), corrected (the natural Japanese), translation (English of the corrected version), explanation (in English, briefly: what was wrong and why, or why it is right; for English input, how the Japanese is built), ok (true when the original needed no change).
 
-The chat is in ${settings.politeness === 'casual' ? 'casual plain form' : 'polite です/ます form'}; use that style in your corrections, and mention it only if their style is inconsistent.
-${kanjiRule(settings.wkLevel)} This applies to corrected Japanese; quote the learner's own text as they wrote it.
+The chat is in ${politeness === 'casual' ? 'casual plain form' : 'polite です/ます form'}; use that style in your corrections, and mention it only if their style is inconsistent.
+${settings.genkiLesson > 0 ? `The learner studies with Genki and has covered lessons 1-${settings.genkiLesson}. Corrected Japanese should use grammar from those lessons where it can; if the natural fix needs later grammar, keep it and say in the explanation which Genki lesson teaches it.
+${genkiSyllabus()}
+` : ''}${kanjiRule(settings.wkLevel)} This applies to corrected Japanese; quote the learner's own text as they wrote it.
 ${FURIGANA_RULE.replace('Furigana: give', 'In corrected Japanese, give')}
 
 ${ENGLISH_RULE}

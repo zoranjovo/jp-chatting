@@ -12,7 +12,7 @@ before(async () => {
 });
 after(clearTempData);
 
-const chat = (id: string, updatedAt: string): Chat => ({ id, title: id, topic: '', createdAt: updatedAt, updatedAt, messages: [] });
+const chat = (id: string, updatedAt: string): Chat => ({ id, title: id, topic: '', politeness: 'polite', createdAt: updatedAt, updatedAt, messages: [] });
 
 describe('settings', () => {
   test('defaults when nothing is saved', async () => {
@@ -54,12 +54,12 @@ describe('settings', () => {
   test('saves made at the same moment all stick, with no temp files left behind', async () => {
     await Promise.all([
       store.saveSettings({ furigana: false }),
-      store.saveSettings({ politeness: 'casual' }),
+      store.saveSettings({ genkiLesson: 7 }),
       store.saveSettings({ uiLanguage: 'ja' }),
       store.saveSettings({ romajiInput: false }),
     ]);
     const s = await store.getSettings();
-    assert.deepEqual([s.furigana, s.politeness, s.uiLanguage, s.romajiInput], [false, 'casual', 'ja', false]);
+    assert.deepEqual([s.furigana, s.genkiLesson, s.uiLanguage, s.romajiInput], [false, 7, 'ja', false]);
     const files = await fs.readdir(dir);
     assert.ok(!files.some((f) => f.endsWith('.tmp')), files.join());
     JSON.parse(await fs.readFile(path.join(dir, 'settings.json'), 'utf8'));
@@ -136,5 +136,41 @@ describe('settings migration', () => {
   test('a full model id is kept as is', async () => {
     await fs.writeFile(path.join(dir, 'settings.json'), JSON.stringify({ claude: { model: 'claude-opus-5-5' } }));
     assert.equal((await store.getSettings()).claude.model, 'claude-opus-5-5');
+  });
+});
+
+describe('Genki lesson', () => {
+  test('defaults to 0 (not using Genki) and is clamped to 0-23', async () => {
+    assert.equal(DEFAULT_SETTINGS.genkiLesson, 0);
+    assert.equal((await store.saveSettings({ genkiLesson: 40 })).genkiLesson, 23);
+    assert.equal((await store.saveSettings({ genkiLesson: -2 })).genkiLesson, 0);
+    assert.equal((await store.saveSettings({ genkiLesson: 12 })).genkiLesson, 12);
+  });
+});
+
+describe('migrating speech style from settings to chats', () => {
+  test('old chats get the old setting, the setting is dropped, and new chats are untouched', async () => {
+    await fs.writeFile(path.join(dir, 'settings.json'), JSON.stringify({ wkLevel: 9, politeness: 'casual' }));
+    const { politeness: _old, ...legacyChat } = chat('legacy', '2026-01-05T00:00:00.000Z');
+    await fs.writeFile(path.join(dir, 'chats', 'legacy.json'), JSON.stringify(legacyChat));
+    await store.saveChat({ ...chat('modern', '2026-01-06T00:00:00.000Z'), politeness: 'polite' });
+
+    await store.migrateLegacy();
+
+    assert.equal((await store.getChat('legacy'))!.politeness, 'casual');
+    assert.equal((await store.getChat('modern'))!.politeness, 'polite');
+    const raw = JSON.parse(await fs.readFile(path.join(dir, 'settings.json'), 'utf8'));
+    assert.ok(!('politeness' in raw));
+    assert.equal(raw.wkLevel, 9, 'other settings are kept');
+  });
+
+  test('without an old setting, old chats become polite; running again changes nothing', async () => {
+    const { politeness: _old, ...legacyChat } = chat('legacy2', '2026-01-07T00:00:00.000Z');
+    await fs.writeFile(path.join(dir, 'chats', 'legacy2.json'), JSON.stringify(legacyChat));
+    await store.migrateLegacy();
+    assert.equal((await store.getChat('legacy2'))!.politeness, 'polite');
+    const before = await fs.readFile(path.join(dir, 'chats', 'legacy.json'), 'utf8');
+    await store.migrateLegacy();
+    assert.equal(await fs.readFile(path.join(dir, 'chats', 'legacy.json'), 'utf8'), before);
   });
 });

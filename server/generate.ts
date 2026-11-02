@@ -3,7 +3,7 @@
 // and scripts/eval-prompts.ts both go through here.
 
 import { autoFix, dropKanaFurigana, problemCount, replyProblems, salvageFromForeign } from '../shared/quality.ts';
-import type { Breakdown, Chat, Feedback, Message, Settings } from '../shared/types.ts';
+import type { Breakdown, Chat, Feedback, Message, Politeness, Settings } from '../shared/types.ts';
 import type { AiRequest } from './ai/index.ts';
 import {
   BREAKDOWN_SCHEMA,
@@ -26,14 +26,14 @@ export type CallAi = (request: AiRequest, settings: Settings) => Promise<unknown
  * isn't clean, one fresh reply is drawn. The candidate with the fewest
  * problems wins, earliest first on a tie.
  */
-export async function generateReply(callAi: CallAi, settings: Settings, chat: Pick<Chat, 'topic' | 'messages'>): Promise<string> {
+export async function generateReply(callAi: CallAi, settings: Settings, chat: Pick<Chat, 'topic' | 'politeness' | 'messages'>): Promise<string> {
   const level = settings.wkLevel;
   const score = (text: string) => problemCount(replyProblems(text, level));
   const tidy = (raw: unknown) => {
     const text = autoFix(String(raw), level);
     return score(text) > 0 ? (salvageFromForeign(text, level) ?? text) : text;
   };
-  const draft = () => callAi({ system: conversationSystem(settings, chat.topic), turns: conversationTurns(chat.messages) }, settings);
+  const draft = () => callAi({ system: conversationSystem(settings, chat), turns: conversationTurns(chat.messages) }, settings);
 
   const candidates = [tidy(await draft())];
   const best = () => candidates.reduce((a, b) => (score(b) < score(a) ? b : a));
@@ -52,7 +52,7 @@ export async function generateReply(callAi: CallAi, settings: Settings, chat: Pi
 }
 
 export async function generateBreakdown(callAi: CallAi, settings: Settings, message: Message): Promise<Breakdown> {
-  const b = toBreakdown(await callAi({ ...breakdownRequest(message), schema: BREAKDOWN_SCHEMA }, settings));
+  const b = toBreakdown(await callAi({ ...breakdownRequest(message, settings.genkiLesson), schema: BREAKDOWN_SCHEMA }, settings));
   for (const line of b.lines) {
     line.japanese = dropKanaFurigana(line.japanese);
     for (const w of line.words) w.text = dropKanaFurigana(w.text);
@@ -60,8 +60,14 @@ export async function generateBreakdown(callAi: CallAi, settings: Settings, mess
   return b;
 }
 
-export async function generateFeedback(callAi: CallAi, settings: Settings, message: Message, previous: Message | undefined): Promise<Feedback> {
-  const f = toFeedback(await callAi({ ...feedbackRequest(settings, message, previous), schema: FEEDBACK_SCHEMA }, settings));
+export async function generateFeedback(
+  callAi: CallAi,
+  settings: Settings,
+  politeness: Politeness,
+  message: Message,
+  previous: Message | undefined,
+): Promise<Feedback> {
+  const f = toFeedback(await callAi({ ...feedbackRequest(settings, politeness, message, previous), schema: FEEDBACK_SCHEMA }, settings));
   f.corrected = autoFix(f.corrected, settings.wkLevel);
   for (const line of f.lines) line.corrected = autoFix(line.corrected, settings.wkLevel);
   return f;

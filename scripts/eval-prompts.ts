@@ -14,7 +14,7 @@ import { callAi } from '../server/ai/index.ts';
 import { generateBreakdown, generateFeedback, generateReply, type CallAi } from '../server/generate.ts';
 import { stripFurigana } from '../shared/kanji.ts';
 import { problemCount, replyProblems, type ReplyProblems } from '../shared/quality.ts';
-import { DEFAULT_SETTINGS, type Breakdown, type Feedback, type Message, type Settings } from '../shared/types.ts';
+import { DEFAULT_SETTINGS, type Breakdown, type Feedback, type Message, type Politeness, type Settings } from '../shared/types.ts';
 
 const OUT_DIR = path.join(import.meta.dirname, '..', '.cache', 'eval');
 const msg = (role: Message['role'], content: string, id = content): Message => ({ id, role, content, createdAt: '' });
@@ -25,7 +25,9 @@ interface ReplyCase {
   kind: 'reply';
   name: string;
   level: number;
-  politeness: Settings['politeness'];
+  /** Genki lesson studied up to; 0 or absent means not using Genki. */
+  genki?: number;
+  politeness: Politeness;
   topic: string;
   messages: Message[];
 }
@@ -33,12 +35,14 @@ interface BreakdownCase {
   kind: 'breakdown';
   name: string;
   level: number;
+  genki?: number;
   message: string;
 }
 interface FeedbackCase {
   kind: 'feedback';
   name: string;
   level: number;
+  genki?: number;
   previous: string;
   message: string;
   verdicts: Feedback['verdict'][];
@@ -102,7 +106,33 @@ const CASES: Case[] = [
     verdicts: ['minor', 'incorrect'],
     expect: ['みました', '{見|み}ました', '見ました'],
   },
+  // Genki: the same kinds of scenario with the grammar limited to early lessons.
+  { kind: 'reply', name: 'genki · opener · café · lesson 3', level: 10, genki: 3, politeness: 'polite', topic: 'Ordering at a café', messages: [] },
+  {
+    kind: 'reply',
+    name: 'genki · turn · weekend · lesson 4',
+    level: 10,
+    genki: 4,
+    politeness: 'polite',
+    topic: '',
+    messages: [msg('assistant', '{週末|しゅうまつ}は{何|なに}をしましたか？'), msg('user', 'ともだちと えいがを みました。')],
+  },
+  { kind: 'reply', name: 'genki · opener · casual · lesson 9', level: 15, genki: 9, politeness: 'casual', topic: 'Hobbies', messages: [] },
+  {
+    kind: 'breakdown',
+    name: 'genki · breakdown names lessons',
+    level: 20,
+    genki: 12,
+    message: 'すみません、ちょっと{待|ま}ってください。{今|いま}、{電話|でんわ}をしています。',
+  },
 ];
+
+/**
+ * Grammar a lesson-3/4 Genki student hasn't met: te-forms (L6-7), plain
+ * negatives and 〜たい (L8, L11), past plain forms (L9). A rough net -- read
+ * the outputs too.
+ */
+const BEYOND_EARLY_GENKI = /て(ください|いる|います|いました|も|から)|ないで|たい[ですか。？]|と思|たことが|でしょう|[っいしちにびみり]た[よね。？！]/;
 
 // --- scoring ---
 
@@ -145,6 +175,7 @@ function scoreReply(c: ReplyCase, text: string): Pick<Result, 'problems' | 'chec
       short: [...plain.matchAll(/[。！？!?]/g)].length <= 4 && plain.length <= 120,
       notEmpty: plain.trim().length > 0,
       startsJapanese: /^[぀-ヿ一-鿿{「（]/u.test(text.trim()),
+      ...(c.genki && c.genki < 6 ? { earlyGenkiGrammar: !BEYOND_EARLY_GENKI.test(plain) } : {}),
     },
   };
 }
@@ -184,10 +215,10 @@ function scoreFeedback(c: FeedbackCase, f: Feedback): Pick<Result, 'problems' | 
 
 // --- running ---
 
-function settingsFor(model: string, level: number, politeness: Settings['politeness']): Settings {
+function settingsFor(model: string, level: number, genki = 0): Settings {
   const [provider, name] = model.split(/:(.*)/s);
-  if (provider === 'claude') return { ...DEFAULT_SETTINGS, wkLevel: level, politeness, provider: 'claude', claude: { ...DEFAULT_SETTINGS.claude, model: name, timeoutMs: 240_000 } };
-  return { ...DEFAULT_SETTINGS, wkLevel: level, politeness, provider: 'endpoint', endpoint: { baseUrl: 'http://localhost:1234/v1', apiKey: '', model: name } };
+  if (provider === 'claude') return { ...DEFAULT_SETTINGS, wkLevel: level, genkiLesson: genki, provider: 'claude', claude: { ...DEFAULT_SETTINGS.claude, model: name, timeoutMs: 240_000 } };
+  return { ...DEFAULT_SETTINGS, wkLevel: level, genkiLesson: genki, provider: 'endpoint', endpoint: { baseUrl: 'http://localhost:1234/v1', apiKey: '', model: name } };
 }
 
 async function runCase(model: string, c: Case, sample: number): Promise<Result> {
@@ -201,14 +232,14 @@ async function runCase(model: string, c: Case, sample: number): Promise<Result> 
   const base = { case: c.name, kind: c.kind, sample, calls };
   try {
     if (c.kind === 'reply') {
-      const text = await generateReply(recording, settingsFor(model, c.level, c.politeness), { topic: c.topic, messages: c.messages });
+      const text = await generateReply(recording, settingsFor(model, c.level, c.genki), { topic: c.topic, politeness: c.politeness, messages: c.messages });
       return { ...base, ms: Date.now() - started, output: text, ...scoreReply(c, text) };
     }
     if (c.kind === 'breakdown') {
-      const b = await generateBreakdown(recording, settingsFor(model, c.level, 'polite'), msg('assistant', c.message));
+      const b = await generateBreakdown(recording, settingsFor(model, c.level, c.genki), msg('assistant', c.message));
       return { ...base, ms: Date.now() - started, output: b, ...scoreBreakdown(c, b) };
     }
-    const f = await generateFeedback(recording, settingsFor(model, c.level, 'polite'), msg('user', c.message), msg('assistant', c.previous));
+    const f = await generateFeedback(recording, settingsFor(model, c.level, c.genki), 'polite', msg('user', c.message), msg('assistant', c.previous));
     return { ...base, ms: Date.now() - started, output: f, ...scoreFeedback(c, f) };
   } catch (err) {
     return { ...base, ms: Date.now() - started, error: (err as Error).message, output: null, problems: { kanji: [], furigana: [], foreign: [] }, checks: { ran: false } };

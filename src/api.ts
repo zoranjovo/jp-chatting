@@ -1,4 +1,4 @@
-import type { Chat, ChatSummary, Message, ModelList, ModelTest, ProviderKind, Settings } from '../shared/types.ts';
+import type { Chat, ChatSummary, Message, ModelList, ModelTest, Politeness, ProviderKind, Settings } from '../shared/types.ts';
 
 async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
   const res = await fetch(url, {
@@ -19,8 +19,9 @@ export const api = {
 
   chats: () => request<ChatSummary[]>('GET', '/api/chats'),
   chat: (id: string) => request<Chat>('GET', `/api/chats/${id}`),
-  createChat: (topic: string) => request<Chat>('POST', '/api/chats', { topic }),
+  createChat: (topic: string, politeness: Politeness) => request<Chat>('POST', '/api/chats', { topic, politeness }),
   renameChat: (id: string, title: string) => request<Chat>('PATCH', `/api/chats/${id}`, { title }),
+  setPoliteness: (id: string, politeness: Politeness) => request<Chat>('PATCH', `/api/chats/${id}`, { politeness }),
   deleteChat: (id: string) => request<{ ok: true }>('DELETE', `/api/chats/${id}`),
   send: (id: string, content: string) => request<Chat>('POST', `/api/chats/${id}/messages`, { content }),
   reply: (id: string) => request<Chat>('POST', `/api/chats/${id}/reply`),
