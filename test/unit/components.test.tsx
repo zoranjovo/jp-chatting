@@ -144,7 +144,7 @@ describe('FeedbackView', () => {
   test('labels follow the UI language', () => {
     const html = render(<FeedbackView feedback={feedback} />, { wkLevel: 60, uiLanguage: 'ja' });
     assert.ok(html.includes('おしい！少し直しましょう'));
-    assert.ok(html.includes('言いたかったこと'));
+    assert.ok(html.includes('言ったこと'));
   });
 });
 
@@ -216,15 +216,21 @@ describe('the learner\'s own text', () => {
     assert.ok(!html.includes('Above your WaniKani level'));
   });
 
-  test('a correct line quoted from the learner is not marked, the AI\'s natural version is', () => {
+  test('a line quoted from the learner is not marked, the AI\'s better version is', () => {
     const f: Feedback = {
       ...feedback,
-      corrected: '語',
-      lines: [{ original: '語です', originalTranslation: 't', corrected: '語です', translation: 't', explanation: '', ok: true }],
+      lines: [{ original: '語です', originalTranslation: 't', corrected: '語だ', translation: 't', explanation: '', ok: false }],
     };
     const html = render(<FeedbackView feedback={f} />, { wkLevel: 1 });
-    assert.equal(count(html, 'over-level'), 1, 'only the corrected version in "Natural Japanese"');
-    assert.match(html, /<dd class="line-jp"><span class="jp"><span class="kanji over-level"/);
+    assert.equal(count(html, 'over-level'), 1, 'only the better version');
+    assert.match(html, /fix-row-fix"><div class="line-jp"><span class="jp"><span class="kanji over-level"/);
+  });
+
+  test('the overview shows what they said, not the whole corrected message again', () => {
+    const html = render(<FeedbackView feedback={{ ...feedback, meaning: 'Coffee, please.', corrected: 'ぜんぶ' }} />, { wkLevel: 60 });
+    assert.match(html, /<dt>You said<\/dt><dd>.*Coffee, please\./s);
+    assert.ok(!html.includes('Natural Japanese'));
+    assert.ok(!html.includes('ぜんぶ'));
   });
 });
 
@@ -257,7 +263,7 @@ describe('inline markdown in the AI\'s English', () => {
     assert.ok(!html.includes('*going*'));
   });
 
-  test('explanations, translations and "You meant" all render markdown, with furigana inside', () => {
+  test('explanations, translations and "You said" all render markdown, with furigana inside', () => {
     const f: Feedback = {
       ...feedback,
       meaning: 'I **have** work',

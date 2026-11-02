@@ -122,13 +122,9 @@ export function FeedbackView({ feedback }: { feedback: Feedback }) {
       <div className={`verdict verdict-${feedback.verdict}`}>{t.verdict[feedback.verdict]}</div>
       {feedback.summary && <Explained className="feedback-summary" text={feedback.summary} />}
       <dl className="feedback-overall">
-        <dt>{t.youMeant}</dt>
+        <dt>{t.youSaid}</dt>
         <dd>
           <RichText text={feedback.meaning} />
-        </dd>
-        <dt>{t.naturalJapanese}</dt>
-        <dd className="line-jp">
-          <JpText text={feedback.corrected} />
         </dd>
       </dl>
       <ol className="analysis-lines feedback-lines">
