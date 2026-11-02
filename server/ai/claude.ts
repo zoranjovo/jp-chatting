@@ -45,7 +45,10 @@ export function claudeEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessE
   return out;
 }
 
-export const AUTH_PROBLEM = /authenticat|log ?in|oauth|not logged/i;
+/** The command comes from settings, which the API can change, so nothing but a claude executable is run. */
+export const isClaudeCommand = (command: string) => /^claude(\.exe)?$/i.test(path.win32.basename(command.trim()));
+
+export const AUTH_PROBLEM =/authenticat|log ?in|oauth|not logged/i;
 
 export function claudeArgs(request: AiRequest, config: ClaudeConfig, systemPromptFile: string): string[] {
   return [
@@ -93,6 +96,10 @@ export function billingProblem(apiKeySource: string | null, rateLimit: Record<st
 }
 
 export function callClaude(request: AiRequest, config: ClaudeConfig, spawnProcess: typeof spawn = spawn): Promise<unknown> {
+  const command = config.command.trim() || 'claude';
+  if (!isClaudeCommand(command)) {
+    return Promise.reject(new AiError(`"${command}" is not the claude executable -- set the CLI command in Settings to claude or a path ending in claude.exe`));
+  }
   fs.mkdirSync(WORK_DIR, { recursive: true });
   // A file, not an argument: a long kanji list can pass Windows' command-line limit.
   const systemPromptFile = path.join(WORK_DIR, `system-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`);
@@ -107,7 +114,7 @@ export function callClaude(request: AiRequest, config: ClaudeConfig, spawnProces
     let buffered = '';
     let settled = false;
 
-    const child = spawnProcess(config.command || 'claude', claudeArgs(request, config, systemPromptFile), {
+    const child = spawnProcess(command, claudeArgs(request, config, systemPromptFile), {
       cwd: WORK_DIR,
       env: claudeEnv(),
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -172,7 +179,7 @@ export function callClaude(request: AiRequest, config: ClaudeConfig, spawnProces
       stderr += chunk;
     });
     child.on('error', (err) => {
-      failure = `could not run "${config.command}": ${err.message}`;
+      failure = `could not run "${command}": ${err.message}`;
       done();
     });
     child.on('close', () => {

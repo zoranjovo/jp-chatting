@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
+import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { after, before, beforeEach, describe, test } from 'node:test';
 import { AiError, type AiRequest } from '../../server/ai/index.ts';
-import { createApp } from '../../server/app.ts';
+import { createApp, fromLoopback } from '../../server/app.ts';
 import { BREAKDOWN_SCHEMA, FEEDBACK_SCHEMA } from '../../server/prompts.ts';
 import type { Chat, Message, ModelList, Settings } from '../../shared/types.ts';
 import { clearTempData, useTempData } from './helpers.ts';
@@ -93,6 +94,40 @@ describe('settings API', () => {
     await api('PUT', '/api/settings', { provider: 'claude' });
     assert.deepEqual((await api('POST', '/api/models', {})).body, { models: ['claude-model'] });
     await api('PUT', '/api/settings', { provider: 'endpoint' });
+  });
+});
+
+describe('loopback guard', () => {
+  /** node:http, not fetch, so the Host header is sent exactly as given. */
+  const raw = (method: string, url: string, headers: Record<string, string>) =>
+    new Promise<number>((resolve, reject) => {
+      const req = http.request(base + url, { method, headers }, (res) => {
+        res.resume();
+        resolve(res.statusCode ?? 0);
+      });
+      req.on('error', reject);
+      req.end(method === 'GET' ? undefined : '{"wkLevel":60}');
+    });
+
+  test('a rebound hostname gets nothing', async () => {
+    assert.equal(await raw('GET', '/api/settings', { Host: 'evil.example:5174' }), 403);
+    assert.equal(await raw('PUT', '/api/settings', { Host: 'evil.example:5174', 'Content-Type': 'application/json' }), 403);
+    assert.equal((await api<Settings>('GET', '/api/settings')).body.wkLevel, 5);
+  });
+
+  test('a page from another origin cannot post, even a simple form request', async () => {
+    const port = new URL(base).port;
+    assert.equal(await raw('POST', '/api/chats', { Host: `127.0.0.1:${port}`, Origin: 'https://evil.example', 'Content-Type': 'text/plain' }), 403);
+    assert.equal(await raw('POST', '/api/chats', { Host: `127.0.0.1:${port}`, Origin: 'null', 'Content-Type': 'text/plain' }), 403);
+  });
+
+  test('the app itself, Vite and tools without an Origin get through', () => {
+    assert.ok(fromLoopback('127.0.0.1:5174', undefined));
+    assert.ok(fromLoopback('localhost:5173', 'http://localhost:5173'));
+    assert.ok(fromLoopback('127.0.0.1:5173', 'http://127.0.0.1:5173'));
+    assert.ok(fromLoopback('[::1]:5174', 'http://[::1]:5174'));
+    assert.ok(!fromLoopback('127.0.0.1.evil.example', undefined));
+    assert.ok(!fromLoopback(undefined, undefined));
   });
 });
 

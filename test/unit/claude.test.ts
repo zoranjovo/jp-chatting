@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, test } from 'node:test';
-import { billingProblem, callClaude, claudeArgs, claudeEnv, CLAUDE_MODELS, promptOf } from '../../server/ai/claude.ts';
+import { billingProblem, callClaude, claudeArgs, claudeEnv, CLAUDE_MODELS, isClaudeCommand, promptOf } from '../../server/ai/claude.ts';
 import type { AiRequest } from '../../server/ai/types.ts';
 import { DEFAULT_SETTINGS } from '../../shared/types.ts';
 import { fakeSpawn, INIT_OK, resultEvent } from './helpers.ts';
@@ -148,6 +148,17 @@ describe('callClaude', () => {
     const fake = fakeSpawn({ events: [INIT_OK, resultEvent({ result: 'ok' })] });
     await callClaude(textRequest, { ...config, command: 'C:/tools/claude.exe' }, fake.spawn);
     assert.equal(fake.runs[0].command, 'C:/tools/claude.exe');
+  });
+
+  test('refuses to run anything but a claude executable', async () => {
+    for (const command of ['cmd.exe', 'C:\\Windows\\System32\\powershell.exe', '/bin/sh', 'claude-evil', 'C:/x/claude.exe/../calc.exe']) {
+      const fake = fakeSpawn({ events: [INIT_OK, resultEvent({ result: 'ok' })] });
+      await assert.rejects(callClaude(textRequest, { ...config, command }, fake.spawn), /not the claude executable/, command);
+      assert.equal(fake.runs.length, 0, command);
+    }
+    for (const command of ['claude', 'CLAUDE.EXE', 'C:\\Users\\me\\.local\\bin\\claude.exe', '/usr/local/bin/claude', '']) {
+      assert.ok(isClaudeCommand(command || 'claude'), command);
+    }
   });
 
   test('returns structured_output for a schema request', async () => {

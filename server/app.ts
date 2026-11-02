@@ -22,6 +22,24 @@ export interface AppDeps {
 
 class NotFound extends Error {}
 
+/**
+ * Listening on 127.0.0.1 keeps the network out but not web pages: a site can
+ * rebind its own hostname to 127.0.0.1 (then it is same-origin and can read
+ * and write everything), or post here cross-site. So only loopback hostnames
+ * are answered, and a request a page sends must come from a loopback origin.
+ */
+const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]']);
+
+export function fromLoopback(host: string | undefined, origin: string | undefined): boolean {
+  if (!LOOPBACK.has((host ?? '').replace(/:\d+$/, '').toLowerCase())) return false;
+  if (origin === undefined) return true;
+  try {
+    return LOOPBACK.has(new URL(origin).hostname);
+  } catch {
+    return false;
+  }
+}
+
 function titleFrom(text: string): string {
   const plain = stripFurigana(text).replace(/\s+/g, ' ').trim();
   return plain.length > 24 ? `${plain.slice(0, 24)}…` : plain;
@@ -30,6 +48,10 @@ function titleFrom(text: string): string {
 export function createApp(overrides: Partial<AppDeps> = {}) {
   const deps: AppDeps = { callAi: realCallAi, listModels: realListModels, serveUi: true, ...overrides };
   const app = express();
+  app.use((req, res, next) => {
+    if (fromLoopback(req.headers.host, req.headers.origin)) return next();
+    res.status(403).json({ error: 'only answers requests from this machine' });
+  });
   app.use(express.json({ limit: '1mb' }));
 
   type Handler = (req: Request, res: Response) => Promise<unknown>;
