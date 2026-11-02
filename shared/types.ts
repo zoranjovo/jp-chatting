@@ -1,5 +1,7 @@
 // Shapes shared by the server (which stores them under data/) and the UI.
 
+import type { JlptLevel } from './jlpt.ts';
+
 export type UiLanguage = 'en' | 'ja';
 export type Politeness = 'polite' | 'casual';
 export type ProviderKind = 'endpoint' | 'claude';
@@ -9,8 +11,10 @@ export interface Settings {
   uiLanguage: UiLanguage;
   /** Highest WaniKani level whose kanji the AI may use. 0 means kana only. */
   wkLevel: number;
-  /** The Genki lesson the learner has studied up to; the AI keeps to grammar from lessons 1..N. 0 means not using Genki. */
+  /** The Genki lesson the learner has studied up to; the AI leans on grammar from lessons 1..N (a guide, not a limit). 0 means not using Genki. */
   genkiLesson: number;
+  /** Roughly where the learner is on the JLPT; guides how the AI pitches its Japanese. 0 means not set. */
+  jlptLevel: JlptLevel;
   furigana: boolean;
   /** Convert romaji to kana while typing in the chat box. */
   romajiInput: boolean;
@@ -34,6 +38,7 @@ export const DEFAULT_SETTINGS: Settings = {
   uiLanguage: 'en',
   wkLevel: 5,
   genkiLesson: 0,
+  jlptLevel: 0,
   furigana: true,
   romajiInput: true,
   provider: 'endpoint',

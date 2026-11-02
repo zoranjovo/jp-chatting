@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { callAi } from '../server/ai/index.ts';
 import { generateBreakdown, generateFeedback, generateReply, type CallAi } from '../server/generate.ts';
+import type { JlptLevel } from '../shared/jlpt.ts';
 import { stripFurigana } from '../shared/kanji.ts';
 import { problemCount, replyProblems, type ReplyProblems } from '../shared/quality.ts';
 import { DEFAULT_SETTINGS, type Breakdown, type Feedback, type Message, type Politeness, type Settings } from '../shared/types.ts';
@@ -27,6 +28,8 @@ interface ReplyCase {
   level: number;
   /** Genki lesson studied up to; 0 or absent means not using Genki. */
   genki?: number;
+  /** JLPT level as a guide; 0 or absent means not set. */
+  jlpt?: JlptLevel;
   politeness: Politeness;
   topic: string;
   messages: Message[];
@@ -106,7 +109,7 @@ const CASES: Case[] = [
     verdicts: ['minor', 'incorrect'],
     expect: ['みました', '{見|み}ました', '見ました'],
   },
-  // Genki: the same kinds of scenario with the grammar limited to early lessons.
+  // Genki: the same kinds of scenario with the grammar guided to early lessons.
   { kind: 'reply', name: 'genki · opener · café · lesson 3', level: 10, genki: 3, politeness: 'polite', topic: 'Ordering at a café', messages: [] },
   {
     kind: 'reply',
@@ -125,14 +128,26 @@ const CASES: Case[] = [
     genki: 12,
     message: 'すみません、ちょっと{待|ま}ってください。{今|いま}、{電話|でんわ}をしています。',
   },
+  // JLPT: the same opener pitched at both ends, with kanji not the limiting factor.
+  { kind: 'reply', name: 'jlpt · opener · café · N5', level: 60, jlpt: 5, politeness: 'polite', topic: 'Ordering at a café', messages: [] },
+  { kind: 'reply', name: 'jlpt · opener · café · N2', level: 60, jlpt: 2, politeness: 'polite', topic: 'Ordering at a café', messages: [] },
+  {
+    kind: 'reply',
+    name: 'jlpt · turn · weekend · N4',
+    level: 20,
+    jlpt: 4,
+    politeness: 'polite',
+    topic: '',
+    messages: [msg('assistant', '{週末|しゅうまつ}は{何|なに}をしましたか？'), msg('user', 'ともだちと えいがを みました。')],
+  },
 ];
 
 /**
  * Grammar a lesson-3/4 Genki student hasn't met: te-forms (L6-7), plain
  * negatives and 〜たい (L8, L11), past plain forms (L9). A rough net -- read
- * the outputs too.
+ * the outputs too. Genki is a guide, not a limit, so the odd hit is fine; watch the rate.
  */
-const BEYOND_EARLY_GENKI = /て(ください|いる|います|いました|も|から)|ないで|たい[ですか。？]|と思|たことが|でしょう|[っいしちにびみり]た[よね。？！]/;
+const BEYOND_EARLY_GENKI = /て(ください|いる|います|いました|も|から)|ないで|たい[ですか。？]|と思|たことが|でしょう|(?<!ま)[っいしちにびみり]た[よね。？！]/;
 
 // --- scoring ---
 
@@ -215,10 +230,10 @@ function scoreFeedback(c: FeedbackCase, f: Feedback): Pick<Result, 'problems' | 
 
 // --- running ---
 
-function settingsFor(model: string, level: number, genki = 0): Settings {
+function settingsFor(model: string, level: number, genki = 0, jlpt: JlptLevel = 0): Settings {
   const [provider, name] = model.split(/:(.*)/s);
-  if (provider === 'claude') return { ...DEFAULT_SETTINGS, wkLevel: level, genkiLesson: genki, provider: 'claude', claude: { ...DEFAULT_SETTINGS.claude, model: name, timeoutMs: 240_000 } };
-  return { ...DEFAULT_SETTINGS, wkLevel: level, genkiLesson: genki, provider: 'endpoint', endpoint: { baseUrl: 'http://localhost:1234/v1', apiKey: '', model: name } };
+  if (provider === 'claude') return { ...DEFAULT_SETTINGS, wkLevel: level, genkiLesson: genki, jlptLevel: jlpt, provider: 'claude', claude: { ...DEFAULT_SETTINGS.claude, model: name, timeoutMs: 240_000 } };
+  return { ...DEFAULT_SETTINGS, wkLevel: level, genkiLesson: genki, jlptLevel: jlpt, provider: 'endpoint', endpoint: { baseUrl: 'http://localhost:1234/v1', apiKey: '', model: name } };
 }
 
 async function runCase(model: string, c: Case, sample: number): Promise<Result> {
@@ -232,7 +247,7 @@ async function runCase(model: string, c: Case, sample: number): Promise<Result> 
   const base = { case: c.name, kind: c.kind, sample, calls };
   try {
     if (c.kind === 'reply') {
-      const text = await generateReply(recording, settingsFor(model, c.level, c.genki), { topic: c.topic, politeness: c.politeness, messages: c.messages });
+      const text = await generateReply(recording, settingsFor(model, c.level, c.genki, c.jlpt), { topic: c.topic, politeness: c.politeness, messages: c.messages });
       return { ...base, ms: Date.now() - started, output: text, ...scoreReply(c, text) };
     }
     if (c.kind === 'breakdown') {

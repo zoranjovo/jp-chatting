@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { genkiBook, MAX_GENKI_LESSON } from '../../shared/genki.ts';
+import { asJlptLevel, JLPT_LEVELS } from '../../shared/jlpt.ts';
 import { allowedKanji, MAX_WK_LEVEL } from '../../shared/kanji.ts';
 import { DEFAULT_SETTINGS, type ClaudeEffort, type ModelList, type Settings } from '../../shared/types.ts';
 import { api } from '../api.ts';
@@ -118,6 +119,19 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             ))}
           </select>
           <small className="muted">{draft.genkiLesson > 0 ? t.genkiHint(draft.genkiLesson) : t.genkiNoneHint}</small>
+        </label>
+
+        <label className="field">
+          <span>{t.jlptLabel}</span>
+          <select value={draft.jlptLevel} onChange={(e) => set('jlptLevel', asJlptLevel(e.target.value))}>
+            <option value={0}>{t.jlptNone}</option>
+            {JLPT_LEVELS.map((level) => (
+              <option key={level} value={level}>
+                {t.jlptOption(level)}
+              </option>
+            ))}
+          </select>
+          <small className="muted">{t.jlptHint}</small>
         </label>
 
         <label className="check">

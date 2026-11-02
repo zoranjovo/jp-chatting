@@ -7,6 +7,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { MAX_GENKI_LESSON } from '../shared/genki.ts';
+import { asJlptLevel } from '../shared/jlpt.ts';
 import { DEFAULT_SETTINGS, type Chat, type ChatSummary, type Politeness, type Settings } from '../shared/types.ts';
 
 const DEFAULT_DATA_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
@@ -113,6 +114,7 @@ export function saveSettings(patch: Partial<Settings>): Promise<Settings> {
     });
     next.wkLevel = Math.max(0, Math.min(60, Math.round(Number(next.wkLevel) || 0)));
     next.genkiLesson = Math.max(0, Math.min(MAX_GENKI_LESSON, Math.round(Number(next.genkiLesson) || 0)));
+    next.jlptLevel = asJlptLevel(next.jlptLevel);
     await writeJson(settingsFile(), next);
     return next;
   });

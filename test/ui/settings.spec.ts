@@ -206,3 +206,14 @@ test('with Claude and no model picked, the default can still be tested', async (
   await dialog.getByLabel('Model', { exact: true }).selectOption('');
   await expect(dialog.getByRole('button', { name: 'Test model' })).toBeEnabled();
 });
+
+test('the JLPT level is saved', async ({ app, request }) => {
+  const dialog = await openSettings(app);
+  const jlpt = dialog.getByLabel('JLPT level');
+  await expect(jlpt).toHaveValue('0');
+  await expect(jlpt.locator('option')).toHaveText(['Not set', 'N5 (beginner)', 'N4', 'N3', 'N2', 'N1 (advanced)']);
+  await expect(dialog).toContainText('not a strict limit');
+  await jlpt.selectOption({ label: 'N3' });
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect.poll(async () => (await saved(request)).jlptLevel).toBe(3);
+});

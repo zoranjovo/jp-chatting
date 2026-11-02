@@ -174,3 +174,11 @@ describe('migrating speech style from settings to chats', () => {
     assert.equal(await fs.readFile(path.join(dir, 'chats', 'legacy.json'), 'utf8'), before);
   });
 });
+
+describe('JLPT level setting', () => {
+  test('defaults to not set, keeps 1-5 and drops anything else', async () => {
+    assert.equal(DEFAULT_SETTINGS.jlptLevel, 0);
+    assert.equal((await store.saveSettings({ jlptLevel: 3 })).jlptLevel, 3);
+    assert.equal((await store.saveSettings({ jlptLevel: 9 as never })).jlptLevel, 0);
+  });
+});

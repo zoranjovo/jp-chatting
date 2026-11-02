@@ -244,13 +244,15 @@ describe('Genki lessons', () => {
     assert.ok(!breakdownRequest(msg('assistant', 'x'), 0).system.includes('Genki'));
   });
 
-  test('the conversation keeps to the grammar of lessons 1..N, listed', () => {
+  test('the conversation leans on the grammar of lessons 1..N, listed, as a guide', () => {
     const system = conversationSystem(settings({ genkiLesson: 6 }), chat());
     assert.match(system, /covered lessons 1-6 \(Genki I\)/);
     assert.match(system, /L1: X は Y です/);
     assert.match(system, /L6: te-form/);
     assert.ok(!system.includes('L7:'), 'nothing from later lessons');
-    assert.match(system, /Do not use grammar from later lessons/);
+    assert.match(system, /Build your messages mainly from this grammar/);
+    assert.match(system, /This is a guide, not a hard limit: grammar from a later lesson is fine now and then/);
+    assert.ok(!system.includes('Use only grammar'));
   });
 
   test('Genki II from lesson 13', () => {
@@ -283,5 +285,34 @@ describe('citing Genki lessons', () => {
       assert.match(system, /L23: causative-passive/);
     }
     assert.ok(!breakdownRequest(msg('assistant', 'x'), 0).system.includes('cite only these lessons'));
+  });
+});
+
+describe('JLPT level', () => {
+  test('not set leaves the prompts as they were, beginner wording included', () => {
+    const system = conversationSystem(settings({ jlptLevel: 0 }), chat());
+    assert.ok(!system.includes('JLPT'));
+    assert.match(system, /beginner-level grammar and vocabulary/);
+    assert.ok(!feedbackRequest(settings({ jlptLevel: 0 }), 'polite', msg('user', 'x'), undefined).system.includes('JLPT'));
+  });
+
+  test('a level is a guide on pitch, described, and not a limit', () => {
+    const system = conversationSystem(settings({ jlptLevel: 3 }), chat());
+    assert.match(system, /Level guide: the learner is at about JLPT N3 -- at that level a learner understands everyday Japanese reasonably well/);
+    assert.match(system, /This is a guide, not a hard limit: the kanji rule here comes first\./);
+    assert.match(system, /grammar and vocabulary at the learner's level \(see the level guide\)/);
+    assert.ok(!system.includes('beginner-level grammar'));
+  });
+
+  test('feedback pitches its corrections at the level', () => {
+    const req = feedbackRequest(settings({ jlptLevel: 4 }), 'polite', msg('user', 'x'), undefined);
+    assert.match(req.system, /about JLPT N4: pitch the corrected Japanese and your explanations at that level \(a guide, not a limit\)/);
+  });
+
+  test('works alongside a Genki lesson, which is the more specific guide to grammar', () => {
+    const system = conversationSystem(settings({ jlptLevel: 5, genkiLesson: 3 }), chat());
+    assert.match(system, /covered lessons 1-3/);
+    assert.match(system, /JLPT N5/);
+    assert.match(system, /the kanji rule here comes first, and the Genki grammar guide is the more specific guide to grammar/);
   });
 });
