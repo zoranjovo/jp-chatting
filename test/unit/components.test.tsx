@@ -10,6 +10,7 @@ import { BreakdownView, FeedbackView, glossSegments } from '../../src/components
 import { ChatSettingsDialog } from '../../src/components/ChatSettingsDialog.tsx';
 import { ContextLine } from '../../src/components/ContextLine.tsx';
 import { MessageBubble } from '../../src/components/MessageBubble.tsx';
+import { ContextDetails } from '../../src/components/MessageInfo.tsx';
 import { JpText } from '../../src/components/JpText.tsx';
 import { parseInline } from '../../src/components/RichText.tsx';
 import { LanguageProvider } from '../../src/i18n.tsx';
@@ -325,12 +326,53 @@ describe('message context line', () => {
     assert.ok(render(<ContextLine context={ctx} />, { uiLanguage: 'ja' }).includes('>Opus 5.5 · エフォート high · カジュアル · WK12 · げんき第6課 · N4<'));
   });
 
-  test('sits under a stamped message with an explaining tooltip, and is absent on old ones', () => {
-    const message: Message = { id: 'm', role: 'assistant', content: 'こんにちは', createdAt: '', context: ctx };
-    const html = render(<MessageBubble chatId="c" message={message} onUpdated={() => {}} />);
-    assert.ok(html.includes('class="context-line message-meta" title="The settings this message was written with. Its breakdown or feedback uses them too.\nOpus 5.5'));
+});
+
+describe('message info', () => {
+  const ctx: MessageContext = { provider: 'claude', model: 'claude-opus-5-5', effort: 'high', politeness: 'casual', wkLevel: 12, genkiLesson: 6, jlptLevel: 4 };
+  const message: Message = { id: 'm', role: 'assistant', content: 'こんにちは', createdAt: '2026-11-03T05:30:00.000Z', context: ctx };
+  const bubble = (m: Message) => render(<MessageBubble chatId="c" message={m} onUpdated={() => {}} />);
+
+  test('the partner\'s stamped messages get a closed ⓘ button', () => {
+    const html = bubble(message);
+    assert.match(html, /<button type="button" class="info-button " aria-expanded="false" aria-label="How this message was written"/);
+    assert.ok(!html.includes('message-info-pop'), 'closed until clicked');
+  });
+
+  test('not on the learner\'s messages, nor on messages from before stamping', () => {
+    assert.ok(!bubble({ ...message, role: 'user' }).includes('info-button'));
     const { context: _, ...old } = message;
-    assert.ok(!render(<MessageBubble chatId="c" message={old} onUpdated={() => {}} />).includes('message-meta'));
+    assert.ok(!bubble(old).includes('info-button'));
+  });
+
+  test('lists the model, provider, effort, style, levels and when it was written, labelled', () => {
+    const html = render(<ContextDetails context={ctx} createdAt={message.createdAt} />);
+    const rows = [...html.matchAll(/<dt>([^<]*)<\/dt><dd>([^<]*)<\/dd>/g)].map((m) => [m[1], m[2]]);
+    assert.deepEqual(rows.slice(0, 7), [
+      ['Model', 'Opus 5.5'],
+      ['AI provider', 'Claude Code CLI'],
+      ['Effort', 'high'],
+      ['Partner’s speech style', 'Casual (plain form)'],
+      ['WaniKani level', '12'],
+      ['Genki lesson', 'Genki I · Lesson 6'],
+      ['JLPT level', 'N4'],
+    ]);
+    assert.equal(rows[7][0], 'Written');
+    assert.match(rows[7][1], /3 Nov 2026/);
+  });
+
+  test('an endpoint has no effort row; unset levels say so', () => {
+    const html = render(
+      <ContextDetails context={{ provider: 'endpoint', model: 'qwen3', politeness: 'polite', wkLevel: 0, genkiLesson: 0, jlptLevel: 0 }} createdAt="" />,
+    );
+    assert.ok(!html.includes('<dt>Effort</dt>'));
+    for (const text of ['<dd>qwen3</dd>', '<dd>Kana only</dd>', '<dd>Not using Genki</dd>', '<dd>Not set</dd>', '<dd>Polite (です/ます)</dd>']) assert.ok(html.includes(text), text);
+  });
+
+  test('Claude\'s default effort is named, and the labels follow the UI language', () => {
+    const html = render(<ContextDetails context={{ ...ctx, effort: undefined }} createdAt={message.createdAt} />, { uiLanguage: 'ja' });
+    assert.ok(html.includes('<dt>思考レベル</dt><dd>デフォルト</dd>'));
+    assert.ok(html.includes('<dd>げんきI・第6課</dd>'));
   });
 });
 

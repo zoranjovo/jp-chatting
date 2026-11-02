@@ -1166,24 +1166,71 @@ ruby rt {
   margin-left: 0;
 }
 
-/* The settings a message was written with, under its bubble. */
-.message-meta {
-  max-width: 88%;
-  margin-top: -2px;
-  padding: 0 6px;
-  font-size: 11.5px;
+/* The ⓘ on the partner's messages and the popup it opens, below the bubble's actions. */
+.bubble {
+  position: relative;
+}
+
+.message-info {
+  margin-right: auto;
+}
+
+.info-button {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
   color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font: italic 600 12px/1 Georgia, serif;
 }
 
-.theirs .message-meta {
-  align-self: flex-start;
+.info-button:hover,
+.info-button.active {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
-.mine .message-meta {
-  align-self: flex-end;
+.message-info-pop {
+  position: absolute;
+  left: 8px;
+  top: calc(100% + 6px);
+  z-index: 5;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 48px));
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.message-info-pop p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.message-info-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 14px;
+  margin: 6px 0 0;
+}
+
+.message-info-list > div {
+  display: contents;
+}
+
+.message-info-list dt {
+  color: var(--muted);
+}
+
+.message-info-list dd {
+  margin: 0;
 }
 
 .chat-uses {

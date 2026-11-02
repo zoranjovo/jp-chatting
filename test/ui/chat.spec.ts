@@ -187,24 +187,46 @@ test('each chat keeps its own speech style', async ({ app }) => {
   await expect(chatSettingsButton(app)).toContainText('Polite');
 });
 
-test('each message shows the settings it was written with, and keeps them after they change', async ({ app, request }) => {
+/** Opens a partner message's ⓘ and returns its rows as "Label: value". */
+async function messageInfo(app: Page, index: number) {
+  const message = theirs(app).nth(index);
+  await message.getByRole('button', { name: 'How this message was written' }).click();
+  const pop = message.locator('.message-info-pop');
+  await expect(pop).toBeVisible();
+  const rows = await pop.locator('.message-info-list > div').evaluateAll((divs) =>
+    divs.map((d) => `${d.querySelector('dt')?.textContent}: ${d.querySelector('dd')?.textContent}`),
+  );
+  await app.keyboard.press('Escape');
+  await expect(pop).toHaveCount(0);
+  return rows.slice(0, -1); // all but "Written", which has the time
+}
+
+const MOCK_INFO = [
+  'Model: mock-small',
+  'AI provider: Model endpoint (OpenAI-compatible)',
+  'Partner’s speech style: Polite (です/ます)',
+  'WaniKani level: 10',
+  'Genki lesson: Not using Genki',
+  'JLPT level: Not set',
+];
+
+test('the partner\'s messages show how they were written, and keep it after the settings change', async ({ app, request }) => {
   await startChat(app);
   await composer(app).fill('はい');
   await composer(app).press('Enter');
   await expect(theirs(app)).toHaveCount(2);
-  const stamp = 'mock-small · Polite · WK 10';
-  await expect(app.locator('.message-meta')).toHaveText([stamp, stamp, stamp]);
+  await expect(mine(app).first().getByRole('button', { name: 'How this message was written' })).toHaveCount(0);
+  expect(await messageInfo(app, 0)).toEqual(MOCK_INFO);
 
   await request.put('/api/settings', { data: { endpoint: { model: 'mock-large' }, wkLevel: 20, jlptLevel: 3 } });
   await app.reload();
-  await expect(app.locator('.message-meta')).toHaveText([stamp, stamp, stamp]);
   const dialog = await openChatSettings(app);
   await expect(dialog.locator('.chat-uses')).toHaveText('mock-large · Polite · WK 20 · N3');
   await dialog.getByText('Casual (plain form)').click();
   await dialog.getByRole('button', { name: 'Save' }).click();
   await app.reload();
-  await expect(app.locator('.message-meta')).toHaveText([stamp, stamp, stamp]);
-  await expect(theirs(app).first().locator('.message-meta')).toHaveAttribute('title', /Its breakdown or feedback uses them too/);
+  expect(await messageInfo(app, 0)).toEqual(MOCK_INFO);
+  expect(await messageInfo(app, 1)).toEqual(MOCK_INFO);
 
   await theirs(app).first().getByRole('button', { name: 'Breakdown' }).click();
   await expect(theirs(app).first().locator('.breakdown-lines')).toBeVisible();
@@ -212,6 +234,14 @@ test('each message shows the settings it was written with, and keeps them after 
   await expect(mine(app).first().locator('.feedback')).toBeVisible();
   const calls = await mockCalls(request);
   expect(calls.filter((c) => c.kind === 'breakdown' || c.kind === 'feedback').map((c) => c.model)).toEqual(['mock-small', 'mock-small']);
+});
+
+test('the info closes on a click elsewhere', async ({ app }) => {
+  await startChat(app);
+  await theirs(app).first().getByRole('button', { name: 'How this message was written' }).click();
+  await expect(app.locator('.message-info-pop')).toContainText('Its breakdown uses these settings too');
+  await app.locator('.topbar h1').click();
+  await expect(app.locator('.message-info-pop')).toHaveCount(0);
 });
 
 test('the next message after a change is stamped with the new settings', async ({ app, request }) => {
@@ -222,9 +252,10 @@ test('the next message after a change is stamped with the new settings', async (
   await composer(app).fill('うん');
   await composer(app).press('Enter');
   await expect(theirs(app)).toHaveCount(2);
-  await expect(app.locator('.message-meta')).toHaveText(['mock-small · Polite · WK 10', 'mock-small · Casual · WK 10', 'mock-small · Casual · WK 10']);
+  expect(await messageInfo(app, 1)).toContain('Partner’s speech style: Casual (plain form)');
   expect((await chatsOnDisk(request))[0].messages.map((m) => m.context?.politeness)).toEqual(['polite', 'casual', 'casual']);
 });
+
 
 async function sendAndWait(app: Page, text: string) {
   const replies = await theirs(app).count();

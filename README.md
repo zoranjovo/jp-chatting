@@ -16,7 +16,7 @@ There are a lot of Japanese specific features in the app, but you should be able
 - **Genki lesson** — set the last Genki lesson you've studied; the partner mostly uses grammar from lessons up to it (a guide, not a strict limit), feedback corrects within it and names the lesson for anything later, and breakdowns say which lesson teaches each grammar point.
 - **JLPT level** — optional N5–N1, a rough guide to how your partner pitches its Japanese (not a strict limit like the kanji level).
 - **Chat settings** — each chat has its own title, topic and polite or casual speech, chosen when you start it and changeable from the top bar.
-- **Settings stamped on every message** — each message shows the model, effort, speech style and levels it was written with, and its breakdown or feedback uses those, so changing your settings later doesn't change how an old message is explained.
+- **Settings stamped on every message** — the model, effort, speech style and levels each message was written with are saved with it, and its breakdown or feedback uses those, so changing your settings later doesn't change how an old message is explained. The small ⓘ on your partner's messages shows them.
 - **Furigana** toggle, **romaji → kana** typing (lowercase → hiragana, CAPS → katakana, `nn` → ん, `-` → ー).
 - **UI in English or Japanese** — switch in the sidebar.
 

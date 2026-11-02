@@ -3,7 +3,7 @@ import type { Message } from '../../shared/types.ts';
 import { api } from '../api.ts';
 import { useT } from '../i18n.tsx';
 import { BreakdownView, FeedbackView } from './Analysis.tsx';
-import { ContextLine } from './ContextLine.tsx';
+import { MessageInfo } from './MessageInfo.tsx';
 import { JpText } from './JpText.tsx';
 
 /** Matches the open/close transition in styles.css. */
@@ -73,6 +73,7 @@ export function MessageBubble({
           <JpText text={message.content} highlight={!mine} />
         </div>
         <div className="bubble-actions">
+          {!mine && message.context && <MessageInfo context={message.context} createdAt={message.createdAt} />}
           {onRewind && (
             <button type="button" className="chip" onClick={onRewind} disabled={rewindDisabled} title={t.rewindTitle}>
               ↶ {t.rewind}
@@ -93,7 +94,6 @@ export function MessageBubble({
           </button>
         </div>
       </div>
-      {message.context && <ContextLine context={message.context} className="message-meta" title={t.contextTitle} />}
       {mounted && (
         <div ref={wrap} className={`analysis-wrap ${shown ? 'open' : ''}`} inert={!open}>
           <div className="analysis-clip">
