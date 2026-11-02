@@ -8,6 +8,7 @@ import {
   FEEDBACK_SCHEMA,
   feedbackRequest,
   rewriteRequest,
+  testRequest,
   toBreakdown,
   toFeedback,
 } from '../../server/prompts.ts';
@@ -222,5 +223,14 @@ describe('feedback with a translation of what the learner wrote', () => {
 
   test('older feedback without it reads as an empty string', () => {
     assert.equal(toFeedback({ lines: [{ original: 'o', ok: false }] }).lines[0].originalTranslation, '');
+  });
+});
+
+describe('testRequest', () => {
+  test('is one short user turn asking for a test response', () => {
+    const req = testRequest();
+    assert.equal(req.turns.length, 1);
+    assert.equal(req.turns[0].role, 'user');
+    assert.match(req.turns[0].content, /^Hi!.*test response/);
   });
 });

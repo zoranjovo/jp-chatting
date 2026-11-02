@@ -45,6 +45,14 @@ export function conversationTurns(messages: Message[]): ChatTurn[] {
   return turns;
 }
 
+/** Settings' "Test model": the smallest request that proves the model answers. */
+export function testRequest(): { system: string; turns: ChatTurn[] } {
+  return {
+    system: 'You are being sent a connection test. Reply with one short, friendly sentence confirming you received it.',
+    turns: [{ role: 'user', content: 'Hi! This is a test message. Please send a short test response.' }],
+  };
+}
+
 export function rewriteRequest(settings: Settings, text: string, problems: ReplyProblems): { system: string; turns: ChatTurn[] } {
   const fixes = [
     problems.kanji.length > 0 && `- It uses kanji the learner does not know: ${problems.kanji.join(' ')} -- write those words in hiragana instead.`,

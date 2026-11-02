@@ -31,6 +31,8 @@ Pick one in Settings:
 - **Model endpoint** — any OpenAI-compatible server. LM Studio: `http://localhost:1234/v1` (start its server first). Ollama: `http://localhost:11434/v1`. Models are listed from the endpoint's `/models`.
 - **Claude Code CLI** — runs `claude -p` on the subscription the CLI is signed in to, never an API key (API-key variables are stripped, and a run that reports an API key or extra usage is stopped). Tools, MCP, CLAUDE.md, skills and hooks are all switched off. Sign the CLI in once with `claude auth login`.
 
+  **Personal use only.** Running this on your own computer with your own Claude subscription signed in to the official Claude Code CLI is ordinary personal use of Claude Code. Don't host it for other people or let anyone else use it through your account — Anthropic's terms don't allow sharing your account or routing other people's requests through your subscription ([Consumer Terms](https://www.anthropic.com/legal/consumer-terms) §2–3, [Claude Code legal and compliance](https://code.claude.com/docs/en/legal-and-compliance)). Checked November 2026; not legal advice.
+
 ## Data
 
 Everything is plain JSON under `data/` (git-ignored): `data/settings.json` and one `data/chats/<id>.json` per chat, with any breakdowns and feedback cached on their messages.

@@ -1,4 +1,4 @@
-import type { Chat, ChatSummary, Message, ModelList, ProviderKind, Settings } from '../shared/types.ts';
+import type { Chat, ChatSummary, Message, ModelList, ModelTest, ProviderKind, Settings } from '../shared/types.ts';
 
 async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
   const res = await fetch(url, {
@@ -15,6 +15,7 @@ export const api = {
   settings: () => request<Settings>('GET', '/api/settings'),
   saveSettings: (patch: Partial<Settings>) => request<Settings>('PUT', '/api/settings', patch),
   models: (provider: ProviderKind, endpoint?: Settings['endpoint']) => request<ModelList>('POST', '/api/models', { provider, endpoint }),
+  testModel: (draft: Pick<Settings, 'provider' | 'endpoint' | 'claude'>) => request<ModelTest>('POST', '/api/test-model', draft),
 
   chats: () => request<ChatSummary[]>('GET', '/api/chats'),
   chat: (id: string) => request<Chat>('GET', `/api/chats/${id}`),

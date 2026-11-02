@@ -95,3 +95,8 @@ export interface ModelList {
   /** Set when the list could not be fetched. */
   error?: string;
 }
+
+export interface ModelTest {
+  reply: string;
+  ms: number;
+}

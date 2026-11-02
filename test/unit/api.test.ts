@@ -13,7 +13,7 @@ await useTempData();
 // --- a scripted AI ---
 
 type Kind = 'chat' | 'rewrite' | 'breakdown' | 'feedback';
-const calls: { kind: Kind; request: AiRequest }[] = [];
+const calls: { kind: Kind; request: AiRequest; settings: Settings }[] = [];
 let answers: Partial<Record<Kind, (req: AiRequest) => unknown>> = {};
 
 const kindOf = (r: AiRequest): Kind =>
@@ -26,9 +26,9 @@ const DEFAULT_ANSWERS: Record<Kind, (req: AiRequest) => unknown> = {
   feedback: () => ({ meaning: 'Hi', verdict: 'correct', corrected: 'やあ', summary: 'Good.', lines: [] }),
 };
 
-async function fakeAi(request: AiRequest): Promise<unknown> {
+async function fakeAi(request: AiRequest, settings: Settings): Promise<unknown> {
   const kind = kindOf(request);
-  calls.push({ kind, request });
+  calls.push({ kind, request, settings });
   return (answers[kind] ?? DEFAULT_ANSWERS[kind])(request);
 }
 
@@ -446,5 +446,38 @@ describe('reply clean-up', () => {
     const f = (await analyze(chat.id, mine.id)).body.feedback!;
     assert.equal(f.corrected, 'コーヒーをください');
     assert.equal(f.lines[0].corrected, 'コーヒーをください');
+  });
+});
+
+describe('test model', () => {
+  test('sends a short test message to the unsaved choice and returns the reply and time', async () => {
+    await api('PUT', '/api/settings', { provider: 'endpoint', endpoint: { model: 'saved-model' } });
+    answers.chat = () => '  Test received!  ';
+    const res = await api('POST', '/api/test-model', { provider: 'claude', claude: { model: 'claude-haiku-5-5' } });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.reply, 'Test received!');
+    assert.equal(typeof res.body.ms, 'number');
+    assert.equal(calls.length, 1);
+    assert.match(calls[0].request.system, /connection test/);
+    assert.match(calls[0].request.turns[0].content, /test message/);
+    assert.equal(calls[0].settings.provider, 'claude');
+    assert.equal(calls[0].settings.claude.model, 'claude-haiku-5-5');
+    assert.equal(calls[0].settings.claude.command, 'claude', 'unsent fields come from the saved settings');
+    assert.equal((await api<Settings>('GET', '/api/settings')).body.provider, 'endpoint', 'nothing is saved');
+  });
+
+  test('a bad provider falls back to the saved one', async () => {
+    await api('PUT', '/api/settings', { provider: 'endpoint' });
+    await api('POST', '/api/test-model', { provider: 'nonsense' });
+    assert.equal(calls[0].settings.provider, 'endpoint');
+  });
+
+  test('a model that fails is a 502 with its message', async () => {
+    answers.chat = () => {
+      throw new AiError('could not reach http://localhost:1234/v1');
+    };
+    const res = await api('POST', '/api/test-model', {});
+    assert.equal(res.status, 502);
+    assert.match(res.body.error, /could not reach/);
   });
 });

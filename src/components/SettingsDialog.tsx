@@ -1,12 +1,23 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { allowedKanji, MAX_WK_LEVEL } from '../../shared/kanji.ts';
-import type { ClaudeEffort, ModelList, Settings } from '../../shared/types.ts';
+import { DEFAULT_SETTINGS, type ClaudeEffort, type ModelList, type Settings } from '../../shared/types.ts';
 import { api } from '../api.ts';
 import { useT } from '../i18n.tsx';
 import { useSettings } from '../settings.tsx';
 import { Dialog } from './Dialog.tsx';
+import { Reveal } from './Reveal.tsx';
 
 const EFFORTS: ClaudeEffort[] = ['', 'low', 'medium', 'high', 'xhigh', 'max'];
+
+type TestState =
+  | { state: 'idle' }
+  | { state: 'testing' }
+  | { state: 'ok'; reply: string; ms: number }
+  | { state: 'error'; error: string };
+
+// What the personal-use notice is based on. Re-check both when the terms change, and update the notice's date.
+const CONSUMER_TERMS = 'https://www.anthropic.com/legal/consumer-terms';
+const CLAUDE_CODE_TERMS = 'https://code.claude.com/docs/en/legal-and-compliance';
 
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const t = useT();
@@ -34,6 +45,26 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     loadModels(draft.provider, draft.endpoint);
   }, [draft.provider, loadModels]);
+
+  // A result belongs to the provider and model it was run against; changing either clears it.
+  const [test, setTest] = useState<TestState>({ state: 'idle' });
+  const testRun = useRef(0);
+  const testTarget = `${draft.provider}|${draft.endpoint.baseUrl}|${draft.endpoint.model}|${draft.claude.command}|${draft.claude.model}`;
+  useEffect(() => {
+    testRun.current += 1;
+    setTest({ state: 'idle' });
+  }, [testTarget]);
+
+  const runTest = async () => {
+    const run = ++testRun.current;
+    setTest({ state: 'testing' });
+    try {
+      const { reply, ms } = await api.testModel({ provider: draft.provider, endpoint: draft.endpoint, claude: draft.claude });
+      if (run === testRun.current) setTest({ state: 'ok', reply, ms });
+    } catch (err) {
+      if (run === testRun.current) setTest({ state: 'error', error: (err as Error).message });
+    }
+  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -106,6 +137,23 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
+        <Reveal open={draft.provider === 'claude'}>
+          <div className="notice" role="note">
+            <strong className="notice-title">{t.claudeNoticeTitle}</strong>
+            <p>{t.claudeNoticeBody}</p>
+            <p className="notice-footnote">
+              {t.claudeNoticeFootnote}{' '}
+              <a href={CONSUMER_TERMS} target="_blank" rel="noreferrer">
+                {t.claudeNoticeConsumerTerms}
+              </a>
+              {' · '}
+              <a href={CLAUDE_CODE_TERMS} target="_blank" rel="noreferrer">
+                {t.claudeNoticeCodeTerms}
+              </a>
+            </p>
+          </div>
+        </Reveal>
+
         {draft.provider === 'endpoint' ? (
           <>
             <label className="field">
@@ -146,7 +194,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               value={current}
               onChange={(e) => (draft.provider === 'claude' ? setClaude({ model: e.target.value }) : setEndpoint({ model: e.target.value }))}
             >
-              <option value="">{loading ? t.loadingModels : t.chooseModel}</option>
+              <option value="">{loading ? t.loadingModels : draft.provider === 'claude' ? t.defaultModel(DEFAULT_SETTINGS.claude.model) : t.chooseModel}</option>
               {current && !options.includes(current) && <option value={current}>{current}</option>}
               {options.map((m) => (
                 <option key={m} value={m}>
@@ -164,6 +212,30 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             </small>
           )}
           {models && !models.error && !loading && options.length === 0 && <small className="muted">{t.noModels}</small>}
+        </div>
+
+        <div className="field model-test">
+          <div>
+            <button type="button" className="secondary" onClick={runTest} disabled={(draft.provider === 'endpoint' && !current) || test.state === 'testing'}>
+              {test.state === 'testing' ? t.testingModel : t.testModel}
+            </button>
+          </div>
+          <Reveal open={test.state === 'ok' || test.state === 'error'}>
+            <div className={`model-test-result ${test.state}`} role="status">
+              {test.state === 'ok' && (
+                <>
+                  <strong>{t.testModelOk((test.ms / 1000).toFixed(1))}</strong>
+                  <span className="model-test-reply">{test.reply}</span>
+                </>
+              )}
+              {test.state === 'error' && (
+                <>
+                  <strong>{t.testModelFailed}</strong>
+                  <span className="model-test-reply">{test.error}</span>
+                </>
+              )}
+            </div>
+          </Reveal>
         </div>
 
         <div className="dialog-actions">

@@ -6,9 +6,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stripFurigana } from '../shared/kanji.ts';
-import type { Chat, Message, ProviderKind, Settings } from '../shared/types.ts';
+import type { Chat, Message, ModelTest, ProviderKind, Settings } from '../shared/types.ts';
 import { AiError, callAi as realCallAi, listModels as realListModels, type AiRequest } from './ai/index.ts';
 import { generateBreakdown, generateFeedback, generateReply } from './generate.ts';
+import { testRequest } from './prompts.ts';
 import * as store from './store.ts';
 
 const DIST = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist');
@@ -88,6 +89,23 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
       const settings = await store.getSettings();
       const provider = (req.body?.provider as ProviderKind) ?? settings.provider;
       res.json(await deps.listModels(provider, { ...settings.endpoint, ...req.body?.endpoint }));
+    }),
+  );
+
+  /** A one-line round trip to the model the Settings dialog has chosen, saved or not. */
+  app.post(
+    '/api/test-model',
+    route(async (req, res) => {
+      const saved = await store.getSettings();
+      const settings: Settings = {
+        ...saved,
+        provider: req.body?.provider === 'claude' || req.body?.provider === 'endpoint' ? req.body.provider : saved.provider,
+        endpoint: { ...saved.endpoint, ...req.body?.endpoint },
+        claude: { ...saved.claude, ...req.body?.claude },
+      };
+      const started = Date.now();
+      const reply = String(await deps.callAi(testRequest(), settings)).trim();
+      res.json({ reply, ms: Date.now() - started } satisfies ModelTest);
     }),
   );
 

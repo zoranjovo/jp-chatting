@@ -1,6 +1,6 @@
 import type { APIRequestContext, Page } from '@playwright/test';
 import type { Settings } from '../../shared/types.ts';
-import { expect, startChat, test, theirs } from './fixtures.ts';
+import { expect, mockCalls, mockControl, startChat, test, theirs } from './fixtures.ts';
 
 async function openSettings(page: Page) {
   await page.getByRole('button', { name: /Settings|設定/ }).click();
@@ -104,12 +104,12 @@ test('an unreachable endpoint shows why the list is empty', async ({ app }) => {
 
 test('the Claude CLI option lists its models and its own settings', async ({ app, request }) => {
   const dialog = await openSettings(app);
-  await dialog.getByText('Claude Code CLI').click();
+  await dialog.getByText('Claude Code CLI', { exact: true }).click();
   await expect(dialog.getByLabel('CLI command')).toHaveValue('claude');
   await expect(dialog.getByLabel('Effort')).toBeVisible();
   await expect(dialog.getByLabel('Endpoint URL')).toHaveCount(0);
   const model = dialog.getByLabel('Model', { exact: true });
-  await expect(model.locator('option')).toHaveText(['Choose a model…', 'claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5']);
+  await expect(model.locator('option')).toHaveText(['Default (claude-sonnet-5-5)', 'claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5']);
   await model.selectOption('claude-haiku-5-5');
   await dialog.getByLabel('Effort').selectOption('low');
   await dialog.getByRole('button', { name: 'Save' }).click();
@@ -138,4 +138,61 @@ test('switching back to English', async ({ app }) => {
   await expect(app.getByRole('heading', { name: 'チャットで日本語を練習しよう' })).toBeVisible();
   await app.getByRole('button', { name: 'EN', exact: true }).click();
   await expect(app.getByRole('heading', { name: 'Practise Japanese by chatting' })).toBeVisible();
+});
+
+test('choosing the Claude CLI shows the personal-use notice, with links to the terms', async ({ app }) => {
+  const dialog = await openSettings(app);
+  await expect(dialog.getByRole('note')).toHaveCount(0);
+  await dialog.getByText('Claude Code CLI', { exact: true }).click();
+  const notice = dialog.getByRole('note');
+  await expect(notice).toContainText('For your own personal use only');
+  await expect(notice).toContainText('Don’t host it for other people');
+  await expect(notice.getByRole('link', { name: 'Consumer Terms' })).toHaveAttribute('href', 'https://www.anthropic.com/legal/consumer-terms');
+  await expect(notice.getByRole('link', { name: 'Claude Code legal and compliance' })).toHaveAttribute('href', 'https://code.claude.com/docs/en/legal-and-compliance');
+  await expect(notice.getByRole('link').first()).toHaveAttribute('target', '_blank');
+
+  await dialog.getByText('Model endpoint').click();
+  await expect(dialog.getByRole('note')).toHaveCount(0);
+});
+
+test('the personal-use notice is translated', async ({ app }) => {
+  await app.getByRole('button', { name: '日本語' }).click();
+  const dialog = await openSettings(app);
+  await dialog.getByText('Claude Code CLI', { exact: true }).click();
+  await expect(dialog.getByRole('note')).toContainText('自分だけの個人利用に限ります');
+  await expect(dialog.getByRole('note').getByRole('link', { name: '消費者向け利用規約' })).toBeVisible();
+});
+
+test('Test model sends a message and shows the reply', async ({ app, request }) => {
+  const dialog = await openSettings(app);
+  await dialog.getByRole('button', { name: 'Test model' }).click();
+  const result = dialog.getByRole('status');
+  await expect(result).toContainText('It works — replied in');
+  await expect(result).toContainText('いらっしゃいませ');
+  expect((await mockCalls(request)).at(-1)).toEqual({ kind: 'chat', turns: 1 });
+});
+
+test('a failing model shows why', async ({ app, request }) => {
+  await mockControl(request, { fail: true });
+  const dialog = await openSettings(app);
+  await dialog.getByRole('button', { name: 'Test model' }).click();
+  await expect(dialog.getByRole('status')).toContainText('The test failed:');
+  await expect(dialog.getByRole('status')).toContainText('mock model is down');
+});
+
+test('changing the model clears an old test result, and with no model the test is disabled', async ({ app }) => {
+  const dialog = await openSettings(app);
+  await dialog.getByRole('button', { name: 'Test model' }).click();
+  await expect(dialog.getByRole('status')).toContainText('It works');
+  await dialog.getByLabel('Model', { exact: true }).selectOption('mock-large');
+  await expect(dialog.getByRole('status')).toHaveCount(0);
+  await dialog.getByLabel('Model', { exact: true }).selectOption('');
+  await expect(dialog.getByRole('button', { name: 'Test model' })).toBeDisabled();
+});
+
+test('with Claude and no model picked, the default can still be tested', async ({ app }) => {
+  const dialog = await openSettings(app);
+  await dialog.getByText('Claude Code CLI', { exact: true }).click();
+  await dialog.getByLabel('Model', { exact: true }).selectOption('');
+  await expect(dialog.getByRole('button', { name: 'Test model' })).toBeEnabled();
 });
