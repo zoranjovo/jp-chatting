@@ -13,7 +13,9 @@
     "test:ui": "playwright test",
     "test:all": "pnpm typecheck && pnpm test && pnpm test:ui",
     "check:claude": "tsx scripts/check-claude-models.ts",
-    "eval": "tsx scripts/eval-prompts.ts"
+    "eval": "tsx scripts/eval-prompts.ts",
+    "kanji": "tsx scripts/build-kanji.ts",
+    "postinstall": "tsx scripts/build-kanji.ts --if-missing"
   },
   "engines": {
     "node": ">=20"

@@ -5,3 +5,6 @@ data/
 *.log
 test-results/
 playwright-report/
+
+# Built from davidluzgouveia/kanji-data by `pnpm kanji` (runs on install)
+shared/wanikani-kanji.json

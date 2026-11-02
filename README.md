@@ -33,7 +33,7 @@ Everything is plain JSON under `data/` (git-ignored): `data/settings.json` and o
 
 ## Kanji data
 
-`shared/wanikani-kanji.json` is built from [davidluzgouveia/kanji-data](https://github.com/davidluzgouveia/kanji-data) (MIT). Its WaniKani levels date from when that dataset was compiled, so a few kanji may sit a level off from today's WaniKani.
+The kanji-by-WaniKani-level list (`shared/wanikani-kanji.json`) isn't in the repo. `pnpm install` builds it from [davidluzgouveia/kanji-data](https://github.com/davidluzgouveia/kanji-data) (MIT), pinned to one commit; run `pnpm kanji` to rebuild it, or if the install was offline. Its WaniKani levels date from when that dataset was compiled, so a few kanji may sit a level off from today's WaniKani.
 
 ## Scripts
 

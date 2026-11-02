@@ -12,6 +12,7 @@ A local-only web app for an English speaker to practise Japanese conversation an
 | `pnpm test` | unit tests (`node:test` via tsx), ~1s |
 | `pnpm test:ui` | Playwright UI tests, ~20s; builds the UI first |
 | `pnpm test:all` | all three — run this before calling work done |
+| `pnpm kanji` | rebuild the git-ignored `shared/wanikani-kanji.json` (also runs on install when missing) |
 | `pnpm check:claude [models…]` | live check of the Claude CLI models (needs `claude auth login`) |
 | `pnpm eval --label X <provider:model>…` | prompt eval on real models — see Prompt changes |
 | `pnpm eval --compare A B` | compare two eval runs; side by side in `.cache/eval/A-vs-B.md` |
@@ -25,7 +26,7 @@ shared/            used by both server and UI
   types.ts         Settings (+ DEFAULT_SETTINGS), Chat, Message, Breakdown, Feedback
   kanji.ts         WaniKani level lookups, furigana markup stripping, kanjiAboveLevel()
   quality.ts       checks on model-written Japanese (replyProblems) and the fixes needing no model (autoFix, salvageFromForeign)
-  wanikani-kanji.json   [kanji, level, meaning, on, kun] rows, ~2k kanji, 60 levels
+  wanikani-kanji.json   [kanji, level, meaning, on, kun] rows, ~2k kanji, 60 levels — git-ignored, built by `pnpm kanji`
 server/
   index.ts         listens on JP_CHATTING_PORT (default 5174)
   app.ts           createApp(deps) — every /api route; deps.callAi is injectable for tests
@@ -113,6 +114,6 @@ Replies are sampled twice per scenario at the model's normal temperature, so exp
 
 - Don't read `PORT` — preview tools set it to the Vite port. The API uses `JP_CHATTING_PORT`.
 - The Claude desktop app's environment can't authenticate a child `claude -p`; for live Claude testing the standalone CLI must be signed in (`claude auth login` in a normal terminal).
-- `shared/wanikani-kanji.json` comes from davidluzgouveia/kanji-data (MIT); its levels reflect WaniKani when that dataset was compiled, so a few kanji may be a level off today. Some common kanji (e.g. 薔) aren't on WaniKani at all and are always "above level".
+- `shared/wanikani-kanji.json` is **not committed** — keep it that way. `scripts/build-kanji.ts` builds it from davidluzgouveia/kanji-data (MIT, pinned commit); `postinstall` runs it when the file is missing, `pnpm kanji` rebuilds. Without it the app, typecheck and tests fail on the import. It comes from kanji-data; its levels reflect WaniKani when that dataset was compiled, so a few kanji may be a level off today. Some common kanji (e.g. 薔) aren't on WaniKani at all and are always "above level".
 - Replies are not streamed (the kanji check needs the whole reply first); the UI shows a typing indicator.
 - The whole chat history is sent on every reply. Fine for practice-length chats; trim in `conversationTurns()` if long chats start hitting context limits.
