@@ -41,7 +41,7 @@ function answer(kind: Kind, body: any): unknown {
         verdict: 'minor',
         corrected: 'コーヒーをお{願|ねが}いします。',
         summary: 'Nice try! Use を for what you are ordering.',
-        lines: [{ original: 'コーヒーがおねがいします。', corrected: 'コーヒーをお{願|ねが}いします。', translation: 'A coffee, please.', explanation: 'With お願いします the thing you ask for takes を.', ok: false }],
+        lines: [{ original: 'コーヒーがおねがいします。', originalTranslation: 'Coffee does a request.', corrected: 'コーヒーをお{願|ねが}いします。', translation: 'A coffee, please.', explanation: 'With お願いします the thing you ask for takes を.', ok: false }],
       }),
     );
   }

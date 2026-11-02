@@ -186,7 +186,7 @@ describe('toFeedback', () => {
       verdict: 'correct',
       corrected: 'c',
       summary: 's',
-      lines: [{ original: 'o', corrected: 'c', translation: 't', explanation: 'e', ok: true }],
+      lines: [{ original: 'o', originalTranslation: 'ot', corrected: 'c', translation: 't', explanation: 'e', ok: true }],
     };
     assert.deepEqual(toFeedback(raw), raw);
   });
@@ -199,5 +199,28 @@ describe('toFeedback', () => {
   test('ok is true only when it says so', () => {
     const out = toFeedback({ lines: [{ ok: 'true' }, { ok: 1 }, { ok: true }] });
     assert.deepEqual(out.lines.map((l) => l.ok), [false, false, true]);
+  });
+});
+
+describe('English in breakdowns and feedback', () => {
+  test('both prompts ask for Japanese without 「」 and allow markdown emphasis', () => {
+    const m = msg('assistant', 'はい');
+    for (const req of [breakdownRequest(settings(), m), feedbackRequest(settings(), msg('user', 'はい'), m)]) {
+      assert.match(req.system, /no 「」 brackets or quotation marks/);
+      assert.match(req.system, /\*\*bold\*\* or \*italic\*/);
+    }
+  });
+});
+
+describe('feedback with a translation of what the learner wrote', () => {
+  test('the schema and prompt ask for it', () => {
+    const items = (FEEDBACK_SCHEMA as any).properties.lines.items;
+    assert.ok(items.required.includes('originalTranslation'));
+    const req = feedbackRequest(settings(), msg('user', 'x'), undefined);
+    assert.match(req.system, /originalTranslation \(what the original literally says in English, mistakes and all/);
+  });
+
+  test('older feedback without it reads as an empty string', () => {
+    assert.equal(toFeedback({ lines: [{ original: 'o', ok: false }] }).lines[0].originalTranslation, '');
   });
 });

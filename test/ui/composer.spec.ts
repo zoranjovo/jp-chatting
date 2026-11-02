@@ -70,3 +70,13 @@ test('pasting a whole romaji sentence converts it', async ({ app }) => {
   await composer(app).fill('arigatou gozaimasu!');
   await expect(composer(app)).toHaveValue('ありがとう ございます！');
 });
+
+test('kanji the learner has not learnt are not flagged in their own messages', async ({ app }) => {
+  await startChat(app);
+  // 鬱 is WaniKani level 50; the tests run at level 10.
+  await composer(app).fill('鬱です');
+  await composer(app).press('Enter');
+  await expect(mine(app)).toHaveCount(1);
+  await expect(mine(app).first().locator('.kanji')).toHaveCount(1);
+  await expect(mine(app).first().locator('.over-level')).toHaveCount(0);
+});

@@ -1,19 +1,44 @@
-import { useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Message } from '../../shared/types.ts';
 import { api } from '../api.ts';
 import { useT } from '../i18n.tsx';
 import { BreakdownView, FeedbackView } from './Analysis.tsx';
 import { JpText } from './JpText.tsx';
 
+/** Matches the open/close transition in styles.css. */
+const SLIDE_MS = 260;
+
 export function MessageBubble({ chatId, message, onUpdated }: { chatId: string; message: Message; onUpdated: (m: Message) => void }) {
   const t = useT();
   const [open, setOpen] = useState(false);
+  // The panel stays mounted once opened, so closing can animate; `shown` is set
+  // just after `open` so the opening transition starts from collapsed.
+  const [mounted, setMounted] = useState(false);
+  const [shown, setShown] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const wrap = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   const mine = message.role === 'user';
   const analysis = mine ? message.feedback : message.breakdown;
+  const label = mine ? t.check : t.breakdown;
+
+  useLayoutEffect(() => {
+    if (!open) return setShown(false);
+    // Make the browser compute the collapsed style first, or there is nothing to transition from.
+    wrap.current?.getBoundingClientRect();
+    setShown(true);
+  }, [open]);
+
+  // Once it has opened, or its content has arrived, bring the panel into view if it ended up off screen.
+  useEffect(() => {
+    if (!shown || busy) return;
+    const timer = setTimeout(() => panel.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), SLIDE_MS);
+    return () => clearTimeout(timer);
+  }, [shown, busy]);
 
   const analyze = async (refresh: boolean) => {
+    setMounted(true);
     setOpen(true);
     if (analysis && !refresh) return;
     setBusy(true);
@@ -31,7 +56,7 @@ export function MessageBubble({ chatId, message, onUpdated }: { chatId: string; 
     <div className={`message ${mine ? 'mine' : 'theirs'}`}>
       <div className="bubble">
         <div className="bubble-text">
-          <JpText text={message.content} />
+          <JpText text={message.content} highlight={!mine} />
         </div>
         <div className="bubble-actions">
           <button
@@ -39,26 +64,35 @@ export function MessageBubble({ chatId, message, onUpdated }: { chatId: string; 
             className={`chip ${open ? 'active' : ''}`}
             onClick={() => (open ? setOpen(false) : analyze(false))}
             aria-expanded={open}
+            aria-label={open ? t.hide : label}
           >
-            {open ? t.hide : mine ? t.check : t.breakdown}
+            {/* Both labels take up space, so the button -- and the bubble -- never change width. */}
+            <span className="chip-labels" aria-hidden>
+              <span className={open ? 'chip-off' : ''}>{label}</span>
+              <span className={open ? '' : 'chip-off'}>{t.hide}</span>
+            </span>
           </button>
         </div>
       </div>
-      {open && (
-        <div className="analysis">
-          {busy && <div className="analysis-busy">{t.analyzing}</div>}
-          {error && (
-            <div className="error">
-              {t.errorPrefix} {error}
+      {mounted && (
+        <div ref={wrap} className={`analysis-wrap ${shown ? 'open' : ''}`} inert={!open}>
+          <div className="analysis-clip">
+            <div className="analysis" ref={panel}>
+              {busy && <div className="analysis-busy">{t.analyzing}</div>}
+              {error && (
+                <div className="error">
+                  {t.errorPrefix} {error}
+                </div>
+              )}
+              {!busy && message.breakdown && !mine && <BreakdownView breakdown={message.breakdown} />}
+              {!busy && message.feedback && mine && <FeedbackView feedback={message.feedback} />}
+              {!busy && (analysis || error) && (
+                <button type="button" className="link-button" onClick={() => analyze(true)}>
+                  {t.redo}
+                </button>
+              )}
             </div>
-          )}
-          {!busy && message.breakdown && !mine && <BreakdownView breakdown={message.breakdown} />}
-          {!busy && message.feedback && mine && <FeedbackView feedback={message.feedback} />}
-          {!busy && (analysis || error) && (
-            <button type="button" className="link-button" onClick={() => analyze(true)}>
-              {t.redo}
-            </button>
-          )}
+          </div>
         </div>
       )}
     </div>

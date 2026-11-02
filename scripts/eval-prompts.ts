@@ -162,6 +162,7 @@ function scoreBreakdown(c: BreakdownCase, b: Breakdown): Pick<Result, 'problems'
       explained: b.lines.every((l) => l.explanation.trim().length > 0),
       words: b.lines.every((l) => l.words.length > 0),
       readingsKana: b.lines.every((l) => l.words.every((w) => !/[A-Za-z]/.test(w.reading))),
+      noBrackets: b.lines.every((l) => !/[「」]/.test(l.translation + l.explanation)),
     },
   };
 }
@@ -175,6 +176,8 @@ function scoreFeedback(c: FeedbackCase, f: Feedback): Pick<Result, 'problems' | 
       corrected: c.expect.some((e) => corrected.includes(stripFurigana(e)) || f.corrected.includes(e)),
       explained: f.summary.trim().length > 0 && f.meaning.trim().length > 0,
       lines: f.lines.length > 0 && f.lines.every((l) => l.translation.trim() && l.explanation.trim()),
+      originalTranslated: f.lines.every((l) => l.ok || (l.originalTranslation ?? '').trim().length > 0),
+      noBrackets: ![f.meaning, f.summary, ...f.lines.flatMap((l) => [l.translation, l.explanation])].some((t) => /[「」]/.test(t)),
     },
   };
 }

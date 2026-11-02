@@ -1,6 +1,7 @@
 // Renders Japanese with {漢字|かんじ} furigana markup as <ruby> (or just the
 // base text when furigana is off), and marks every kanji above the learner's
-// WaniKani level.
+// WaniKani level -- in text the AI wrote. The learner's own messages may use
+// any kanji they like, so those are not marked.
 
 import { Fragment, type ReactNode } from 'react';
 import { isAllowed, isKanji, kanjiInfo } from '../../shared/kanji.ts';
@@ -9,13 +10,14 @@ import { useSettings } from '../settings.tsx';
 
 const MARKUP = /\{([^|{}]+)\|([^{}]*)\}/g;
 
-function Kanji({ ch, level }: { ch: string; level: number }) {
+/** `level` null: show the kanji's details but never mark it as above the level. */
+function Kanji({ ch, level }: { ch: string; level: number | null }) {
   const t = useT();
   const info = kanjiInfo(ch);
   const title = info
     ? `${ch} — ${info.meaning} · ${t.wkLevel} ${info.level}${info.on ? `\n${info.on}` : ''}${info.kun ? `\n${info.kun}` : ''}`
     : `${ch} — ${t.notInWk}`;
-  const over = !isAllowed(ch, level);
+  const over = level !== null && !isAllowed(ch, level);
   return (
     <span className={over ? 'kanji over-level' : 'kanji'} title={over ? `${t.overLevel}\n${title}` : title}>
       {ch}
@@ -23,32 +25,37 @@ function Kanji({ ch, level }: { ch: string; level: number }) {
   );
 }
 
-function marked(text: string, level: number): ReactNode[] {
+function marked(text: string, level: number | null): ReactNode[] {
   return [...text].map((ch, i) => (isKanji(ch) ? <Kanji key={i} ch={ch} level={level} /> : ch));
 }
 
-export function JpText({ text }: { text: string }) {
+/**
+ * `className` defaults to the Japanese font; pass "" for English that quotes Japanese.
+ * `highlight` marks kanji above the learner's level; turn it off for text the learner wrote.
+ */
+export function JpText({ text, className = 'jp', highlight = true }: { text: string; className?: string; highlight?: boolean }) {
   const { settings } = useSettings();
+  const level = highlight ? settings.wkLevel : null;
   const parts: ReactNode[] = [];
   let last = 0;
   for (const match of text.matchAll(MARKUP)) {
     const at = match.index ?? 0;
-    if (at > last) parts.push(<Fragment key={`t${last}`}>{marked(text.slice(last, at), settings.wkLevel)}</Fragment>);
+    if (at > last) parts.push(<Fragment key={`t${last}`}>{marked(text.slice(last, at), level)}</Fragment>);
     const [, base, reading] = match;
     parts.push(
       settings.furigana ? (
         <ruby key={`r${at}`}>
-          {marked(base, settings.wkLevel)}
+          {marked(base, level)}
           <rp>(</rp>
           <rt>{reading}</rt>
           <rp>)</rp>
         </ruby>
       ) : (
-        <Fragment key={`r${at}`}>{marked(base, settings.wkLevel)}</Fragment>
+        <Fragment key={`r${at}`}>{marked(base, level)}</Fragment>
       ),
     );
     last = at + match[0].length;
   }
-  if (last < text.length) parts.push(<Fragment key={`t${last}`}>{marked(text.slice(last), settings.wkLevel)}</Fragment>);
-  return <span className="jp">{parts}</span>;
+  if (last < text.length) parts.push(<Fragment key={`t${last}`}>{marked(text.slice(last), level)}</Fragment>);
+  return <span className={className || undefined}>{parts}</span>;
 }

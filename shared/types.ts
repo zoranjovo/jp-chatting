@@ -60,6 +60,8 @@ export interface Feedback {
   summary: string;
   lines: {
     original: string;
+    /** What the original literally says in English, mistakes and all. */
+    originalTranslation: string;
     corrected: string;
     translation: string;
     explanation: string;

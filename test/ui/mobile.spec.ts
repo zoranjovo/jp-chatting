@@ -35,3 +35,16 @@ test('the page never scrolls sideways and the composer fits', async ({ app }) =>
   expect(overflow).toBeLessThanOrEqual(0);
   await expect(app.getByRole('button', { name: 'Send' })).toBeInViewport();
 });
+
+test('on a phone each explanation sits under its sentence', async ({ app }) => {
+  await startChat(app);
+  const message = app.locator('.message.theirs').first();
+  await message.getByRole('button', { name: 'Breakdown' }).click();
+  const line = message.locator('.analysis-line').nth(1);
+  await expect(line.locator('.line-explain')).toBeVisible();
+  const main = (await line.locator('.line-main').boundingBox())!;
+  const explain = (await line.locator('.line-explain').boundingBox())!;
+  expect(explain.y).toBeGreaterThanOrEqual(main.y + main.height - 1);
+  const overflow = await app.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+});

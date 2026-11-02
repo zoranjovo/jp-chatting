@@ -12,8 +12,10 @@ test('Breakdown shows each line with its translation, explanation and words', as
   await expect(lines.nth(0).locator('.line-en')).toHaveText('Welcome!');
   await expect(lines.nth(1).locator('.line-en')).toHaveText('What will you drink?');
   await expect(lines.nth(1).locator('.line-explain')).toContainText('を marks the object');
-  await expect(lines.nth(1).locator('.word')).toHaveCount(2);
-  await expect(lines.nth(1).locator('.word').first()).toContainText('what');
+  // The sentence reads through: 何 and を glossed, the rest of the sentence after them unglossed.
+  await expect(lines.nth(1).locator('.gloss:not(.gloss-plain)')).toHaveCount(2);
+  await expect(lines.nth(1).locator('.gloss').first()).toContainText('what');
+  await expect(lines.nth(1).locator('.gloss-line')).toHaveText(/何.*を.*飲みますか？/);
 });
 
 test('Breakdown is fetched once, then hidden and shown from the cache', async ({ app, request }) => {
@@ -23,7 +25,8 @@ test('Breakdown is fetched once, then hidden and shown from the cache', async ({
   await expect(message.locator('.analysis-line')).toHaveCount(2);
 
   await message.getByRole('button', { name: 'Hide' }).click();
-  await expect(message.locator('.analysis')).toHaveCount(0);
+  await expect(message.locator('.analysis')).toBeHidden();
+  await expect(message.locator('.analysis-wrap')).not.toHaveClass(/open/);
   await message.getByRole('button', { name: 'Breakdown' }).click();
   await expect(message.locator('.analysis-line')).toHaveCount(2);
   expect(await count(request, 'breakdown')).toBe(1);
@@ -61,7 +64,9 @@ test('Check gives feedback on the learner\'s message', async ({ app }) => {
   await expect(message.locator('.verdict')).toHaveText('Almost — small fixes');
   await expect(message.locator('.feedback-summary')).toContainText('Use を');
   await expect(message.locator('.feedback-overall')).toContainText('A coffee, please.');
-  await expect(message.locator('.strike')).toHaveText('コーヒーがおねがいします。');
+  await expect(message.locator('.fix-row-yours .line-jp')).toHaveText('コーヒーがおねがいします。');
+  await expect(message.locator('.fix-row-yours .line-en')).toHaveText('Coffee does a request.');
+  await expect(message.locator('.fix-row-fix .line-en')).toHaveText('A coffee, please.');
   await expect(message.locator('.line-fix')).toHaveCount(1);
 });
 
@@ -77,4 +82,59 @@ test('the partner\'s and the learner\'s analyses are independent', async ({ app,
   const [chat] = await chatsOnDisk(request);
   expect(chat.messages[0].breakdown).toBeTruthy();
   expect(chat.messages[1].feedback).toBeTruthy();
+});
+
+test('opening and closing the panel never resizes the message bubble or its button', async ({ app }) => {
+  await startChat(app);
+  const message = theirs(app).first();
+  const bubble = message.locator('.bubble');
+  const button = message.locator('.bubble .chip');
+  const size = async () => [(await bubble.boundingBox())!.width, (await button.boundingBox())!.width];
+  const before = await size();
+
+  await button.click();
+  await expect(message.locator('.analysis-wrap')).toHaveClass(/open/);
+  await expect(message.locator('.analysis-line')).toHaveCount(2);
+  expect(await size()).toEqual(before);
+
+  await button.click();
+  await expect(message.locator('.analysis')).toBeHidden();
+  expect(await size()).toEqual(before);
+});
+
+test('the panel spans the column while the bubble keeps to its text', async ({ app }) => {
+  await startChat(app);
+  const message = theirs(app).first();
+  await message.getByRole('button', { name: 'Breakdown' }).click();
+  await expect(message.locator('.analysis-line')).toHaveCount(2);
+  const bubble = (await message.locator('.bubble').boundingBox())!;
+  const panel = (await message.locator('.analysis').boundingBox())!;
+  expect(panel.width).toBeGreaterThan(bubble.width * 1.5);
+});
+
+test('a closed panel is inert, so its Redo button cannot be tabbed to', async ({ app }) => {
+  await startChat(app);
+  const message = theirs(app).first();
+  await message.getByRole('button', { name: 'Breakdown' }).click();
+  await expect(message.getByRole('button', { name: 'Redo' })).toBeVisible();
+  await message.getByRole('button', { name: 'Hide' }).click();
+  await expect(message.getByRole('button', { name: 'Redo' })).toHaveCount(0);
+});
+
+test('on a wide screen each explanation sits right of its sentence, all on one column', async ({ app }) => {
+  await startChat(app);
+  const message = theirs(app).first();
+  await message.getByRole('button', { name: 'Breakdown' }).click();
+  const lines = message.locator('.analysis-line');
+  await expect(lines).toHaveCount(2);
+  await expect(message.locator('.analysis-wrap')).toHaveClass(/open/);
+  const lefts: number[] = [];
+  for (let i = 0; i < 2; i++) {
+    const main = (await lines.nth(i).locator('.line-main').boundingBox())!;
+    const explain = (await lines.nth(i).locator('.line-explain').boundingBox())!;
+    expect(explain.x).toBeGreaterThanOrEqual(main.x + main.width);
+    expect(Math.abs(explain.y - main.y)).toBeLessThan(20);
+    lefts.push(Math.round(explain.x));
+  }
+  expect(lefts[0]).toBe(lefts[1]);
 });

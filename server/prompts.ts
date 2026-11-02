@@ -87,9 +87,12 @@ export const FEEDBACK_SCHEMA = object({
   summary: str,
   lines: {
     type: 'array',
-    items: object({ original: str, corrected: str, translation: str, explanation: str, ok: { type: 'boolean' } }),
+    items: object({ original: str, originalTranslation: str, corrected: str, translation: str, explanation: str, ok: { type: 'boolean' } }),
   },
 });
+
+/** For the English parts of a breakdown or feedback, which the UI renders with inline markdown. */
+const ENGLISH_RULE = 'In the English text, write Japanese words and phrases as they are, with no 「」 brackets or quotation marks around them. For emphasis you may use **bold** or *italic*.';
 
 export function breakdownRequest(settings: Settings, message: Message): { system: string; turns: ChatTurn[] } {
   return {
@@ -102,6 +105,8 @@ Split the message into lines -- usually one sentence each, but join short senten
 - words: each word or particle in the line, in order: text (as written in the message), reading (in hiragana -- never romaji; a katakana word keeps its katakana), meaning (a short English gloss or the particle's role).
 
 ${FURIGANA_RULE.replace('Furigana: give', 'In japanese and words.text, give')}
+
+${ENGLISH_RULE}
 
 Answer with JSON only, matching the schema.`,
     turns: [{ role: 'user', content: `The message:\n\n${stripFurigana(message.content)}` }],
@@ -117,11 +122,13 @@ Give:
 - verdict: "correct" if it is natural, correct Japanese -- even if you would have phrased it differently; "minor" for small slips (a particle, a kana typo, slightly unnatural wording); "incorrect" if the meaning is wrong or unclear; "english" if they wrote mostly in English.
 - corrected: the whole message as natural Japanese that a beginner could have written, with every mistake fixed. If it was already correct, repeat it. If they wrote English, translate it.
 - summary: one or two encouraging sentences in English about how they did and the most important thing to learn.
-- lines: the message split into lines (usually one sentence each). For each: original (what they wrote), corrected (the natural Japanese), translation (English), explanation (in English, briefly: what was wrong and why, or why it is right; for English input, how the Japanese is built), ok (true when the original needed no change).
+- lines: the message split into lines (usually one sentence each). For each: original (what they wrote), originalTranslation (what the original literally says in English, mistakes and all, so they can see what they actually said; for English input, repeat it), corrected (the natural Japanese), translation (English of the corrected version), explanation (in English, briefly: what was wrong and why, or why it is right; for English input, how the Japanese is built), ok (true when the original needed no change).
 
 The chat is in ${settings.politeness === 'casual' ? 'casual plain form' : 'polite です/ます form'}; use that style in your corrections, and mention it only if their style is inconsistent.
 ${kanjiRule(settings.wkLevel)} This applies to corrected Japanese; quote the learner's own text as they wrote it.
 ${FURIGANA_RULE.replace('Furigana: give', 'In corrected Japanese, give')}
+
+${ENGLISH_RULE}
 
 Answer with JSON only, matching the schema.`,
     turns: [
@@ -170,6 +177,7 @@ export function toFeedback(raw: unknown): Feedback {
     summary: text(r.summary),
     lines: list(r.lines).map((l) => ({
       original: text(l.original),
+      originalTranslation: text(l.originalTranslation),
       corrected: text(l.corrected),
       translation: text(l.translation),
       explanation: text(l.explanation),
