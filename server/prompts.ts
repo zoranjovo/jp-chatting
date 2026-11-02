@@ -1,0 +1,179 @@
+// Prompts and answer schemas for the three things the AI does: keep the
+// conversation going, break down its own messages, and give feedback on the
+// learner's.
+
+import { allowedKanji, stripFurigana } from '../shared/kanji.ts';
+import type { ReplyProblems } from '../shared/quality.ts';
+import type { Breakdown, Feedback, Message, Settings } from '../shared/types.ts';
+import type { ChatTurn } from './ai/index.ts';
+
+/** Stands in for the learner's first turn, so every history starts with a user message. */
+const OPENER_CUE = '(The learner has just opened a new chat. Start the conversation.)';
+
+const FURIGANA_RULE = `Furigana: give the reading of every word that contains kanji in this exact markup: {kanji|reading}. The reading is always hiragana -- never romaji, never katakana. Wrap only the kanji part; okurigana stays outside the braces. Examples: {日本語|にほんご}を{話|はな}します。 {今日|きょう}は{暑|あつ}いですね。 Words written only in kana (コーヒー, カフェ, ありがとう) never get markup.`;
+
+function kanjiRule(level: number): string {
+  if (level <= 0) return 'Kanji: the learner knows hiragana and katakana but no kanji yet. Do not use any kanji at all -- write everything in hiragana, and katakana for loanwords.';
+  return `Kanji: the learner knows all hiragana and katakana, but only these kanji (WaniKani levels 1-${level}):
+${allowedKanji(level).join('')}
+Use no other kanji at all. Any word that needs a kanji outside that list must be written in hiragana instead (katakana for loanwords). Check every kanji you write against the list; if you are unsure about one, write that word in hiragana.`;
+}
+
+function styleRule(settings: Settings): string {
+  return settings.politeness === 'casual'
+    ? 'Speech style: casual plain form (だ/る form, like talking with a friend). No です/ます.'
+    : 'Speech style: polite です/ます form.';
+}
+
+export function conversationSystem(settings: Settings, topic: string): string {
+  return `You are a friendly Japanese conversation partner for an English speaker who is learning Japanese. You are chatting by text message.
+
+Rules:
+- Write only in Japanese. Never write English or romaji, even when the learner writes in English -- then just answer in simple Japanese as if they had said it in Japanese.
+- Keep each message short: one to three short sentences with beginner-level grammar and vocabulary. Usually end with something easy to answer, such as a simple question.
+- ${styleRule(settings)}
+- Do not correct the learner's mistakes or explain grammar; a separate tool does that. Keep the conversation going naturally, guessing what they meant if needed.
+- ${topic.trim() ? `Topic or scenario for this chat, chosen by the learner: ${topic.trim()}. Stay in it (play a role if it calls for one).` : 'No topic was chosen: start with an everyday topic and follow wherever the learner takes it.'}
+- ${kanjiRule(settings.wkLevel)}
+- ${FURIGANA_RULE}
+- Your output is shown to the learner exactly as written, as your chat message. Write only the message itself: no name label, quotes, translation, romaji, English or notes. Never comment on your own writing -- if you notice a mistake, just write the corrected message.`;
+}
+
+export function conversationTurns(messages: Message[]): ChatTurn[] {
+  const turns: ChatTurn[] = messages.map((m) => ({ role: m.role, content: m.content }));
+  if (turns[0]?.role !== 'user') turns.unshift({ role: 'user', content: OPENER_CUE });
+  return turns;
+}
+
+export function rewriteRequest(settings: Settings, text: string, problems: ReplyProblems): { system: string; turns: ChatTurn[] } {
+  const fixes = [
+    problems.kanji.length > 0 && `- It uses kanji the learner does not know: ${problems.kanji.join(' ')} -- write those words in hiragana instead.`,
+    problems.furigana.length > 0 && `- It has broken furigana markup: ${problems.furigana.join(' ')} -- readings must be hiragana, and kana-only words get no markup.`,
+    problems.foreign.length > 0 && `- It contains English, romaji or a note that is not part of the message: ${problems.foreign.map((f) => `"${f}"`).join(', ')} -- remove it; keep only the Japanese message (if the note came with a corrected version, keep the corrected version).`,
+  ].filter(Boolean);
+  return {
+    system: `You edit Japanese text for a beginner. ${kanjiRule(settings.wkLevel)}\n${FURIGANA_RULE}\nOutput only the edited text -- no comments.`,
+    turns: [
+      {
+        role: 'user',
+        content: `This chat message for the learner has problems:\n${fixes.join('\n')}\nFix exactly these and change nothing else. Keep the furigana markup on any remaining kanji.\n\n${text}`,
+      },
+    ],
+  };
+}
+
+const str = { type: 'string' } as const;
+
+function object(properties: Record<string, unknown>): Record<string, unknown> {
+  return { type: 'object', properties, required: Object.keys(properties), additionalProperties: false };
+}
+
+export const BREAKDOWN_SCHEMA = object({
+  lines: {
+    type: 'array',
+    items: object({
+      japanese: str,
+      translation: str,
+      explanation: str,
+      words: { type: 'array', items: object({ text: str, reading: str, meaning: str }) },
+    }),
+  },
+});
+
+export const FEEDBACK_SCHEMA = object({
+  meaning: str,
+  verdict: { type: 'string', enum: ['correct', 'minor', 'incorrect', 'english'] },
+  corrected: str,
+  summary: str,
+  lines: {
+    type: 'array',
+    items: object({ original: str, corrected: str, translation: str, explanation: str, ok: { type: 'boolean' } }),
+  },
+});
+
+export function breakdownRequest(settings: Settings, message: Message): { system: string; turns: ChatTurn[] } {
+  return {
+    system: `You are a patient Japanese teacher. An English-speaking beginner wants to understand a Japanese message line by line.
+
+Split the message into lines -- usually one sentence each, but join short sentences or split long ones wherever that makes the translation and explanation clearer. Cover the whole message, in order, without skipping anything. For each line give:
+- japanese: the Japanese text of the line, copied exactly as in the message -- never turn kana into kanji or change any wording.
+- translation: a natural English translation.
+- explanation: a brief explanation in English of how the line is built -- the grammar, particles, conjugations and set phrases that matter, in one to three sentences. Keep it beginner-friendly.
+- words: each word or particle in the line, in order: text (as written in the message), reading (in hiragana -- never romaji; a katakana word keeps its katakana), meaning (a short English gloss or the particle's role).
+
+${FURIGANA_RULE.replace('Furigana: give', 'In japanese and words.text, give')}
+
+Answer with JSON only, matching the schema.`,
+    turns: [{ role: 'user', content: `The message:\n\n${stripFurigana(message.content)}` }],
+  };
+}
+
+export function feedbackRequest(settings: Settings, message: Message, previous: Message | undefined): { system: string; turns: ChatTurn[] } {
+  return {
+    system: `You are a kind but honest Japanese teacher. An English-speaking beginner is practising Japanese by chatting, and wants feedback on a message they wrote. They may have written in Japanese, in English, or a mix.
+
+Give:
+- meaning: what they are trying to say, in English.
+- verdict: "correct" if it is natural, correct Japanese -- even if you would have phrased it differently; "minor" for small slips (a particle, a kana typo, slightly unnatural wording); "incorrect" if the meaning is wrong or unclear; "english" if they wrote mostly in English.
+- corrected: the whole message as natural Japanese that a beginner could have written, with every mistake fixed. If it was already correct, repeat it. If they wrote English, translate it.
+- summary: one or two encouraging sentences in English about how they did and the most important thing to learn.
+- lines: the message split into lines (usually one sentence each). For each: original (what they wrote), corrected (the natural Japanese), translation (English), explanation (in English, briefly: what was wrong and why, or why it is right; for English input, how the Japanese is built), ok (true when the original needed no change).
+
+The chat is in ${settings.politeness === 'casual' ? 'casual plain form' : 'polite です/ます form'}; use that style in your corrections, and mention it only if their style is inconsistent.
+${kanjiRule(settings.wkLevel)} This applies to corrected Japanese; quote the learner's own text as they wrote it.
+${FURIGANA_RULE.replace('Furigana: give', 'In corrected Japanese, give')}
+
+Answer with JSON only, matching the schema.`,
+    turns: [
+      {
+        role: 'user',
+        content: `${previous ? `The message they were replying to:\n${stripFurigana(previous.content)}\n\n` : ''}Their message:\n${message.content}`,
+      },
+    ],
+  };
+}
+
+// Models sometimes return a string where a list belongs, or drop a field;
+// these coerce whatever came back into the shape the UI renders.
+
+const text = (v: unknown): string => (typeof v === 'string' ? v : v == null ? '' : String(v));
+const list = (v: unknown): Record<string, unknown>[] => {
+  if (typeof v === 'string') {
+    try {
+      v = JSON.parse(v);
+    } catch {
+      return [];
+    }
+  }
+  return Array.isArray(v) ? v.filter((x) => x && typeof x === 'object') : [];
+};
+
+export function toBreakdown(raw: unknown): Breakdown {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  return {
+    lines: list(r.lines).map((l) => ({
+      japanese: text(l.japanese),
+      translation: text(l.translation),
+      explanation: text(l.explanation),
+      words: list(l.words).map((w) => ({ text: text(w.text), reading: text(w.reading), meaning: text(w.meaning) })),
+    })),
+  };
+}
+
+export function toFeedback(raw: unknown): Feedback {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const verdict = ['correct', 'minor', 'incorrect', 'english'].includes(text(r.verdict)) ? (r.verdict as Feedback['verdict']) : 'minor';
+  return {
+    meaning: text(r.meaning),
+    verdict,
+    corrected: text(r.corrected),
+    summary: text(r.summary),
+    lines: list(r.lines).map((l) => ({
+      original: text(l.original),
+      corrected: text(l.corrected),
+      translation: text(l.translation),
+      explanation: text(l.explanation),
+      ok: l.ok === true,
+    })),
+  };
+}

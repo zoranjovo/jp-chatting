@@ -1,0 +1,185 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { DEFAULT_SETTINGS, type Chat, type ChatSummary, type Message, type Settings } from '../shared/types.ts';
+import { api } from './api.ts';
+import { ChatView } from './components/ChatView.tsx';
+import { NewChatDialog } from './components/NewChatDialog.tsx';
+import { SettingsDialog } from './components/SettingsDialog.tsx';
+import { Sidebar } from './components/Sidebar.tsx';
+import { LanguageProvider, useT } from './i18n.tsx';
+import { SettingsContext } from './settings.tsx';
+
+export function App() {
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.settings().then(setSettings, (err: Error) => setLoadError(err.message));
+  }, []);
+
+  const update = useCallback(async (patch: Partial<Settings>) => {
+    setSettings((s) => ({ ...s, ...patch }));
+    setSettings(await api.saveSettings(patch));
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.lang = settings.uiLanguage;
+  }, [settings.uiLanguage]);
+
+  const state = useMemo(() => ({ settings, update }), [settings, update]);
+
+  return (
+    <SettingsContext.Provider value={state}>
+      <LanguageProvider language={settings.uiLanguage}>
+        <Shell loadError={loadError} />
+      </LanguageProvider>
+    </SettingsContext.Provider>
+  );
+}
+
+function Shell({ loadError }: { loadError: string | null }) {
+  const t = useT();
+  const [chats, setChats] = useState<ChatSummary[]>([]);
+  const [chat, setChat] = useState<Chat | null>(null);
+  const [waiting, setWaiting] = useState<Set<string>>(new Set());
+  const [errors, setErrors] = useState<Record<string, string | null>>({});
+  const [dialog, setDialog] = useState<'new' | 'settings' | null>(null);
+  const [navOpen, setNavOpen] = useState(false);
+  const activeId = useRef<string | null>(null);
+
+  const refreshList = useCallback(() => api.chats().then(setChats).catch(() => {}), []);
+
+  /** Shows a chat the server returned, if it is still the one on screen. */
+  const show = useCallback((next: Chat) => {
+    if (activeId.current === next.id) setChat(next);
+  }, []);
+
+  const select = useCallback(async (id: string) => {
+    activeId.current = id;
+    setNavOpen(false);
+    try {
+      show(await api.chat(id));
+    } catch (err) {
+      setErrors((e) => ({ ...e, [id]: (err as Error).message }));
+    }
+  }, [show]);
+
+  useEffect(() => {
+    api.chats().then((list) => {
+      setChats(list);
+      if (list[0]) select(list[0].id);
+    }).catch(() => {});
+  }, [select]);
+
+  const setBusy = (id: string, busy: boolean) =>
+    setWaiting((w) => {
+      const next = new Set(w);
+      if (busy) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+
+  const requestReply = useCallback(async (id: string) => {
+    setBusy(id, true);
+    setErrors((e) => ({ ...e, [id]: null }));
+    try {
+      show(await api.reply(id));
+    } catch (err) {
+      setErrors((e) => ({ ...e, [id]: (err as Error).message }));
+    } finally {
+      setBusy(id, false);
+      refreshList();
+    }
+  }, [show, refreshList]);
+
+  const startChat = async (topic: string) => {
+    setDialog(null);
+    const created = await api.createChat(topic);
+    activeId.current = created.id;
+    setChat(created);
+    setNavOpen(false);
+    refreshList();
+    requestReply(created.id);
+  };
+
+  const send = async (text: string) => {
+    if (!chat) return;
+    const id = chat.id;
+    try {
+      show(await api.send(id, text));
+      requestReply(id);
+    } catch (err) {
+      setErrors((e) => ({ ...e, [id]: (err as Error).message }));
+    }
+  };
+
+  const rename = async (id: string, title: string) => {
+    show(await api.renameChat(id, title));
+    refreshList();
+  };
+
+  const remove = async (id: string) => {
+    await api.deleteChat(id);
+    if (activeId.current === id) {
+      activeId.current = null;
+      setChat(null);
+    }
+    refreshList();
+  };
+
+  const messageUpdated = (m: Message) =>
+    setChat((c) => (c ? { ...c, messages: c.messages.map((x) => (x.id === m.id ? m : x)) } : c));
+
+  return (
+    <div className={`app ${navOpen ? 'nav-open' : ''}`}>
+      <Sidebar
+        chats={chats}
+        activeId={chat?.id ?? null}
+        onSelect={select}
+        onNew={() => setDialog('new')}
+        onRename={rename}
+        onDelete={remove}
+        onSettings={() => setDialog('settings')}
+      />
+      <div className="scrim" onClick={() => setNavOpen(false)} />
+      <main className="main">
+        <header className="topbar">
+          <button type="button" className="icon-button menu-button" onClick={() => setNavOpen(true)} aria-label={t.menu}>
+            ☰
+          </button>
+          <h1 className="jp">{chat ? chat.title || t.untitled : t.appName}</h1>
+          <button type="button" className="icon-button topbar-new" onClick={() => setDialog('new')} aria-label={t.newChat} title={t.newChat}>
+            +
+          </button>
+        </header>
+        {loadError && (
+          <div className="error">
+            {t.errorPrefix} {loadError}
+          </div>
+        )}
+        {chat ? (
+          <ChatView
+            chat={chat}
+            waiting={waiting.has(chat.id)}
+            error={errors[chat.id] ?? null}
+            onSend={send}
+            onRetry={() => requestReply(chat.id)}
+            onMessageUpdated={messageUpdated}
+          />
+        ) : (
+          <div className="empty">
+            <div className="empty-mark" aria-hidden>
+              会話
+            </div>
+            <h2>{t.emptyTitle}</h2>
+            <p>{t.emptyBody}</p>
+            <button type="button" className="primary" onClick={() => setDialog('new')}>
+              + {t.newChat}
+            </button>
+          </div>
+        )}
+      </main>
+      {dialog === 'new' && <NewChatDialog onStart={startChat} onClose={() => setDialog(null)} />}
+      {dialog === 'settings' && <SettingsDialog onClose={() => setDialog(null)} />}
+    </div>
+  );
+}

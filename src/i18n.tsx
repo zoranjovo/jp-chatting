@@ -1,0 +1,193 @@
+// UI strings in English and Japanese. `ja` must have every key `en` has --
+// the Strings type makes a missing one a type error.
+
+import { createContext, useContext, type ReactNode } from 'react';
+import type { UiLanguage } from '../shared/types.ts';
+
+const en = {
+  appName: 'jp-chatting',
+  newChat: 'New chat',
+  settings: 'Settings',
+  noChats: 'No chats yet.',
+  deleteChat: 'Delete chat',
+  renameChat: 'Rename chat',
+  confirmDelete: 'Delete this chat? This cannot be undone.',
+  renamePrompt: 'New name for this chat:',
+  untitled: 'Untitled chat',
+  menu: 'Menu',
+
+  newChatTitle: 'Start a new chat',
+  topicLabel: 'Topic or scenario (optional)',
+  topicPlaceholder: 'e.g. ordering at a café, talking about weekend plans…',
+  topicHint: 'Leave it empty to chat about anything. Your partner sends the first message.',
+  start: 'Start',
+  cancel: 'Cancel',
+  topicExamples: ['Ordering at a café', 'Weekend plans', 'Self-introduction', 'Shopping for clothes', 'Asking for directions'],
+
+  emptyTitle: 'Practise Japanese by chatting',
+  emptyBody: 'Start a new chat and your partner will send the first message. Tap “Breakdown” on any of their messages for a line-by-line translation, and “Check” on yours for feedback.',
+
+  you: 'You',
+  partner: 'Partner',
+  typing: 'Typing…',
+  composerPlaceholder: 'Write in Japanese… (Enter to send, Shift+Enter for a new line)',
+  composerPlaceholderRomaji: 'Type romaji — it turns into kana (CAPS for katakana)…',
+  send: 'Send',
+  romajiOn: 'Romaji → kana is on',
+  romajiOff: 'Romaji → kana is off',
+  retryReply: 'Get a reply',
+  errorPrefix: 'Something went wrong:',
+
+  breakdown: 'Breakdown',
+  check: 'Check',
+  hide: 'Hide',
+  analyzing: 'Thinking…',
+  redo: 'Redo',
+  words: 'Words',
+  verdict: {
+    correct: 'Correct!',
+    minor: 'Almost — small fixes',
+    incorrect: 'Needs work',
+    english: 'Written in English',
+  },
+  youMeant: 'You meant',
+  naturalJapanese: 'Natural Japanese',
+  yourLine: 'You wrote',
+  betterLine: 'Better',
+  lineOk: 'Good',
+  overLevel: 'Above your WaniKani level',
+  notInWk: 'Not taught on WaniKani',
+  wkLevel: 'WaniKani level',
+
+  settingsTitle: 'Settings',
+  sectionLearning: 'Learning',
+  sectionAi: 'AI',
+  uiLanguage: 'Interface language',
+  wkLevelLabel: 'WaniKani level',
+  wkLevelHint: (level: number, count: number) =>
+    level === 0 ? 'Kana only — no kanji.' : `Your partner may use the ${count} kanji from levels 1–${level}. Others are written in kana.`,
+  furigana: 'Show furigana (readings over kanji)',
+  romajiInput: 'Convert romaji to kana while typing',
+  politeness: 'Partner’s speech style',
+  polite: 'Polite (です/ます)',
+  casual: 'Casual (plain form)',
+  provider: 'AI provider',
+  providerEndpoint: 'Model endpoint (OpenAI-compatible)',
+  providerClaude: 'Claude Code CLI',
+  baseUrl: 'Endpoint URL',
+  baseUrlHint: 'LM Studio: http://localhost:1234/v1 · Ollama: http://localhost:11434/v1',
+  apiKey: 'API key (optional)',
+  model: 'Model',
+  chooseModel: 'Choose a model…',
+  refreshModels: 'Refresh list',
+  loadingModels: 'Loading models…',
+  modelsError: 'Could not list models:',
+  noModels: 'The endpoint lists no models.',
+  claudeCommand: 'CLI command',
+  claudeHint: 'Runs `claude -p` on the subscription the CLI is signed in to — never an API key.',
+  effort: 'Effort',
+  effortDefault: 'Default',
+  save: 'Save',
+  saved: 'Saved',
+};
+
+export type Strings = typeof en;
+
+const ja: Strings = {
+  appName: 'jp-chatting',
+  newChat: '新しいチャット',
+  settings: '設定',
+  noChats: 'まだチャットがありません。',
+  deleteChat: 'チャットを削除',
+  renameChat: '名前を変更',
+  confirmDelete: 'このチャットを削除しますか？元に戻せません。',
+  renamePrompt: 'チャットの新しい名前：',
+  untitled: '無題のチャット',
+  menu: 'メニュー',
+
+  newChatTitle: '新しいチャットを始める',
+  topicLabel: 'トピック・場面（任意）',
+  topicPlaceholder: '例：カフェで注文する、週末の予定について話す…',
+  topicHint: '空のままでも大丈夫です。相手が最初のメッセージを送ります。',
+  start: '始める',
+  cancel: 'キャンセル',
+  topicExamples: ['カフェで注文', '週末の予定', '自己紹介', '服の買い物', '道を聞く'],
+
+  emptyTitle: 'チャットで日本語を練習しよう',
+  emptyBody: '新しいチャットを始めると、相手が最初のメッセージを送ります。相手のメッセージの「解説」で一行ずつの翻訳を、自分のメッセージの「チェック」で添削を見られます。',
+
+  you: 'あなた',
+  partner: '相手',
+  typing: '入力中…',
+  composerPlaceholder: '日本語で書いてください…（Enterで送信、Shift+Enterで改行）',
+  composerPlaceholderRomaji: 'ローマ字で入力するとかなになります（大文字はカタカナ）…',
+  send: '送信',
+  romajiOn: 'ローマ字→かな：オン',
+  romajiOff: 'ローマ字→かな：オフ',
+  retryReply: '返信をもらう',
+  errorPrefix: 'エラーが発生しました：',
+
+  breakdown: '解説',
+  check: 'チェック',
+  hide: '閉じる',
+  analyzing: '考え中…',
+  redo: 'やり直す',
+  words: '単語',
+  verdict: {
+    correct: '正解！',
+    minor: 'おしい！少し直しましょう',
+    incorrect: 'もう少し練習しましょう',
+    english: '英語で書かれています',
+  },
+  youMeant: '言いたかったこと',
+  naturalJapanese: '自然な日本語',
+  yourLine: 'あなたの文',
+  betterLine: 'より自然な文',
+  lineOk: 'よくできました',
+  overLevel: 'WaniKaniのレベル外',
+  notInWk: 'WaniKaniにない漢字',
+  wkLevel: 'WaniKaniレベル',
+
+  settingsTitle: '設定',
+  sectionLearning: '学習',
+  sectionAi: 'AI',
+  uiLanguage: '表示言語',
+  wkLevelLabel: 'WaniKaniレベル',
+  wkLevelHint: (level: number, count: number) =>
+    level === 0 ? 'かなのみ（漢字なし）。' : `相手はレベル1〜${level}の漢字${count}字を使えます。それ以外はかなで書きます。`,
+  furigana: 'ふりがなを表示する',
+  romajiInput: '入力中にローマ字をかなに変換する',
+  politeness: '相手の話し方',
+  polite: '丁寧（です・ます）',
+  casual: 'カジュアル（普通形）',
+  provider: 'AIプロバイダー',
+  providerEndpoint: 'モデルエンドポイント（OpenAI互換）',
+  providerClaude: 'Claude Code CLI',
+  baseUrl: 'エンドポイントURL',
+  baseUrlHint: 'LM Studio: http://localhost:1234/v1 · Ollama: http://localhost:11434/v1',
+  apiKey: 'APIキー（任意）',
+  model: 'モデル',
+  chooseModel: 'モデルを選択…',
+  refreshModels: '一覧を更新',
+  loadingModels: 'モデルを読み込み中…',
+  modelsError: 'モデル一覧を取得できません：',
+  noModels: 'エンドポイントにモデルがありません。',
+  claudeCommand: 'CLIコマンド',
+  claudeHint: 'CLIでサインインしているサブスクリプションで `claude -p` を実行します（APIキーは使いません）。',
+  effort: '思考レベル',
+  effortDefault: 'デフォルト',
+  save: '保存',
+  saved: '保存しました',
+};
+
+export const STRINGS: Record<UiLanguage, Strings> = { en, ja };
+
+const LanguageContext = createContext<UiLanguage>('en');
+
+export function LanguageProvider({ language, children }: { language: UiLanguage; children: ReactNode }) {
+  return <LanguageContext.Provider value={language}>{children}</LanguageContext.Provider>;
+}
+
+export function useT(): Strings {
+  return STRINGS[useContext(LanguageContext)];
+}

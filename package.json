@@ -1,0 +1,38 @@
+{
+  "name": "jp-chatting",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local-only app for practising Japanese typing and conversation with an AI partner.",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n server,web -c blue,magenta \"tsx watch --clear-screen=false server/index.ts\" \"vite\"",
+    "build": "vite build",
+    "start": "tsx server/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test \"test/unit/**/*.test.ts\" \"test/unit/**/*.test.tsx\"",
+    "test:ui": "playwright test",
+    "test:all": "pnpm typecheck && pnpm test && pnpm test:ui",
+    "check:claude": "tsx scripts/check-claude-models.ts",
+    "eval": "tsx scripts/eval-prompts.ts"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/express": "^5.0.3",
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^4.5.0",
+    "concurrently": "^9.1.2",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.0",
+    "vite": "^6.3.0"
+  }
+}
