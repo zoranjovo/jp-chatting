@@ -73,7 +73,7 @@ test/ui/           Playwright specs, fixtures.ts, mock-llm.ts (scripted model se
 - Never add `--bare` (API keys only). Tools, MCP, CLAUDE.md, skills, hooks, slash commands, Chrome and session persistence are all off; cwd is the empty `.cache/claude/`.
 - The system prompt goes in a temp file (`--system-prompt-file`) because the kanji list can exceed Windows' command-line limit; the user prompt goes on stdin.
 - Schema requests use `--json-schema` and read `structured_output`; they need `--max-turns 3` for the StructuredOutput tool turn.
-- The CLI has no model-listing command, so `CLAUDE_MODELS` is a fixed list. When changing it, run `pnpm check:claude` and keep only models that pass.
+- The CLI has no model-listing command, so `CLAUDE_MODELS` is a fixed list: Haiku, Sonnet and Opus 5.5 by full id (aliases like `sonnet` can move to a newer model on a CLI update; old saved aliases are mapped to the 5.5 ids on load). When changing it, run `pnpm check:claude` and keep only models that pass.
 - Auth errors get a hint to run `claude auth login`. The standalone CLI's sign-in is separate from the Claude desktop app's.
 
 ## Conventions
@@ -89,7 +89,7 @@ test/ui/           Playwright specs, fixtures.ts, mock-llm.ts (scripted model se
 
 Unit tests can't tell whether a prompt change made the Japanese better or worse, so check prompt and pipeline changes against real models:
 
-1. Before the change: `pnpm eval --label before claude:haiku claude:sonnet claude:opus endpoint:<lm-studio-model>` (an endpoint model needs LM Studio serving it on :1234).
+1. Before the change: `pnpm eval --label before claude:claude-haiku-5-5 claude:claude-sonnet-5-5 claude:claude-opus-5-5 endpoint:<lm-studio-model>` (an endpoint model needs LM Studio serving it on :1234).
 2. Make the change, then `pnpm eval --label after …` with the same models.
 3. `pnpm eval --compare before after` re-scores both runs with the current checks, prints a metrics table, and writes every output side by side to `.cache/eval/before-vs-after.md`. **Read the outputs**, not just the numbers: the checks catch rule-breaking (kanji, markup, English, style, length, breakdown coverage, feedback verdicts), not naturalness.
 

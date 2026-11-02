@@ -64,13 +64,18 @@ async function writeJson(file: string, value: unknown): Promise<void> {
   }
 }
 
+/** Model aliases older versions saved, pinned to the model they meant then. */
+const CLAUDE_ALIASES: Record<string, string> = { haiku: 'claude-haiku-5-5', sonnet: 'claude-sonnet-5-5', opus: 'claude-opus-5-5' };
+
 /** Fills in fields a settings file from an older version lacks. */
 function withDefaults(saved: Partial<Settings> | null): Settings {
+  const claude = { ...DEFAULT_SETTINGS.claude, ...saved?.claude };
+  claude.model = CLAUDE_ALIASES[claude.model] ?? claude.model;
   return {
     ...DEFAULT_SETTINGS,
     ...saved,
     endpoint: { ...DEFAULT_SETTINGS.endpoint, ...saved?.endpoint },
-    claude: { ...DEFAULT_SETTINGS.claude, ...saved?.claude },
+    claude,
   };
 }
 

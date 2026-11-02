@@ -37,7 +37,7 @@ export const DEFAULT_SETTINGS: Settings = {
   romajiInput: true,
   provider: 'endpoint',
   endpoint: { baseUrl: 'http://localhost:1234/v1', apiKey: '', model: '' },
-  claude: { command: 'claude', model: 'sonnet', effort: '', timeoutMs: 180_000 },
+  claude: { command: 'claude', model: 'claude-sonnet-5-5', effort: '', timeoutMs: 180_000 },
 };
 
 /** Breakdown of one of the AI's messages, line by line. */

@@ -15,22 +15,16 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Settings } from '../../shared/types.ts';
+import { DEFAULT_SETTINGS, type Settings } from '../../shared/types.ts';
 import { AiError, type AiRequest } from './types.ts';
 
 type ClaudeConfig = Settings['claude'];
 
-/** The CLI has no command that lists models, so these are the ones it accepts. */
-export const CLAUDE_MODELS = [
-  'sonnet',
-  'opus',
-  'haiku',
-  'fable',
-  'claude-sonnet-5-5',
-  'claude-opus-5-5',
-  'claude-haiku-5-5',
-  'claude-fable-5-1',
-];
+/**
+ * The CLI has no command that lists models, so this is the list offered.
+ * Full ids, not aliases like "sonnet", so a CLI update never quietly swaps the model.
+ */
+export const CLAUDE_MODELS = ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5'];
 
 /** An empty directory, so no project CLAUDE.md or git status reaches the session. */
 const WORK_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '.cache', 'claude');
@@ -56,7 +50,7 @@ export const AUTH_PROBLEM = /authenticat|log ?in|oauth|not logged/i;
 export function claudeArgs(request: AiRequest, config: ClaudeConfig, systemPromptFile: string): string[] {
   return [
     '-p',
-    '--model', config.model || 'sonnet',
+    '--model', config.model || DEFAULT_SETTINGS.claude.model,
     '--output-format', 'stream-json',
     '--verbose',
     '--safe-mode',

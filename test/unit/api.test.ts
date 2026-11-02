@@ -73,12 +73,12 @@ beforeEach(async () => {
 
 describe('settings API', () => {
   test('reads and updates settings', async () => {
-    const put = await api<Settings>('PUT', '/api/settings', { uiLanguage: 'ja', claude: { model: 'opus' } });
+    const put = await api<Settings>('PUT', '/api/settings', { uiLanguage: 'ja', claude: { model: 'claude-opus-5-5' } });
     assert.equal(put.status, 200);
     assert.equal(put.body.uiLanguage, 'ja');
     const got = await api<Settings>('GET', '/api/settings');
     assert.equal(got.body.uiLanguage, 'ja');
-    assert.equal(got.body.claude.model, 'opus');
+    assert.equal(got.body.claude.model, 'claude-opus-5-5');
     assert.equal(got.body.claude.command, 'claude');
   });
 

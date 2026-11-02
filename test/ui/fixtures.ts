@@ -12,7 +12,7 @@ export const TEST_SETTINGS: Partial<Settings> = {
   romajiInput: true,
   provider: 'endpoint',
   endpoint: { baseUrl: `${MOCK_URL}/v1`, apiKey: '', model: 'mock-small' },
-  claude: { command: 'claude', model: 'sonnet', effort: '', timeoutMs: 180_000 },
+  claude: { command: 'claude', model: 'claude-sonnet-5-5', effort: '', timeoutMs: 180_000 },
 };
 
 export async function resetApp(request: APIRequestContext) {

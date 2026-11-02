@@ -21,10 +21,10 @@ describe('settings', () => {
 
   test('a patch merges into what is saved, nested sections included', async () => {
     await store.saveSettings({ wkLevel: 12, endpoint: { ...DEFAULT_SETTINGS.endpoint, model: 'qwen' } });
-    const saved = await store.saveSettings({ claude: { ...DEFAULT_SETTINGS.claude, model: 'opus' } } as never);
+    const saved = await store.saveSettings({ claude: { ...DEFAULT_SETTINGS.claude, model: 'claude-opus-5-5' } } as never);
     assert.equal(saved.wkLevel, 12);
     assert.equal(saved.endpoint.model, 'qwen');
-    assert.equal(saved.claude.model, 'opus');
+    assert.equal(saved.claude.model, 'claude-opus-5-5');
     assert.deepEqual(await store.getSettings(), saved);
   });
 
@@ -43,10 +43,10 @@ describe('settings', () => {
   });
 
   test('a settings file from an older version gains the new fields', async () => {
-    await fs.writeFile(path.join(dir, 'settings.json'), JSON.stringify({ wkLevel: 3, claude: { model: 'haiku' } }));
+    await fs.writeFile(path.join(dir, 'settings.json'), JSON.stringify({ wkLevel: 3, claude: { model: 'claude-haiku-5-5' } }));
     const s = await store.getSettings();
     assert.equal(s.wkLevel, 3);
-    assert.equal(s.claude.model, 'haiku');
+    assert.equal(s.claude.model, 'claude-haiku-5-5');
     assert.equal(s.claude.command, DEFAULT_SETTINGS.claude.command);
     assert.equal(s.furigana, DEFAULT_SETTINGS.furigana);
   });
@@ -122,5 +122,19 @@ describe('chats', () => {
   test('newId is unique and now is an ISO timestamp', () => {
     assert.notEqual(store.newId(), store.newId());
     assert.ok(!Number.isNaN(Date.parse(store.now())));
+  });
+});
+
+describe('settings migration', () => {
+  test('old Claude model aliases are pinned to their 5.5 ids', async () => {
+    for (const [alias, id] of [['haiku', 'claude-haiku-5-5'], ['sonnet', 'claude-sonnet-5-5'], ['opus', 'claude-opus-5-5']]) {
+      await fs.writeFile(path.join(dir, 'settings.json'), JSON.stringify({ claude: { model: alias } }));
+      assert.equal((await store.getSettings()).claude.model, id, alias);
+    }
+  });
+
+  test('a full model id is kept as is', async () => {
+    await fs.writeFile(path.join(dir, 'settings.json'), JSON.stringify({ claude: { model: 'claude-opus-5-5' } }));
+    assert.equal((await store.getSettings()).claude.model, 'claude-opus-5-5');
   });
 });

@@ -109,13 +109,13 @@ test('the Claude CLI option lists its models and its own settings', async ({ app
   await expect(dialog.getByLabel('Effort')).toBeVisible();
   await expect(dialog.getByLabel('Endpoint URL')).toHaveCount(0);
   const model = dialog.getByLabel('Model', { exact: true });
-  await expect(model.locator('option', { hasText: 'opus' }).first()).toBeAttached();
-  await model.selectOption('haiku');
+  await expect(model.locator('option')).toHaveText(['Choose a model…', 'claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5']);
+  await model.selectOption('claude-haiku-5-5');
   await dialog.getByLabel('Effort').selectOption('low');
   await dialog.getByRole('button', { name: 'Save' }).click();
   await expect.poll(async () => (await saved(request)).provider).toBe('claude');
   const s = await saved(request);
-  expect(s.claude.model).toBe('haiku');
+  expect(s.claude.model).toBe('claude-haiku-5-5');
   expect(s.claude.effort).toBe('low');
 });
 

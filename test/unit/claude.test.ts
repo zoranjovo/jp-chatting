@@ -53,8 +53,8 @@ describe('claudeArgs', () => {
     assert.equal(flag(claudeArgs(textRequest, { ...config, effort: 'low' }, 's'), '--effort'), 'low');
   });
 
-  test('an empty model falls back to sonnet', () => {
-    assert.equal(flag(claudeArgs(textRequest, { ...config, model: '' }, 's'), '--model'), 'sonnet');
+  test('an empty model falls back to the default, Sonnet 5.5', () => {
+    assert.equal(flag(claudeArgs(textRequest, { ...config, model: '' }, 's'), '--model'), 'claude-sonnet-5-5');
   });
 });
 
@@ -229,5 +229,11 @@ describe('CLAUDE_MODELS', () => {
 
   test('the default model is in the list', () => {
     assert.ok(CLAUDE_MODELS.includes(DEFAULT_SETTINGS.claude.model));
+  });
+});
+
+describe('the offered models', () => {
+  test('are exactly Haiku, Sonnet and Opus 5.5, by full id', () => {
+    assert.deepEqual(CLAUDE_MODELS, ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5']);
   });
 });
