@@ -1,6 +1,10 @@
 # jp-chatting
 
-A local-only app for practising Japanese typing and conversation with an AI partner.
+A local-only app for practising Japanese typing and conversation with an LLM of your choice.
+
+Yes, it is 100% vibecoded.
+
+There are a lot of Japanese specific features in the app, but you should be able to strip that out and adapt the basic premise of it to learn and practise any language, feel free to fork.
 
 - **Chats** — multiple chats, each optionally with a topic or scenario ("ordering at a café"). The partner sends the first message.
 - **Breakdown** — on any partner message: line-by-line English translation, a short explanation of how each line is built, and a word-by-word gloss.
