@@ -3,7 +3,7 @@ import type { Settings } from '../../shared/types.ts';
 import { expect, mockCalls, mockControl, startChat, test, theirs } from './fixtures.ts';
 
 async function openSettings(page: Page) {
-  await page.getByRole('button', { name: /Settings|設定/ }).click();
+  await page.locator('.sidebar').getByRole('button', { name: /Settings|設定/ }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
   return dialog;
@@ -179,7 +179,7 @@ test('Test model sends a message and shows the reply', async ({ app, request }) 
   const result = dialog.getByRole('status');
   await expect(result).toContainText('It works — replied in');
   await expect(result).toContainText('いらっしゃいませ');
-  expect((await mockCalls(request)).at(-1)).toEqual({ kind: 'chat', turns: 1 });
+  expect((await mockCalls(request)).at(-1)).toEqual({ kind: 'chat', turns: 1, model: 'mock-small' });
 });
 
 test('a failing model shows why', async ({ app, request }) => {

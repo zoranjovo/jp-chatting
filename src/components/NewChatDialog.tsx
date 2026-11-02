@@ -30,7 +30,7 @@ export function NewChatDialog({ onStart, onClose }: { onStart: (topic: string, p
         <p className="muted small">{t.topicHint}</p>
         <div className="field">
           <span>{t.politeness}</span>
-          <StyleSwitch value={politeness} onChange={setPoliteness} long />
+          <StyleSwitch value={politeness} onChange={setPoliteness} />
           <small className="muted">{t.speechStyleHint}</small>
         </div>
         <div className="dialog-actions">
@@ -46,15 +46,15 @@ export function NewChatDialog({ onStart, onClose }: { onStart: (topic: string, p
   );
 }
 
-/** Polite / casual as a two-way switch; `long` uses the labels that spell out です/ます and plain form. */
-export function StyleSwitch({ value, onChange, long = false }: { value: Politeness; onChange: (p: Politeness) => void; long?: boolean }) {
+/** Polite / casual as a two-way switch. */
+export function StyleSwitch({ value, onChange }: { value: Politeness; onChange: (p: Politeness) => void }) {
   const t = useT();
   const options: [Politeness, string][] = [
-    ['polite', long ? t.polite : t.politeShort],
-    ['casual', long ? t.casual : t.casualShort],
+    ['polite', t.polite],
+    ['casual', t.casual],
   ];
   return (
-    <div className={`segmented ${long ? '' : 'segmented-small'}`} role="radiogroup" aria-label={t.politeness}>
+    <div className="segmented" role="radiogroup" aria-label={t.politeness}>
       {options.map(([p, label]) => (
         <label key={p} className={value === p ? 'active' : ''}>
           <input type="radio" checked={value === p} onChange={() => onChange(p)} />

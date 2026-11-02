@@ -23,7 +23,7 @@ export async function resetApp(request: APIRequestContext) {
   await request.post(`${MOCK_URL}/__reset`);
 }
 
-export async function mockCalls(request: APIRequestContext): Promise<{ kind: string; turns: number }[]> {
+export async function mockCalls(request: APIRequestContext): Promise<{ kind: string; turns: number; model: string }[]> {
   return (await request.get(`${MOCK_URL}/__calls`)).json();
 }
 

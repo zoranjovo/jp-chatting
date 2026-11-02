@@ -10,7 +10,7 @@ export const OPENER = 'いらっしゃいませ！{何|なに}を{飲|の}みま
 export const SECOND = 'はい、{大|おお}きいサイズと{小|ちい}さいサイズ、どちらにしますか？';
 
 type Kind = 'chat' | 'rewrite' | 'breakdown' | 'feedback';
-let calls: { kind: Kind; turns: number }[] = [];
+let calls: { kind: Kind; turns: number; model: string }[] = [];
 let control = { fail: false, delayMs: 0 };
 
 const completion = (content: string) => ({ choices: [{ message: { role: 'assistant', content } }] });
@@ -77,7 +77,7 @@ http
       const schema = JSON.stringify(body.response_format ?? '');
       const system = String(body.messages?.[0]?.content ?? '');
       const kind: Kind = schema.includes('verdict') ? 'feedback' : schema.includes('lines') ? 'breakdown' : system.startsWith('You edit Japanese') ? 'rewrite' : 'chat';
-      calls.push({ kind, turns: body.messages.length - 1 });
+      calls.push({ kind, turns: body.messages.length - 1, model: String(body.model) });
       if (control.delayMs) await new Promise((r) => setTimeout(r, control.delayMs));
       if (control.fail) return send(500, { error: 'mock model is down' });
       send(200, answer(kind, body));

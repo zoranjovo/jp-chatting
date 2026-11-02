@@ -3,6 +3,7 @@ import type { Message } from '../../shared/types.ts';
 import { api } from '../api.ts';
 import { useT } from '../i18n.tsx';
 import { BreakdownView, FeedbackView } from './Analysis.tsx';
+import { ContextLine } from './ContextLine.tsx';
 import { JpText } from './JpText.tsx';
 
 /** Matches the open/close transition in styles.css. */
@@ -74,6 +75,7 @@ export function MessageBubble({ chatId, message, onUpdated }: { chatId: string; 
           </button>
         </div>
       </div>
+      {message.context && <ContextLine context={message.context} className="message-meta" title={t.contextTitle} />}
       {mounted && (
         <div ref={wrap} className={`analysis-wrap ${shown ? 'open' : ''}`} inert={!open}>
           <div className="analysis-clip">

@@ -5,8 +5,11 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { DEFAULT_SETTINGS, type Breakdown, type Feedback, type Settings } from '../../shared/types.ts';
+import { DEFAULT_SETTINGS, type Breakdown, type Chat, type Feedback, type Message, type MessageContext, type Settings } from '../../shared/types.ts';
 import { BreakdownView, FeedbackView, glossSegments } from '../../src/components/Analysis.tsx';
+import { ChatSettingsDialog } from '../../src/components/ChatSettingsDialog.tsx';
+import { ContextLine } from '../../src/components/ContextLine.tsx';
+import { MessageBubble } from '../../src/components/MessageBubble.tsx';
 import { JpText } from '../../src/components/JpText.tsx';
 import { parseInline } from '../../src/components/RichText.tsx';
 import { LanguageProvider } from '../../src/i18n.tsx';
@@ -303,5 +306,46 @@ describe('Japanese quoted in 「」 inside English', () => {
   test('the Japanese itself (not RichText) keeps its brackets', () => {
     const html = render(<JpText text="「はい」と言った" />, { wkLevel: 60 });
     assert.ok(html.includes('「はい」'));
+  });
+});
+
+describe('message context line', () => {
+  const ctx: MessageContext = { provider: 'claude', model: 'claude-opus-5-5', effort: 'high', politeness: 'casual', wkLevel: 12, genkiLesson: 6, jlptLevel: 4 };
+
+  test('lists the model, effort, style and levels', () => {
+    assert.ok(render(<ContextLine context={ctx} />).includes('>Opus 5.5 · high effort · Casual · WK 12 · Genki L6 · N4<'));
+  });
+
+  test('leaves out what is not set, and says kana only for level 0', () => {
+    const html = render(<ContextLine context={{ provider: 'endpoint', model: 'qwen3', politeness: 'polite', wkLevel: 0, genkiLesson: 0, jlptLevel: 0 }} />);
+    assert.ok(html.includes('>qwen3 · Polite · Kana only<'));
+  });
+
+  test('follows the UI language', () => {
+    assert.ok(render(<ContextLine context={ctx} />, { uiLanguage: 'ja' }).includes('>Opus 5.5 · エフォート high · カジュアル · WK12 · げんき第6課 · N4<'));
+  });
+
+  test('sits under a stamped message with an explaining tooltip, and is absent on old ones', () => {
+    const message: Message = { id: 'm', role: 'assistant', content: 'こんにちは', createdAt: '', context: ctx };
+    const html = render(<MessageBubble chatId="c" message={message} onUpdated={() => {}} />);
+    assert.ok(html.includes('class="context-line message-meta" title="The settings this message was written with. Its breakdown or feedback uses them too.\nOpus 5.5'));
+    const { context: _, ...old } = message;
+    assert.ok(!render(<MessageBubble chatId="c" message={old} onUpdated={() => {}} />).includes('message-meta'));
+  });
+});
+
+describe('ChatSettingsDialog', () => {
+  const chat: Chat = { id: 'c', title: 'Café', topic: 'Ordering', politeness: 'casual', createdAt: '', updatedAt: '', messages: [] };
+
+  test('shows the chat\'s title, topic and style, and the app-wide model and levels the next message will use', () => {
+    const html = render(<ChatSettingsDialog chat={chat} onSave={() => {}} onClose={() => {}} />, {
+      provider: 'claude',
+      claude: { ...DEFAULT_SETTINGS.claude, model: 'claude-haiku-5-5' },
+      wkLevel: 8,
+    });
+    assert.match(html, /value="Café"/);
+    assert.match(html, /value="Ordering"/);
+    assert.ok(html.includes('<label class="active"><input type="radio" checked=""/>Casual (plain form)'));
+    assert.match(html, /class="context-line chat-uses"[^>]*>Haiku 5\.5 · Casual · WK 8</);
   });
 });

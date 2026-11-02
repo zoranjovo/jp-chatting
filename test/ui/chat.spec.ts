@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test';
 import { chatsOnDisk, composer, expect, mine, mockCalls, mockControl, startChat, test, theirs } from './fixtures.ts';
 
 test('the empty state invites starting a chat', async ({ app }) => {
@@ -21,7 +22,7 @@ test('a new chat with a topic gets an opener from the partner', async ({ app, re
   const [chat] = await chatsOnDisk(request);
   expect(chat.topic).toBe('Ordering at a café');
   expect(chat.messages).toHaveLength(1);
-  expect((await mockCalls(request))[0]).toEqual({ kind: 'chat', turns: 1 });
+  expect((await mockCalls(request))[0]).toEqual({ kind: 'chat', turns: 1, model: 'mock-small' });
 });
 
 test('a chat without a topic is named after the opener', async ({ app }) => {
@@ -122,6 +123,15 @@ test('a failed reply keeps the learner\'s message', async ({ app, request }) => 
   await expect(theirs(app)).toHaveCount(2);
 });
 
+const chatSettingsButton = (app: Page) => app.locator('.topbar').getByRole('button', { name: 'Chat settings' });
+
+async function openChatSettings(app: Page) {
+  await chatSettingsButton(app).click();
+  const dialog = app.getByRole('dialog');
+  await expect(dialog.getByRole('heading', { name: 'Chat settings' })).toBeVisible();
+  return dialog;
+}
+
 test('a new chat takes the speech style chosen when starting it', async ({ app, request }) => {
   await app.getByRole('button', { name: '+ New chat' }).first().click();
   const dialog = app.getByRole('dialog');
@@ -129,19 +139,41 @@ test('a new chat takes the speech style chosen when starting it', async ({ app, 
   await dialog.getByText('Casual (plain form)').click();
   await dialog.getByRole('button', { name: 'Start' }).click();
   await expect(theirs(app)).toHaveCount(1);
-  await expect(app.locator('.topbar').getByRole('radio', { name: 'Casual' })).toBeChecked();
+  await expect(chatSettingsButton(app)).toContainText('Casual');
   expect((await chatsOnDisk(request))[0].politeness).toBe('casual');
 });
 
-test('the top bar switches the open chat\'s speech style', async ({ app, request }) => {
+test('the chat settings pane changes the title, topic and speech style', async ({ app, request }) => {
   await startChat(app, 'Style');
-  const topbar = app.locator('.topbar');
-  await expect(topbar.getByRole('radio', { name: 'Polite' })).toBeChecked();
-  await topbar.getByText('Casual', { exact: true }).click();
-  await expect(topbar.getByRole('radio', { name: 'Casual' })).toBeChecked();
-  await expect.poll(async () => (await chatsOnDisk(request))[0].politeness).toBe('casual');
+  await expect(chatSettingsButton(app)).toContainText('Polite');
+  const dialog = await openChatSettings(app);
+  await expect(dialog.getByLabel('Title')).toHaveValue('Style');
+  await expect(dialog.getByRole('radio', { name: 'Polite (です/ます)' })).toBeChecked();
+  await dialog.getByLabel('Title').fill('Weekend');
+  await dialog.getByLabel('Topic or scenario (optional)').fill('Weekend plans');
+  await dialog.getByText('Casual (plain form)').click();
+  await dialog.getByRole('button', { name: 'Save' }).click();
+
+  await expect(app.getByRole('dialog')).toHaveCount(0);
+  await expect(chatSettingsButton(app)).toContainText('Casual');
+  await expect(app.locator('.topbar h1')).toHaveText('Weekend');
+  await expect(app.locator('.topic-banner')).toHaveText('Weekend plans');
+  await expect(app.locator('.chat-item.active .chat-title')).toHaveText('Weekend');
+  const [chat] = await chatsOnDisk(request);
+  expect([chat.title, chat.topic, chat.politeness]).toEqual(['Weekend', 'Weekend plans', 'casual']);
   await app.reload();
-  await expect(app.locator('.topbar').getByRole('radio', { name: 'Casual' })).toBeChecked();
+  await expect(chatSettingsButton(app)).toContainText('Casual');
+});
+
+test('cancelling the chat settings pane changes nothing', async ({ app, request }) => {
+  await startChat(app, 'Style');
+  const dialog = await openChatSettings(app);
+  await dialog.getByText('Casual (plain form)').click();
+  await dialog.getByLabel('Title').fill('Other');
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(chatSettingsButton(app)).toContainText('Polite');
+  const [chat] = await chatsOnDisk(request);
+  expect([chat.title, chat.politeness]).toEqual(['Style', 'polite']);
 });
 
 test('each chat keeps its own speech style', async ({ app }) => {
@@ -150,7 +182,46 @@ test('each chat keeps its own speech style', async ({ app }) => {
   await app.getByRole('dialog').getByText('Casual (plain form)').click();
   await app.getByRole('dialog').getByRole('button', { name: 'Start' }).click();
   await expect(app.locator('.topbar h1')).not.toHaveText('Polite one');
-  await expect(app.locator('.topbar').getByRole('radio', { name: 'Casual' })).toBeChecked();
+  await expect(chatSettingsButton(app)).toContainText('Casual');
   await app.locator('.chat-item', { hasText: 'Polite one' }).locator('.chat-item-main').click();
-  await expect(app.locator('.topbar').getByRole('radio', { name: 'Polite' })).toBeChecked();
+  await expect(chatSettingsButton(app)).toContainText('Polite');
+});
+
+test('each message shows the settings it was written with, and keeps them after they change', async ({ app, request }) => {
+  await startChat(app);
+  await composer(app).fill('はい');
+  await composer(app).press('Enter');
+  await expect(theirs(app)).toHaveCount(2);
+  const stamp = 'mock-small · Polite · WK 10';
+  await expect(app.locator('.message-meta')).toHaveText([stamp, stamp, stamp]);
+
+  await request.put('/api/settings', { data: { endpoint: { model: 'mock-large' }, wkLevel: 20, jlptLevel: 3 } });
+  await app.reload();
+  await expect(app.locator('.message-meta')).toHaveText([stamp, stamp, stamp]);
+  const dialog = await openChatSettings(app);
+  await expect(dialog.locator('.chat-uses')).toHaveText('mock-large · Polite · WK 20 · N3');
+  await dialog.getByText('Casual (plain form)').click();
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await app.reload();
+  await expect(app.locator('.message-meta')).toHaveText([stamp, stamp, stamp]);
+  await expect(theirs(app).first().locator('.message-meta')).toHaveAttribute('title', /Its breakdown or feedback uses them too/);
+
+  await theirs(app).first().getByRole('button', { name: 'Breakdown' }).click();
+  await expect(theirs(app).first().locator('.breakdown-lines')).toBeVisible();
+  await mine(app).first().getByRole('button', { name: 'Check' }).click();
+  await expect(mine(app).first().locator('.feedback')).toBeVisible();
+  const calls = await mockCalls(request);
+  expect(calls.filter((c) => c.kind === 'breakdown' || c.kind === 'feedback').map((c) => c.model)).toEqual(['mock-small', 'mock-small']);
+});
+
+test('the next message after a change is stamped with the new settings', async ({ app, request }) => {
+  await startChat(app);
+  const dialog = await openChatSettings(app);
+  await dialog.getByText('Casual (plain form)').click();
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await composer(app).fill('うん');
+  await composer(app).press('Enter');
+  await expect(theirs(app)).toHaveCount(2);
+  await expect(app.locator('.message-meta')).toHaveText(['mock-small · Polite · WK 10', 'mock-small · Casual · WK 10', 'mock-small · Casual · WK 10']);
+  expect((await chatsOnDisk(request))[0].messages.map((m) => m.context?.politeness)).toEqual(['polite', 'casual', 'casual']);
 });

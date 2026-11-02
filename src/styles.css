@@ -1150,25 +1150,43 @@ ruby rt {
   pointer-events: none;
 }
 
-/* The chat's polite/casual switch in the top bar. */
-.segmented-small {
+/* Opens the chat's settings; shows its speech style at a glance. */
+.chat-settings-button {
   flex: none;
-  padding: 2px;
-  border-radius: 9px;
-}
-
-.segmented-small label {
-  font-size: 12.5px;
-  padding: 3px 10px;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
   white-space: nowrap;
 }
 
-.topbar .segmented-small {
-  margin-left: auto;
+.chat-settings-button + .topbar-new {
+  margin-left: 0;
 }
 
-.topbar .segmented-small + .topbar-new {
-  margin-left: 0;
+/* The settings a message was written with, under its bubble. */
+.message-meta {
+  max-width: 88%;
+  margin-top: -2px;
+  padding: 0 6px;
+  font-size: 11.5px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.theirs .message-meta {
+  align-self: flex-start;
+}
+
+.mine .message-meta {
+  align-self: flex-end;
+}
+
+.chat-uses {
+  font-size: 14px;
 }
 
 .topic-examples {

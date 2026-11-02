@@ -14,7 +14,8 @@ There are a lot of Japanese specific features in the app, but you should be able
 - **Kanji limit** — set your WaniKani level; the partner only uses kanji up to that level and writes everything else in kana. Replies are checked, and any slip is rewritten once; anything left over is highlighted (hover any kanji for its level, meaning and readings).
 - **Genki lesson** — set the last Genki lesson you've studied; the partner mostly uses grammar from lessons up to it (a guide, not a strict limit), feedback corrects within it and names the lesson for anything later, and breakdowns say which lesson teaches each grammar point.
 - **JLPT level** — optional N5–N1, a rough guide to how your partner pitches its Japanese (not a strict limit like the kanji level).
-- **Polite or casual per chat** — chosen when you start a chat, switchable from the top bar.
+- **Chat settings** — each chat has its own title, topic and polite or casual speech, chosen when you start it and changeable from the top bar.
+- **Settings stamped on every message** — each message shows the model, effort, speech style and levels it was written with, and its breakdown or feedback uses those, so changing your settings later doesn't change how an old message is explained.
 - **Furigana** toggle, **romaji → kana** typing (lowercase → hiragana, CAPS → katakana, `nn` → ん, `-` → ー).
 - **UI in English or Japanese** — switch in the sidebar.
 

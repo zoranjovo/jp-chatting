@@ -75,12 +75,31 @@ export interface Feedback {
   }[];
 }
 
+/**
+ * The settings a message was written under: the model for the partner's
+ * messages, the one in use when the learner sent theirs. Analysing the message
+ * later uses these, so a breakdown matches what the partner was told even after
+ * the settings change.
+ */
+export interface MessageContext {
+  provider: ProviderKind;
+  model: string;
+  /** Claude only; absent for the CLI default and for endpoints. */
+  effort?: Exclude<ClaudeEffort, ''>;
+  politeness: Politeness;
+  wkLevel: number;
+  genkiLesson: number;
+  jlptLevel: JlptLevel;
+}
+
 export interface Message {
   id: string;
   role: 'assistant' | 'user';
   /** Japanese may carry furigana as {漢字|かんじ}. */
   content: string;
   createdAt: string;
+  /** Absent on messages from before contexts were stamped. */
+  context?: MessageContext;
   breakdown?: Breakdown;
   feedback?: Feedback;
 }

@@ -28,6 +28,7 @@ shared/            used by both server and UI
   kanji.ts         WaniKani level lookups, furigana markup stripping, kanjiAboveLevel()
   genki.ts         grammar points per Genki lesson (1-23), fed to the prompts when settings.genkiLesson > 0
   jlpt.ts          JLPT N5-N1 descriptions, a pitch guide when settings.jlptLevel > 0
+  context.ts       MessageContext stamping (contextOf) and analysing under a stamp (settingsFor)
   quality.ts       checks on model-written Japanese (replyProblems) and the fixes needing no model (autoFix, salvageFromForeign)
   wanikani-kanji.json   [kanji, level, meaning, on, kun] rows, ~2k kanji, 60 levels — git-ignored, built by `pnpm kanji`
 server/
@@ -45,7 +46,8 @@ src/               React 19 UI (no router, no state library)
   i18n.tsx         en/ja string tables + useT()
   romaji.ts        romaji → kana conversion for the composer
   components/      Sidebar, ChatView, MessageBubble, Analysis (breakdown/feedback), Composer,
-                   JpText (furigana + kanji highlighting), SettingsDialog, NewChatDialog, Dialog
+                   JpText (furigana + kanji highlighting), SettingsDialog, NewChatDialog, ChatSettingsDialog,
+                   ContextLine (a message's stamp), Dialog
 scripts/check-claude-models.ts
 scripts/eval-prompts.ts   fixed scenarios × models through generate.ts, scored; results in .cache/eval/
 test/unit/         node:test — one file per module, helpers.ts has the fakes
@@ -60,7 +62,9 @@ test/ui/           Playwright specs, fixtures.ts, mock-llm.ts (scripted model se
 - **Analysis.** `POST …/messages/:mid/analyze` → a `Breakdown` for partner messages, a `Feedback` for the learner's. The result is cached on the message in the chat file; `?refresh=1` regenerates. Model output goes through `toBreakdown`/`toFeedback`, which coerce wrong types, string-encoded arrays and missing fields — models get this wrong regularly, so don't remove it.
 - **Genki lesson** (`settings.genkiLesson`, 0 = not using Genki). The conversation prompt lists the grammar of lessons 1..N from `shared/genki.ts` as a *guide*: build mainly from it, later grammar now and then when it's the natural way to say something; feedback corrects within those lessons and names the lesson for anything later; breakdowns cite lessons ("te-form (Genki L6)"). With 0 the prompts are exactly as without the feature. The list is a summary written from Genki 3rd edition — fix it there if a point is in the wrong lesson.
 - **JLPT level** (`settings.jlptLevel`, 0 = not set, else 5..1 for N5..N1) is *guidance*, not a limit: the conversation prompt gets a "level guide" line (and swaps "beginner-level" for "at the learner's level"), feedback pitches corrections at it. The kanji level is the only hard limit (and the only one checked in code); the prompt says it comes first, and that Genki is the more specific grammar guide when both are set. With 0 the prompts are unchanged.
-- **Speech style is per chat** (`chat.politeness`), chosen in the New chat dialog and switchable from the top bar (`PATCH /api/chats/:id`). It used to be a setting: `migrateLegacy()` in `store.ts` runs at server start, gives chats without one the old setting's value and drops it from `settings.json`.
+- **Chat settings** — title, topic and speech style (`chat.politeness`) belong to the chat: chosen in the New chat dialog, changed in the chat settings pane opened from the top bar (`PATCH /api/chats/:id`). The pane also shows, read-only, the app-wide model and levels the next message will use.
+- **Message context.** Every message is stamped with a `MessageContext` — provider, model (the Claude default written out), Claude effort, speech style, WaniKani level, Genki lesson, JLPT level — when it is stored: the partner's at reply time, the learner's at send time. Analysis applies the stamp over the current settings (`settingsFor`), so a breakdown or feedback after a settings change still matches how the message was written; connection details (endpoint URL, key, CLI command, timeout) stay current. Messages from before stamping have none and use the current settings and the chat's style. The UI shows the stamp under each bubble.
+- **Speech style used to be a setting**: `migrateLegacy()` in `store.ts` runs at server start, gives chats without one the old setting's value and drops it from `settings.json`.
 - **Kanji limit.** The allowed kanji (WaniKani levels 1..N) are listed in the system prompt. The UI highlights any kanji above the level (`.over-level`) and every kanji has a hover title with its level/meaning/readings. Level 0 means kana only. `々` is never counted.
 - **Reply pipeline** (`generateReply` in `server/generate.ts`). Models break the rules regularly — Sonnet often writes notes to itself in English ("Wait, I must check kanji…"), local models put furigana on katakana or give romaji readings — so every reply goes through:
   1. `autoFix`, no model call: drop `<think>` blocks and empty `{}`, drop furigana from kana-only words, spell out out-of-level kanji from their reading (`{注文|ちゅうもん}` → `ちゅうもん`, only when the hiragana reading covers every kana in the base, so `{お願|ねが}` is left alone).

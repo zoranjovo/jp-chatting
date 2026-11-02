@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_SETTINGS, type Chat, type ChatSummary, type Message, type Politeness, type Settings } from '../shared/types.ts';
 import { api } from './api.ts';
 import { ChatView } from './components/ChatView.tsx';
-import { NewChatDialog, StyleSwitch } from './components/NewChatDialog.tsx';
+import { ChatSettingsDialog, type ChatPatch } from './components/ChatSettingsDialog.tsx';
+import { NewChatDialog } from './components/NewChatDialog.tsx';
 import { SettingsDialog } from './components/SettingsDialog.tsx';
 import { Sidebar } from './components/Sidebar.tsx';
 import { LanguageProvider, useT } from './i18n.tsx';
@@ -42,7 +43,7 @@ function Shell({ loadError }: { loadError: string | null }) {
   const [chat, setChat] = useState<Chat | null>(null);
   const [waiting, setWaiting] = useState<Set<string>>(new Set());
   const [errors, setErrors] = useState<Record<string, string | null>>({});
-  const [dialog, setDialog] = useState<'new' | 'settings' | null>(null);
+  const [dialog, setDialog] = useState<'new' | 'settings' | 'chat' | null>(null);
   const [navOpen, setNavOpen] = useState(false);
   const activeId = useRef<string | null>(null);
 
@@ -115,10 +116,16 @@ function Shell({ loadError }: { loadError: string | null }) {
     }
   };
 
-  /** Applies to the partner's next reply and to feedback from now on; earlier messages stay as they were. */
-  const changeStyle = async (politeness: Politeness) => {
+  /** Applies from the next message; earlier ones keep the settings they were stamped with. */
+  const saveChatSettings = async (patch: ChatPatch) => {
+    setDialog(null);
     if (!chat) return;
-    show(await api.setPoliteness(chat.id, politeness));
+    try {
+      show(await api.updateChat(chat.id, patch));
+      refreshList();
+    } catch (err) {
+      setErrors((e) => ({ ...e, [chat.id]: (err as Error).message }));
+    }
   };
 
   const rename = async (id: string, title: string) => {
@@ -156,7 +163,12 @@ function Shell({ loadError }: { loadError: string | null }) {
             ☰
           </button>
           <h1 className="jp">{chat ? chat.title || t.untitled : t.appName}</h1>
-          {chat && <StyleSwitch value={chat.politeness} onChange={changeStyle} />}
+          {chat && (
+            <button type="button" className="chip chat-settings-button" onClick={() => setDialog('chat')} title={t.chatSettings} aria-label={t.chatSettings}>
+              <span>{chat.politeness === 'casual' ? t.casualShort : t.politeShort}</span>
+              <span aria-hidden>⚙</span>
+            </button>
+          )}
           <button type="button" className="icon-button topbar-new" onClick={() => setDialog('new')} aria-label={t.newChat} title={t.newChat}>
             +
           </button>
@@ -190,6 +202,7 @@ function Shell({ loadError }: { loadError: string | null }) {
       </main>
       {dialog === 'new' && <NewChatDialog onStart={startChat} onClose={() => setDialog(null)} />}
       {dialog === 'settings' && <SettingsDialog onClose={() => setDialog(null)} />}
+      {dialog === 'chat' && chat && <ChatSettingsDialog chat={chat} onSave={saveChatSettings} onClose={() => setDialog(null)} />}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { contextOf, settingsFor } from '../shared/context.ts';
 import { stripFurigana } from '../shared/kanji.ts';
 import type { Chat, Message, ModelTest, Politeness, ProviderKind, Settings } from '../shared/types.ts';
 import { AiError, callAi as realCallAi, listModels as realListModels, type AiRequest } from './ai/index.ts';
@@ -129,15 +130,17 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
 
   app.get('/api/chats/:id', route(async (req, res) => res.json(await loadChat(String(req.params.id)))));
 
-  /** Rename, or change the speech style; each only when sent. */
+  /** The chat's own settings: title, topic and speech style, each only when sent. They apply from the next message on. */
   app.patch(
     '/api/chats/:id',
     route(async (req, res) => {
       const title = typeof req.body?.title === 'string' ? req.body.title.trim() : undefined;
+      const topic = typeof req.body?.topic === 'string' ? req.body.topic.trim() : undefined;
       const politeness = asPoliteness(req.body?.politeness);
       res.json(
         await updateChat(String(req.params.id), (chat) => {
           if (title) chat.title = title;
+          if (topic !== undefined) chat.topic = topic;
           if (politeness) chat.politeness = politeness;
         }),
       );
@@ -160,8 +163,12 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
     route(async (req, res) => {
       const content = String(req.body?.content ?? '').trim();
       if (!content) return res.status(400).json({ error: 'empty message' });
-      const message: Message = { id: store.newId(), role: 'user', content, createdAt: store.now() };
-      res.json(await updateChat(String(req.params.id), (chat) => void chat.messages.push(message)));
+      const settings = await store.getSettings();
+      res.json(
+        await updateChat(String(req.params.id), (chat) => {
+          chat.messages.push({ id: store.newId(), role: 'user', content, createdAt: store.now(), context: contextOf(settings, chat.politeness) });
+        }),
+      );
     }),
   );
 
@@ -171,8 +178,9 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
     route(async (req, res) => {
       const id = String(req.params.id);
       const settings = await store.getSettings();
-      const content = await generateReply(deps.callAi, settings, await loadChat(id));
-      const message: Message = { id: store.newId(), role: 'assistant', content, createdAt: store.now() };
+      const chat = await loadChat(id);
+      const content = await generateReply(deps.callAi, settings, chat);
+      const message: Message = { id: store.newId(), role: 'assistant', content, createdAt: store.now(), context: contextOf(settings, chat.politeness) };
       res.json(
         await updateChat(id, (chat) => {
           chat.messages.push(message);
@@ -195,13 +203,15 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
       const refresh = req.query.refresh === '1';
       if (!refresh && (message.breakdown || message.feedback)) return res.json(message);
 
-      const settings = await store.getSettings();
+      // Under the settings the message was written with, so changing them since doesn't change the answer.
+      const settings = settingsFor(await store.getSettings(), message.context);
       let patch: Partial<Message>;
       if (message.role === 'assistant') {
         patch = { breakdown: await generateBreakdown(deps.callAi, settings, message) };
       } else {
         const previous = chat.messages.slice(0, index).findLast((m) => m.role === 'assistant');
-        patch = { feedback: await generateFeedback(deps.callAi, settings, chat.politeness, message, previous) };
+        const politeness = message.context?.politeness ?? chat.politeness;
+        patch = { feedback: await generateFeedback(deps.callAi, settings, politeness, message, previous) };
       }
       const saved = await updateChat(id, (c) => {
         const m = c.messages.find((x) => x.id === mid);

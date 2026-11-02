@@ -528,3 +528,93 @@ describe('Genki lesson in the prompts', () => {
     await api('PUT', '/api/settings', { genkiLesson: 0 });
   });
 });
+
+describe('chat settings', () => {
+  test('the topic can be changed, and cleared, and the next reply uses it', async () => {
+    const chat = await newChat('Café');
+    await reply(chat.id);
+    assert.equal((await api<Chat>('PATCH', `/api/chats/${chat.id}`, { topic: '  At the station ' })).body.topic, 'At the station');
+    calls.length = 0;
+    await send(chat.id, 'はい');
+    await reply(chat.id);
+    assert.match(calls[0].request.system, /chosen by the learner: At the station\./);
+    assert.equal((await api<Chat>('PATCH', `/api/chats/${chat.id}`, { topic: '' })).body.topic, '');
+    assert.equal((await api<Chat>('PATCH', `/api/chats/${chat.id}`, { politeness: 'casual' })).body.topic, '', 'other changes leave it alone');
+  });
+});
+
+describe('message context', () => {
+  const CLAUDE = { provider: 'claude', claude: { model: 'claude-opus-5-5', effort: 'high' } };
+  const resetSettings = () => api('PUT', '/api/settings', { provider: 'endpoint', endpoint: { model: '' }, claude: { model: 'claude-sonnet-5-5', effort: '' }, genkiLesson: 0, jlptLevel: 0 });
+
+  test('each message is stamped with the model, effort, style and levels it was written under', async () => {
+    await api('PUT', '/api/settings', { ...CLAUDE, wkLevel: 12, genkiLesson: 6, jlptLevel: 4 });
+    const chat = (await api<Chat>('POST', '/api/chats', { topic: '', politeness: 'casual' })).body;
+    await reply(chat.id);
+    const sent = (await send(chat.id, 'うん')).body;
+    const expected = { provider: 'claude', model: 'claude-opus-5-5', effort: 'high', politeness: 'casual', wkLevel: 12, genkiLesson: 6, jlptLevel: 4 };
+    assert.deepEqual(sent.messages[0].context, expected);
+    assert.deepEqual(sent.messages[1].context, expected);
+    await resetSettings();
+  });
+
+  test('an endpoint has no effort, and the Claude default model is written out', async () => {
+    await api('PUT', '/api/settings', { provider: 'endpoint', endpoint: { model: 'qwen3' } });
+    const a = await newChat();
+    const ctx = (await reply(a.id)).body.messages[0].context!;
+    assert.equal(ctx.model, 'qwen3');
+    assert.ok(!('effort' in ctx));
+    await api('PUT', '/api/settings', { provider: 'claude', claude: { model: '', effort: '' } });
+    const b = await newChat();
+    assert.equal((await reply(b.id)).body.messages[0].context!.model, 'claude-sonnet-5-5');
+    await resetSettings();
+  });
+
+  test('a breakdown after the settings changed uses the message\'s model and levels, not the new ones', async () => {
+    await api('PUT', '/api/settings', { ...CLAUDE, wkLevel: 12, genkiLesson: 6 });
+    const chat = await newChat();
+    const mid = (await reply(chat.id)).body.messages[0].id;
+    await api('PUT', '/api/settings', { provider: 'endpoint', endpoint: { model: 'qwen3' }, wkLevel: 3, genkiLesson: 2 });
+    calls.length = 0;
+    await analyze(chat.id, mid);
+    const used = calls[0].settings;
+    assert.deepEqual([used.provider, used.claude.model, used.claude.effort, used.wkLevel, used.genkiLesson], ['claude', 'claude-opus-5-5', 'high', 12, 6]);
+    assert.match(calls[0].request.system, /The learner studies with Genki/);
+    await resetSettings();
+  });
+
+  test('feedback after the style changed uses the style the message was sent in', async () => {
+    const chat = (await api<Chat>('POST', '/api/chats', { topic: '', politeness: 'casual' })).body;
+    await reply(chat.id);
+    const mid = (await send(chat.id, 'げんき')).body.messages[1].id;
+    await api('PATCH', `/api/chats/${chat.id}`, { politeness: 'polite' });
+    calls.length = 0;
+    await analyze(chat.id, mid);
+    assert.match(calls[0].request.system, /The chat is in casual plain form/);
+  });
+
+  test('connection details stay current: a stamped endpoint model goes to today\'s URL', async () => {
+    await api('PUT', '/api/settings', { provider: 'endpoint', endpoint: { baseUrl: 'http://old:1/v1', model: 'qwen3' } });
+    const chat = await newChat();
+    const mid = (await reply(chat.id)).body.messages[0].id;
+    await api('PUT', '/api/settings', { endpoint: { baseUrl: 'http://new:1/v1', model: 'gemma' } });
+    calls.length = 0;
+    await analyze(chat.id, mid);
+    assert.deepEqual([calls[0].settings.endpoint.baseUrl, calls[0].settings.endpoint.model], ['http://new:1/v1', 'qwen3']);
+    await api('PUT', '/api/settings', { endpoint: { baseUrl: 'http://localhost:1234/v1' } });
+    await resetSettings();
+  });
+
+  test('messages from before stamping are analysed with the current settings and the chat\'s style', async () => {
+    const chat = (await api<Chat>('POST', '/api/chats', { topic: '', politeness: 'casual' })).body;
+    await reply(chat.id);
+    const sent = (await send(chat.id, 'げんき')).body;
+    const { saveChat } = await import('../../server/store.ts');
+    await saveChat({ ...sent, messages: sent.messages.map(({ context: _, ...m }) => m) });
+    await api('PUT', '/api/settings', { wkLevel: 9 });
+    calls.length = 0;
+    await analyze(chat.id, sent.messages[1].id);
+    assert.equal(calls[0].settings.wkLevel, 9);
+    assert.match(calls[0].request.system, /The chat is in casual plain form/);
+  });
+});
