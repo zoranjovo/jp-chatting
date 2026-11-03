@@ -66,9 +66,10 @@ export async function generateFeedback(
   settings: Settings,
   politeness: Politeness,
   message: Message,
-  previous: Message | undefined,
+  /** The conversation before the message, for context. */
+  earlier: Message[],
 ): Promise<Feedback> {
-  const f = toFeedback(await callAi({ ...feedbackRequest(settings, politeness, message, previous), schema: FEEDBACK_SCHEMA }, settings));
+  const f = toFeedback(await callAi({ ...feedbackRequest(settings, politeness, message, earlier), schema: FEEDBACK_SCHEMA }, settings));
   f.corrected = autoFix(f.corrected, settings.wkLevel);
   for (const line of f.lines) line.corrected = autoFix(line.corrected, settings.wkLevel);
   return f;

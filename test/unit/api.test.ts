@@ -334,7 +334,7 @@ describe('analysis', () => {
     assert.equal(res.body.feedback!.verdict, 'correct');
     assert.equal(res.body.breakdown, undefined);
     assert.equal(calls[0].kind, 'feedback');
-    assert.match(calls[0].request.turns[0].content, /replying to:\nこんにちは！げんきですか？/);
+    assert.match(calls[0].request.turns[0].content, /Partner: こんにちは！げんきですか？\n\nThe learner's message:\nげんきです$/);
   });
 
   test('a malformed AI answer is coerced into shape', async () => {

@@ -167,12 +167,21 @@ Answer with JSON only, matching the schema.`,
   };
 }
 
-export function feedbackRequest(settings: Settings, politeness: Politeness, message: Message, previous: Message | undefined): { system: string; turns: ChatTurn[] } {
+/** How many messages before the learner's are sent along, so the feedback knows who said what. */
+const FEEDBACK_CONTEXT = 6;
+
+export function feedbackRequest(settings: Settings, politeness: Politeness, message: Message, earlier: Message[] = []): { system: string; turns: ChatTurn[] } {
+  const transcript = earlier
+    .slice(-FEEDBACK_CONTEXT)
+    .map((m) => `${m.role === 'user' ? 'Learner' : 'Partner'}: ${stripFurigana(m.content)}`)
+    .join('\n');
   return {
     system: `You are a kind but honest Japanese teacher. An English-speaking beginner is practising Japanese by chatting, and wants feedback on a message they wrote. They may have written in Japanese, in English, or a mix.
 
+Write to the learner directly: call them "you", and the other side of the chat "your partner". Keep straight who said what -- in the conversation, "Learner" lines are theirs and "Partner" lines are their partner's.
+
 Give:
-- meaning: what they are trying to say, in English.
+- meaning: what they are trying to say, in English, in their own voice -- first person, as they would say it (e.g. "I'm from Boston. Where are you from?").
 - verdict: "correct" if it is natural, correct Japanese -- even if you would have phrased it differently; "minor" for small slips (a particle, a kana typo, slightly unnatural wording); "incorrect" if the meaning is wrong or unclear; "english" if they wrote mostly in English.
 - corrected: the whole message as natural Japanese that a beginner could have written, with every mistake fixed. If it was already correct, repeat it. If they wrote English, translate it.
 - summary: one or two encouraging sentences in English about how they did and the most important thing to learn.
@@ -190,7 +199,7 @@ Answer with JSON only, matching the schema.`,
     turns: [
       {
         role: 'user',
-        content: `${previous ? `The message they were replying to:\n${stripFurigana(previous.content)}\n\n` : ''}Their message:\n${message.content}`,
+        content: `${transcript ? `The conversation so far:\n${transcript}\n\n` : ''}The learner's message:\n${message.content}`,
       },
     ],
   };

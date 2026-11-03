@@ -326,7 +326,8 @@ async function runCase(model: string, c: Case, sample: number): Promise<Result> 
       const b = await generateBreakdown(recording, settingsFor(model, c.level, c.genki, c.jlpt), msg('assistant', c.message), c.earlier ?? []);
       return { ...base, ms: Date.now() - started, output: b, ...scoreBreakdown(c, b) };
     }
-    const f = await generateFeedback(recording, settingsFor(model, c.level, c.genki), 'polite', msg('user', c.message), msg('assistant', c.previous));
+    const earlier = [...(c.earlier ?? []), msg('assistant', c.previous)];
+    const f = await generateFeedback(recording, settingsFor(model, c.level, c.genki), 'polite', msg('user', c.message), earlier);
     return { ...base, ms: Date.now() - started, output: f, ...scoreFeedback(c, f) };
   } catch (err) {
     return { ...base, ms: Date.now() - started, error: (err as Error).message, output: null, problems: { kanji: [], furigana: [], foreign: [] }, checks: { ran: false } };

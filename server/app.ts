@@ -229,9 +229,8 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
       if (message.role === 'assistant') {
         patch = { breakdown: await generateBreakdown(deps.callAi, settings, message, chat.messages.slice(0, index)) };
       } else {
-        const previous = chat.messages.slice(0, index).findLast((m) => m.role === 'assistant');
         const politeness = message.context?.politeness ?? chat.politeness;
-        patch = { feedback: await generateFeedback(deps.callAi, settings, politeness, message, previous) };
+        patch = { feedback: await generateFeedback(deps.callAi, settings, politeness, message, chat.messages.slice(0, index)) };
       }
       const saved = await updateChat(id, (c) => {
         const m = c.messages.find((x) => x.id === mid);
