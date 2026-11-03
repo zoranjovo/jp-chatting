@@ -107,9 +107,40 @@ describe('rewriteRequest', () => {
 
 describe('breakdownRequest', () => {
   test('sends the message without furigana markup', () => {
-    const req = breakdownRequest(msg('assistant', '{今日|きょう}は{暑|あつ}い'));
+    const req = breakdownRequest(msg('assistant', '{今日|きょう}は{暑|あつ}い'), settings());
     assert.match(req.turns[0].content, /今日は暑い$/);
     assert.match(req.system, /line by line/);
+  });
+
+  test('sends the last few messages before it, labelled, for context', () => {
+    const earlier = ['一', '二', '三', '四', '五', '六', '七'].map((n, i) => msg(i % 2 ? 'user' : 'assistant', `{${n}|x}つめ`));
+    const req = breakdownRequest(msg('assistant', 'いいですね'), settings(), earlier);
+    const content = req.turns[0].content;
+    assert.ok(!content.includes('一つめ'), 'only the last six');
+    assert.match(content, /The conversation so far:\nLearner: 二つめ\nPartner: 三つめ/);
+    assert.match(content, /Partner: 七つめ\n\nThe message:\n\nいいですね$/);
+    assert.match(req.system, /explain what the message refers to/);
+  });
+
+  test('with nothing before it, says nothing about context', () => {
+    const req = breakdownRequest(msg('assistant', 'こんにちは'), settings());
+    assert.ok(!req.turns[0].content.includes('conversation'));
+    assert.ok(!req.system.includes('given for context'));
+  });
+
+  test('is pitched at the JLPT level when set, beginner-friendly when not', () => {
+    assert.match(breakdownRequest(msg('assistant', 'x'), settings({ jlptLevel: 0 })).system, /English-speaking beginner[\s\S]*beginner-friendly/);
+    const n1 = breakdownRequest(msg('assistant', 'x'), settings({ jlptLevel: 1 })).system;
+    assert.match(n1, /learner at about JLPT N1/);
+    assert.match(n1, /skip the basics/);
+    assert.ok(!n1.includes('beginner'));
+    assert.ok(!breakdownRequest(msg('assistant', 'x'), settings({ jlptLevel: 5 })).system.includes('skip the basics'));
+  });
+
+  test('keeps Japanese it adds within the kanji level, but copies the message as it is', () => {
+    const system = breakdownRequest(msg('assistant', 'x'), settings({ wkLevel: 3 })).system;
+    assert.ok(system.includes(allowedKanji(3).join('')));
+    assert.match(system, /copy the message exactly/);
   });
 });
 
@@ -207,7 +238,7 @@ describe('toFeedback', () => {
 describe('English in breakdowns and feedback', () => {
   test('both prompts ask for Japanese without 「」 and allow markdown emphasis', () => {
     const m = msg('assistant', 'はい');
-    for (const req of [breakdownRequest(m), feedbackRequest(settings(), 'polite', msg('user', 'はい'), m)]) {
+    for (const req of [breakdownRequest(m, settings()), feedbackRequest(settings(), 'polite', msg('user', 'はい'), m)]) {
       assert.match(req.system, /no 「」 brackets or quotation marks/);
       assert.match(req.system, /\*\*bold\*\* or \*italic\*/);
     }
@@ -241,7 +272,7 @@ describe('Genki lessons', () => {
     const s = settings({ genkiLesson: 0 });
     assert.ok(!conversationSystem(s, chat()).includes('Genki'));
     assert.ok(!feedbackRequest(s, 'polite', msg('user', 'x'), undefined).system.includes('Genki'));
-    assert.ok(!breakdownRequest(msg('assistant', 'x'), 0).system.includes('Genki'));
+    assert.ok(!breakdownRequest(msg('assistant', 'x'), settings({ genkiLesson: 0 })).system.includes('Genki'));
   });
 
   test('the conversation leans on the grammar of lessons 1..N, listed, as a guide', () => {
@@ -272,19 +303,19 @@ describe('Genki lessons', () => {
   });
 
   test('breakdowns name the Genki lesson for grammar points', () => {
-    assert.match(breakdownRequest(msg('assistant', 'x'), 6).system, /te-form \(Genki L6\)/);
+    assert.match(breakdownRequest(msg('assistant', 'x'), settings({ genkiLesson: 6 })).system, /te-form \(Genki L6\)/);
   });
 });
 
 describe('citing Genki lessons', () => {
   test('breakdowns and feedback get the whole syllabus to cite from, only when using Genki', () => {
-    const withGenki = [breakdownRequest(msg('assistant', 'x'), 3).system, feedbackRequest(settings({ genkiLesson: 3 }), 'polite', msg('user', 'x'), undefined).system];
+    const withGenki = [breakdownRequest(msg('assistant', 'x'), settings({ genkiLesson: 3 })).system, feedbackRequest(settings({ genkiLesson: 3 }), 'polite', msg('user', 'x'), undefined).system];
     for (const system of withGenki) {
       assert.match(system, /cite only these lessons/);
       assert.match(system, /L7: 〜ている/);
       assert.match(system, /L23: causative-passive/);
     }
-    assert.ok(!breakdownRequest(msg('assistant', 'x'), 0).system.includes('cite only these lessons'));
+    assert.ok(!breakdownRequest(msg('assistant', 'x'), settings({ genkiLesson: 0 })).system.includes('cite only these lessons'));
   });
 });
 

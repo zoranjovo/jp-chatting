@@ -133,24 +133,37 @@ export const FEEDBACK_SCHEMA = object({
 /** For the English parts of a breakdown or feedback, which the UI renders with inline markdown. */
 const ENGLISH_RULE = 'In the English text, write Japanese words and phrases as they are, with no 「」 brackets or quotation marks around them. For emphasis you may use **bold** or *italic*.';
 
-export function breakdownRequest(message: Message, genkiLesson = 0): { system: string; turns: ChatTurn[] } {
+/** How many messages before the one being broken down are sent along, so it can be explained in context. */
+const BREAKDOWN_CONTEXT = 6;
+
+export function breakdownRequest(
+  message: Message,
+  levels: Pick<Settings, 'genkiLesson' | 'jlptLevel' | 'wkLevel'>,
+  earlier: Message[] = [],
+): { system: string; turns: ChatTurn[] } {
+  const { genkiLesson, jlptLevel } = levels;
+  const context = earlier.slice(-BREAKDOWN_CONTEXT);
+  const transcript = context.map((m) => `${m.role === 'user' ? 'Learner' : 'Partner'}: ${stripFurigana(m.content)}`).join('\n');
   return {
-    system: `You are a patient Japanese teacher. An English-speaking beginner wants to understand a Japanese message line by line.
+    system: `You are a patient Japanese teacher. ${jlptLevel > 0 ? `An English-speaking learner at about JLPT N${jlptLevel}` : 'An English-speaking beginner'} wants to understand a Japanese message from their chat partner, line by line.
 
 Split the message into lines -- usually one sentence each, but join short sentences or split long ones wherever that makes the translation and explanation clearer. Cover the whole message, in order, without skipping anything. For each line give:
 - japanese: the Japanese text of the line, copied exactly as in the message -- never turn kana into kanji or change any wording.
 - translation: a natural English translation.
-- explanation: a brief explanation in English of how the line is built -- the grammar, particles, conjugations and set phrases that matter, in one to three sentences. Keep it beginner-friendly.${genkiLesson > 0 ? ' The learner studies with Genki: when a grammar point is taught in a Genki lesson, name it, e.g. "te-form (Genki L6)" -- take the lesson from the list below.' : ''}
+- explanation: a brief explanation in English of how the line is built -- the grammar, particles, conjugations and set phrases that matter, in one to three sentences. ${jlptLevel > 0 ? `Pitch it at about JLPT N${jlptLevel}: spend it on what a learner at that level may not know yet${jlptLevel <= 3 ? ', and skip the basics (は as the topic, を, です, ます) unless they do something unusual here' : ''}.` : 'Keep it beginner-friendly.'}${genkiLesson > 0 ? ' The learner studies with Genki: when a grammar point is taught in a Genki lesson, name it, e.g. "te-form (Genki L6)" -- take the lesson from the list below.' : ''}
 - words: each word or particle in the line, in order: text (as written in the message), reading (in hiragana -- never romaji; a katakana word keeps its katakana), meaning (a short English gloss or the particle's role).
-
+${context.length > 0 ? `
+The conversation before the message is given for context. Use it to explain what the message refers to -- names, things mentioned earlier, the question it answers -- but break down only the message itself.
+` : ''}
 ${FURIGANA_RULE.replace('Furigana: give', 'In japanese and words.text, give')}
+${kanjiRule(levels.wkLevel)} This applies to any Japanese you add in the English parts (another form of a word, an example); japanese and words.text copy the message exactly, whatever it uses.
 ${genkiLesson > 0 ? `
 ${genkiSyllabus()}
 ` : ''}
 ${ENGLISH_RULE}
 
 Answer with JSON only, matching the schema.`,
-    turns: [{ role: 'user', content: `The message:\n\n${stripFurigana(message.content)}` }],
+    turns: [{ role: 'user', content: `${transcript ? `The conversation so far:\n${transcript}\n\n` : ''}The message:\n\n${stripFurigana(message.content)}` }],
   };
 }
 
