@@ -62,13 +62,16 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
   type Handler = (req: Request, res: Response) => Promise<unknown>;
   const route = (fn: Handler) => (req: Request, res: Response, next: NextFunction) => fn(req, res).catch(next);
 
-  /** One read-modify-write at a time per chat, so a reply and a breakdown finishing together don't overwrite each other. */
+  /**
+   * One read-modify-write at a time per chat, so a reply and a breakdown finishing together don't overwrite each other.
+   * `touch` moves the chat to the top of the list; only changes to the conversation itself do, not analyses or renames.
+   */
   const locks = new Map<string, Promise<unknown>>();
-  async function updateChat(id: string, change: (chat: Chat) => void): Promise<Chat> {
+  async function updateChat(id: string, change: (chat: Chat) => void, touch = true): Promise<Chat> {
     const run = (locks.get(id) ?? Promise.resolve()).then(async () => {
       const chat = await loadChat(id);
       change(chat);
-      chat.updatedAt = store.now();
+      if (touch) chat.updatedAt = store.now();
       return store.saveChat(chat);
     });
     locks.set(id, run.catch(() => undefined));
@@ -143,7 +146,7 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
           if (title) chat.title = title;
           if (topic !== undefined) chat.topic = topic;
           if (politeness) chat.politeness = politeness;
-        }),
+        }, false),
       );
     }),
   );
@@ -233,10 +236,14 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
         const politeness = message.context?.politeness ?? chat.politeness;
         patch = { feedback: await generateFeedback(deps.callAi, settings, politeness, message, previous) };
       }
-      const saved = await updateChat(id, (c) => {
-        const m = c.messages.find((x) => x.id === mid);
-        if (m) Object.assign(m, patch);
-      });
+      const saved = await updateChat(
+        id,
+        (c) => {
+          const m = c.messages.find((x) => x.id === mid);
+          if (m) Object.assign(m, patch);
+        },
+        false,
+      );
       const analysed = saved.messages.find((m) => m.id === mid);
       if (!analysed) throw new NotFound('message not found -- rewound while it was being analysed');
       res.json(analysed);

@@ -149,6 +149,26 @@ describe('chats API', () => {
     assert.ok(list.indexOf(a.id) < list.indexOf(b.id));
   });
 
+  test('analysing, renaming or restyling a chat leaves its place in the list', async () => {
+    // Apart by a few ms each, so the timestamps can't tie.
+    const tick = () => new Promise((r) => setTimeout(r, 5));
+    const a = await newChat('older');
+    await reply(a.id);
+    await tick();
+    const b = await newChat('newer');
+    const opener = (await api<Chat>('GET', `/api/chats/${a.id}`)).body.messages[0];
+    const order = async () => (await api<Chat[]>('GET', '/api/chats')).body.map((c) => c.id).filter((id) => id === a.id || id === b.id);
+    assert.deepEqual(await order(), [b.id, a.id]);
+
+    await analyze(a.id, opener.id);
+    await api('PATCH', `/api/chats/${a.id}`, { title: 'Renamed', topic: 'Other', politeness: 'casual' });
+    assert.deepEqual(await order(), [b.id, a.id]);
+
+    await tick();
+    await send(a.id, 'bump');
+    assert.deepEqual(await order(), [a.id, b.id]);
+  });
+
   test('renames and deletes', async () => {
     const chat = await newChat('x');
     assert.equal((await api<Chat>('PATCH', `/api/chats/${chat.id}`, { title: ' New name ' })).body.title, 'New name');
