@@ -17,7 +17,7 @@ import path from 'node:path';
 import { callAi } from '../server/ai/index.ts';
 import { generateBreakdown, generateFeedback, generateReply, type CallAi } from '../server/generate.ts';
 import type { JlptLevel } from '../shared/jlpt.ts';
-import { stripFurigana } from '../shared/kanji.ts';
+import { kanjiAboveLevel, stripFurigana } from '../shared/kanji.ts';
 import { problemCount, replyProblems, type ReplyProblems } from '../shared/quality.ts';
 import { DEFAULT_SETTINGS, type Breakdown, type ClaudeEffort, type EndpointReasoning, type Feedback, type Message, type Politeness, type Settings } from '../shared/types.ts';
 
@@ -43,6 +43,9 @@ export interface BreakdownCase {
   name: string;
   level: number;
   genki?: number;
+  jlpt?: JlptLevel;
+  /** The conversation before the message. */
+  earlier?: Message[];
   message: string;
 }
 export interface FeedbackCase {
@@ -132,6 +135,35 @@ export const CASES: Case[] = [
     genki: 12,
     message: 'すみません、ちょっと{待|ま}ってください。{今|いま}、{電話|でんわ}をしています。',
   },
+  // Breakdowns in context: a name only the conversation explains, and pitch at both ends of JLPT.
+  {
+    kind: 'breakdown',
+    name: 'breakdown · uses the conversation',
+    level: 30,
+    earlier: [msg('assistant', '{好|す}きなお{笑|わら}い{芸人|げいにん}はいますか？'), msg('user', '{千鳥|ちどり}が{大好|だいす}きです！ノブさんのツッコミがおもしろいです。')],
+    message: 'いいですね！{千鳥|ちどり}の{漫才|まんざい}は{私|わたし}も{好|す}きです。ノブさんの「クセがすごい」は{有名|ゆうめい}ですよね。',
+  },
+  {
+    kind: 'breakdown',
+    name: 'breakdown · N5 · basics explained',
+    level: 10,
+    jlpt: 5,
+    message: '{私|わたし}は{毎朝|まいあさ}コーヒーを{飲|の}みます。あなたは？',
+  },
+  {
+    kind: 'breakdown',
+    name: 'breakdown · N1 · skips the basics',
+    level: 60,
+    jlpt: 1,
+    message: '{早速|さっそく}ですが、{先日|せんじつ}ご{提案|ていあん}いただいた{件|けん}について、{社内|しゃない}で{検討|けんとう}させていただきました。',
+  },
+  {
+    kind: 'breakdown',
+    name: 'breakdown · L1 · no new kanji in explanations',
+    level: 1,
+    earlier: [msg('assistant', 'しゅみは なんですか？'), msg('user', 'えを かくのが すきです。')],
+    message: 'いいですね！どんな えを かきますか？{人|ひと}ですか、{山|やま}ですか？',
+  },
   // JLPT: the same opener pitched at both ends, with kanji not the limiting factor.
   { kind: 'reply', name: 'jlpt · opener · café · N5', level: 60, jlpt: 5, politeness: 'polite', topic: 'Ordering at a café', messages: [] },
   { kind: 'reply', name: 'jlpt · opener · café · N2', level: 60, jlpt: 2, politeness: 'polite', topic: 'Ordering at a café', messages: [] },
@@ -203,6 +235,9 @@ function scoreBreakdown(c: BreakdownCase, b: Breakdown): Pick<Result, 'problems'
   const joined = normalise(b.lines.map((l) => l.japanese).join(''));
   const message = normalise(c.message);
   const texts = b.lines.flatMap((l) => [l.japanese, ...l.words.map((w) => w.text)]);
+  // Kanji the breakdown adds in its English beyond what the message itself uses, above the learner's level.
+  const own = new Set(stripFurigana(c.message));
+  const added = b.lines.flatMap((l) => [l.translation, l.explanation, ...l.words.map((w) => w.meaning)]).flatMap((t) => kanjiAboveLevel(stripFurigana(t), c.level));
   return {
     problems: sumProblems(texts.map((t) => ({ ...replyProblems(t, 60), foreign: [] }))),
     checks: {
@@ -213,6 +248,7 @@ function scoreBreakdown(c: BreakdownCase, b: Breakdown): Pick<Result, 'problems'
       words: b.lines.every((l) => l.words.length > 0),
       readingsKana: b.lines.every((l) => l.words.every((w) => !/[A-Za-z]/.test(w.reading))),
       noBrackets: b.lines.every((l) => !/[「」]/.test(l.translation + l.explanation)),
+      noNewKanji: added.every((k) => own.has(k)),
     },
   };
 }
@@ -262,7 +298,7 @@ async function runCase(model: string, c: Case, sample: number): Promise<Result> 
       return { ...base, ms: Date.now() - started, output: text, ...scoreReply(c, text) };
     }
     if (c.kind === 'breakdown') {
-      const b = await generateBreakdown(recording, settingsFor(model, c.level, c.genki), msg('assistant', c.message));
+      const b = await generateBreakdown(recording, settingsFor(model, c.level, c.genki, c.jlpt), msg('assistant', c.message), c.earlier ?? []);
       return { ...base, ms: Date.now() - started, output: b, ...scoreBreakdown(c, b) };
     }
     const f = await generateFeedback(recording, settingsFor(model, c.level, c.genki), 'polite', msg('user', c.message), msg('assistant', c.previous));
