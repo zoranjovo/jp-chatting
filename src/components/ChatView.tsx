@@ -13,6 +13,7 @@ export function ChatView({
   onRetry,
   onMessageUpdated,
   onRewind,
+  focusComposer,
 }: {
   chat: Chat;
   waiting: boolean;
@@ -22,6 +23,8 @@ export function ChatView({
   onMessageUpdated: (m: Message) => void;
   /** Resolves true once the message and everything after it are gone. */
   onRewind: (m: Message) => Promise<boolean>;
+  /** Changing it moves focus to the composer, e.g. once a new chat has been started. */
+  focusComposer?: number;
 }) {
   const t = useT();
   const end = useRef<HTMLDivElement>(null);
@@ -45,6 +48,10 @@ export function ChatView({
   useEffect(() => {
     end.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [chat.messages.length, waiting]);
+
+  useEffect(() => {
+    if (focusComposer) composer.current?.focus();
+  }, [focusComposer]);
 
   return (
     <div className="chat">
@@ -75,7 +82,15 @@ export function ChatView({
           </div>
         )}
         {needsReply && (
-          <button type="button" className="secondary retry" onClick={onRetry}>
+          <button
+            type="button"
+            className="secondary retry"
+            onClick={() => {
+              // The button goes away once the reply is asked for; keep the keyboard in the chat.
+              composer.current?.focus();
+              onRetry();
+            }}
+          >
             {t.retryReply}
           </button>
         )}

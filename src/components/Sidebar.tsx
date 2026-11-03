@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
 import type { ChatSummary, UiLanguage } from '../../shared/types.ts';
 import { useT } from '../i18n.tsx';
 import { useSettings } from '../settings.tsx';
@@ -27,10 +27,22 @@ export function Sidebar({
   const [renaming, setRenaming] = useState<ChatSummary | null>(null);
   const [deleting, setDeleting] = useState<ChatSummary | null>(null);
 
+  // Once a deleted chat has left the list, focus the chat that took its place (or New chat), not the page.
+  const aside = useRef<HTMLElement>(null);
+  const refocus = useRef<{ id: string; index: number } | null>(null);
+  useEffect(() => {
+    const pending = refocus.current;
+    if (!pending || chats.some((c) => c.id === pending.id)) return;
+    refocus.current = null;
+    const items = aside.current?.querySelectorAll<HTMLButtonElement>('.chat-item-main');
+    const next = items?.[Math.min(pending.index, items.length - 1)] ?? aside.current?.querySelector<HTMLButtonElement>('.new-chat');
+    next?.focus();
+  }, [chats]);
+
   const setLanguage = (uiLanguage: UiLanguage) => update({ uiLanguage });
 
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" ref={aside}>
       <div className="brand">
         <span className="brand-mark" aria-hidden>
           話
@@ -89,6 +101,7 @@ export function Sidebar({
           confirmLabel={t.delete}
           cancelLabel={t.cancel}
           onConfirm={() => {
+            refocus.current = { id: deleting.id, index: chats.findIndex((c) => c.id === deleting.id) };
             onDelete(deleting.id);
             setDeleting(null);
           }}

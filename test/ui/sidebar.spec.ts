@@ -61,6 +61,22 @@ test('deleting the open chat takes its id out of the URL', async ({ app }) => {
   expect(new URL(app.url()).hash).toBe('');
 });
 
+const focusedText = (app: Page) => app.evaluate(() => document.activeElement?.textContent?.trim() ?? '');
+
+test('after deleting a chat, focus moves to the chat that took its place, or to New chat', async ({ app }) => {
+  await startChat(app, 'Keep');
+  await startChat(app, 'Delete me');
+  await app.locator('.chat-item', { hasText: 'Delete me' }).getByRole('button', { name: 'Delete chat' }).click();
+  await app.getByRole('dialog').getByRole('button', { name: 'Delete' }).press('Enter');
+  await expect(app.locator('.chat-item')).toHaveCount(1);
+  await expect.poll(() => focusedText(app)).toMatch(/^Keep/);
+
+  await app.locator('.chat-item', { hasText: 'Keep' }).getByRole('button', { name: 'Delete chat' }).click();
+  await app.getByRole('dialog').getByRole('button', { name: 'Delete' }).press('Enter');
+  await expect(app.locator('.chat-item')).toHaveCount(0);
+  await expect.poll(() => focusedText(app)).toBe('+ New chat');
+});
+
 test('a chat can be renamed', async ({ app, request }) => {
   await startChat(app, 'Old name');
   await app.locator('.chat-item.active').getByRole('button', { name: 'Rename chat' }).click();

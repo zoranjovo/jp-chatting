@@ -49,6 +49,7 @@ function Shell({ loadError }: { loadError: string | null }) {
   const [errors, setErrors] = useState<Record<string, string | null>>({});
   const [dialog, setDialog] = useState<'new' | 'settings' | 'chat' | null>(null);
   const [navOpen, setNavOpen] = useState(false);
+  const [focusComposer, setFocusComposer] = useState(0);
   const activeId = useRef<string | null>(null);
 
   const refreshList = useCallback(() => api.chats().then(setChats).catch(() => {}), []);
@@ -137,6 +138,7 @@ function Shell({ loadError }: { loadError: string | null }) {
     activeId.current = created.id;
     showInUrl(created.id);
     setChat(created);
+    setFocusComposer((n) => n + 1);
     setNavOpen(false);
     refreshList();
     requestReply(created.id);
@@ -241,6 +243,7 @@ function Shell({ loadError }: { loadError: string | null }) {
             onRetry={() => requestReply(chat.id)}
             onMessageUpdated={messageUpdated}
             onRewind={rewind}
+            focusComposer={focusComposer}
           />
         ) : (
           <div className="empty">

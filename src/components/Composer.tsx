@@ -6,6 +6,7 @@ import { useSettings } from '../settings.tsx';
 export interface ComposerHandle {
   /** Puts a rewound message back in the box, above anything already typed. */
   prepend: (message: string) => void;
+  focus: () => void;
 }
 
 /** Unsent text per chat, so a draft stays with its own chat when the learner switches to another. */
@@ -33,6 +34,9 @@ export function Composer({
     prepend(message) {
       setText((current) => (current.trim() ? `${message}\n\n${current}` : message));
       caret.current = message.length;
+      ref.current?.focus();
+    },
+    focus() {
       ref.current?.focus();
     },
   }), []);

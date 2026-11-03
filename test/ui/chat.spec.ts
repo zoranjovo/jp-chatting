@@ -178,6 +178,29 @@ test('a chat opened from the list does not read out its old messages', async ({ 
   await expect(app.locator('.chat > [role="status"]')).toHaveText('');
 });
 
+const focused = (app: Page) => app.evaluate(() => {
+  const el = document.activeElement;
+  return el ? `${el.tagName.toLowerCase()}${el.className ? `.${String(el.className).trim().split(/\s+/).join('.')}` : ''}:${el.textContent?.trim() ?? ''}` : '';
+});
+
+test('starting a chat puts the keyboard in its composer', async ({ app }) => {
+  await startChat(app);
+  expect(await focused(app)).toMatch(/^textarea/);
+});
+
+test('"Get a reply" leaves the keyboard in the composer, not on the page', async ({ app, request }) => {
+  await startChat(app);
+  await mockControl(request, { fail: true });
+  await composer(app).fill('きこえますか');
+  await composer(app).press('Enter');
+  await expect(app.locator('.error')).toBeVisible();
+  await mockControl(request, { fail: false });
+  await app.getByRole('button', { name: 'Get a reply' }).focus();
+  await app.keyboard.press('Enter');
+  await expect(theirs(app)).toHaveCount(2);
+  expect(await focused(app)).toMatch(/^textarea/);
+});
+
 const chatSettingsButton = (app: Page) => app.locator('.topbar').getByRole('button', { name: 'Chat settings' });
 
 async function openChatSettings(app: Page) {
