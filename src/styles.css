@@ -413,7 +413,8 @@ button:disabled {
   margin: 2px -6px -4px;
 }
 
-.icon-button {
+/* The message actions: round icons, named by a tooltip. */
+.bubble-actions .icon-button {
   display: inline-grid;
   place-items: center;
   width: 28px;
@@ -425,22 +426,22 @@ button:disabled {
   color: var(--muted);
 }
 
-.icon-button:hover:not(:disabled),
-.icon-button.active {
+.bubble-actions .icon-button:hover:not(:disabled),
+.bubble-actions .icon-button.active {
   color: var(--accent);
   background: var(--accent-soft);
 }
 
-.icon-button:disabled {
+.bubble-actions .icon-button:disabled {
   opacity: 0.4;
 }
 
-.mine .icon-button {
+.mine .bubble-actions .icon-button {
   color: color-mix(in srgb, var(--mine-ink) 75%, transparent);
 }
 
-.mine .icon-button:hover:not(:disabled),
-.mine .icon-button.active {
+.mine .bubble-actions .icon-button:hover:not(:disabled),
+.mine .bubble-actions .icon-button.active {
   color: var(--mine-ink);
   background: color-mix(in srgb, var(--mine-ink) 18%, transparent);
 }
@@ -1066,8 +1067,68 @@ ruby rt {
   box-shadow: 0 20px 60px rgb(0 0 0 / 25%);
 }
 
+.dialog.small {
+  width: min(400px, calc(100vw - 32px));
+}
+
+.dialog-message {
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+
 .dialog::backdrop {
   background: rgb(20 15 10 / 40%);
+}
+
+/* In: the backdrop fades while the box rises and settles. Out (Dialog's CLOSE_MS): the reverse, a little quicker. */
+.dialog[open] {
+  animation: dialog-in 200ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.dialog[open]::backdrop {
+  animation: fade-in 200ms ease-out;
+}
+
+.dialog.closing {
+  animation: dialog-out 140ms ease-in forwards;
+  pointer-events: none;
+}
+
+.dialog.closing::backdrop {
+  animation: fade-out 140ms ease-in forwards;
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+}
+
+@keyframes dialog-out {
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog[open],
+  .dialog[open]::backdrop {
+    animation: none;
+  }
 }
 
 .dialog-body {
