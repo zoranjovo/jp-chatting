@@ -6,7 +6,11 @@
 //   pnpm eval --compare before after
 //
 // Results go to .cache/eval/<label>.json; a comparison writes .cache/eval/<a>-vs-<b>.md
-// with every output side by side for reading.
+// with every output side by side for reading. An endpoint model can take a Thinking level,
+// e.g. endpoint:qwen3.6-35b-a3b#none for thinking off.
+//
+// The scenarios, scoring and runner are exported for other scripts (such as a local
+// model benchmark); the command line below only runs when this file is run directly.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -15,14 +19,14 @@ import { generateBreakdown, generateFeedback, generateReply, type CallAi } from 
 import type { JlptLevel } from '../shared/jlpt.ts';
 import { stripFurigana } from '../shared/kanji.ts';
 import { problemCount, replyProblems, type ReplyProblems } from '../shared/quality.ts';
-import { DEFAULT_SETTINGS, type Breakdown, type Feedback, type Message, type Politeness, type Settings } from '../shared/types.ts';
+import { DEFAULT_SETTINGS, type Breakdown, type EndpointReasoning, type Feedback, type Message, type Politeness, type Settings } from '../shared/types.ts';
 
-const OUT_DIR = path.join(import.meta.dirname, '..', '.cache', 'eval');
-const msg = (role: Message['role'], content: string, id = content): Message => ({ id, role, content, createdAt: '' });
+export const OUT_DIR = path.join(import.meta.dirname, '..', '.cache', 'eval');
+export const msg = (role: Message['role'], content: string, id = content): Message => ({ id, role, content, createdAt: '' });
 
 // --- scenarios ---
 
-interface ReplyCase {
+export interface ReplyCase {
   kind: 'reply';
   name: string;
   level: number;
@@ -34,14 +38,14 @@ interface ReplyCase {
   topic: string;
   messages: Message[];
 }
-interface BreakdownCase {
+export interface BreakdownCase {
   kind: 'breakdown';
   name: string;
   level: number;
   genki?: number;
   message: string;
 }
-interface FeedbackCase {
+export interface FeedbackCase {
   kind: 'feedback';
   name: string;
   level: number;
@@ -52,11 +56,11 @@ interface FeedbackCase {
   /** The corrected Japanese should contain one of these. */
   expect: string[];
 }
-type Case = ReplyCase | BreakdownCase | FeedbackCase;
+export type Case = ReplyCase | BreakdownCase | FeedbackCase;
 
 const CAFE_OPENER = 'いらっしゃいませ！{何|なに}を{飲|の}みますか？';
 
-const CASES: Case[] = [
+export const CASES: Case[] = [
   { kind: 'reply', name: 'opener · café · L10 · polite', level: 10, politeness: 'polite', topic: 'Ordering at a café', messages: [] },
   { kind: 'reply', name: 'opener · no topic · L0 (kana only)', level: 0, politeness: 'polite', topic: '', messages: [] },
   { kind: 'reply', name: 'opener · weekend plans · L3 · casual', level: 3, politeness: 'casual', topic: 'Weekend plans', messages: [] },
@@ -160,11 +164,11 @@ function isSubsequence(needle: string, hay: string): boolean {
   return i === needle.length;
 }
 
-function sumProblems(list: ReplyProblems[]): ReplyProblems {
+export function sumProblems(list: ReplyProblems[]): ReplyProblems {
   return { kanji: list.flatMap((p) => p.kanji), furigana: list.flatMap((p) => p.furigana), foreign: list.flatMap((p) => p.foreign) };
 }
 
-interface Result {
+export interface Result {
   case: string;
   kind: Case['kind'];
   sample: number;
@@ -230,10 +234,12 @@ function scoreFeedback(c: FeedbackCase, f: Feedback): Pick<Result, 'problems' | 
 
 // --- running ---
 
+/** "claude:<model>", or "endpoint:<model>" with an optional "#<reasoning_effort>" (e.g. "#none" for thinking off). */
 function settingsFor(model: string, level: number, genki = 0, jlpt: JlptLevel = 0): Settings {
-  const [provider, name] = model.split(/:(.*)/s);
+  const [provider, spec] = model.split(/:(.*)/s);
+  const [name, reasoning = ''] = spec.split('#');
   if (provider === 'claude') return { ...DEFAULT_SETTINGS, wkLevel: level, genkiLesson: genki, jlptLevel: jlpt, provider: 'claude', claude: { ...DEFAULT_SETTINGS.claude, model: name, timeoutMs: 240_000 } };
-  return { ...DEFAULT_SETTINGS, wkLevel: level, genkiLesson: genki, jlptLevel: jlpt, provider: 'endpoint', endpoint: { baseUrl: 'http://localhost:1234/v1', apiKey: '', model: name, reasoning: '' } };
+  return { ...DEFAULT_SETTINGS, wkLevel: level, genkiLesson: genki, jlptLevel: jlpt, provider: 'endpoint', endpoint: { baseUrl: 'http://localhost:1234/v1', apiKey: '', model: name, reasoning: reasoning as EndpointReasoning } };
 }
 
 async function runCase(model: string, c: Case, sample: number): Promise<Result> {
@@ -261,10 +267,17 @@ async function runCase(model: string, c: Case, sample: number): Promise<Result> 
   }
 }
 
-async function runModel(model: string, samples: number): Promise<Result[]> {
+export const SKIPPED = 'skipped: over the time budget';
+
+/** Runs every case in order. Past `deadline` (ms since epoch) the remaining cases are recorded as skipped, not run. */
+export async function runModel(model: string, samples: number, deadline = Infinity): Promise<Result[]> {
   const results: Result[] = [];
   for (const c of CASES) {
     for (let s = 0; s < (c.kind === 'reply' ? samples : 1); s += 1) {
+      if (Date.now() > deadline) {
+        results.push({ case: c.name, kind: c.kind, sample: s, ms: 0, error: SKIPPED, output: null, calls: [], problems: { kanji: [], furigana: [], foreign: [] }, checks: { ran: false } });
+        continue;
+      }
       const r = await runCase(model, c, s);
       results.push(r);
       const failed = Object.entries(r.checks).filter(([, ok]) => !ok).map(([k]) => k);
@@ -277,9 +290,9 @@ async function runModel(model: string, samples: number): Promise<Result[]> {
 
 // --- reporting ---
 
-type Run = Record<string, Result[]>;
+export type Run = Record<string, Result[]>;
 
-function summarise(results: Result[]) {
+export function summarise(results: Result[]) {
   const replies = results.filter((r) => r.kind === 'reply');
   const analyses = results.filter((r) => r.kind !== 'reply');
   const checks = (rs: Result[]) => rs.flatMap((r) => Object.values(r.checks));
@@ -301,7 +314,7 @@ function summarise(results: Result[]) {
   };
 }
 
-function printSummary(run: Run) {
+export function printSummary(run: Run) {
   console.table(Object.fromEntries(Object.entries(run).map(([model, rs]) => [model, summarise(rs)])));
 }
 
@@ -325,7 +338,7 @@ function show(r: Result | undefined): string {
 }
 
 /** Scores a saved run again with the current checks, so two runs are always judged alike. */
-function rescore(run: Run): Run {
+export function rescore(run: Run): Run {
   for (const results of Object.values(run)) {
     for (const r of results) {
       const c = CASES.find((x) => x.name === r.case);
@@ -343,7 +356,7 @@ function rescore(run: Run): Run {
   return run;
 }
 
-function compare(a: string, b: string) {
+export function compare(a: string, b: string) {
   const runA: Run = rescore(JSON.parse(fs.readFileSync(path.join(OUT_DIR, `${a}.json`), 'utf8')));
   const runB: Run = rescore(JSON.parse(fs.readFileSync(path.join(OUT_DIR, `${b}.json`), 'utf8')));
   const models = [...new Set([...Object.keys(runA), ...Object.keys(runB)])];
@@ -370,22 +383,24 @@ function compare(a: string, b: string) {
 
 // --- main ---
 
-const args = process.argv.slice(2);
-const flag = (name: string) => {
-  const i = args.indexOf(name);
-  return i >= 0 ? args.splice(i, 2)[1] : undefined;
-};
+if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
+  const args = process.argv.slice(2);
+  const flag = (name: string) => {
+    const i = args.indexOf(name);
+    return i >= 0 ? args.splice(i, 2)[1] : undefined;
+  };
 
-if (args[0] === '--compare') {
-  compare(args[1], args[2]);
-} else {
-  const label = flag('--label') ?? new Date().toISOString().replace(/[:.]/g, '-');
-  const samples = Number(flag('--samples') ?? 2);
-  const models = args.length > 0 ? args : ['claude:haiku'];
-  const entries = await Promise.all(models.map(async (m) => [m, await runModel(m, samples)] as const));
-  const run: Run = Object.fromEntries(entries);
-  fs.mkdirSync(OUT_DIR, { recursive: true });
-  fs.writeFileSync(path.join(OUT_DIR, `${label}.json`), JSON.stringify(run, null, 2));
-  printSummary(run);
-  console.log(`saved ${path.join(OUT_DIR, `${label}.json`)}`);
+  if (args[0] === '--compare') {
+    compare(args[1], args[2]);
+  } else {
+    const label = flag('--label') ?? new Date().toISOString().replace(/[:.]/g, '-');
+    const samples = Number(flag('--samples') ?? 2);
+    const models = args.length > 0 ? args : ['claude:haiku'];
+    const entries = await Promise.all(models.map(async (m) => [m, await runModel(m, samples)] as const));
+    const run: Run = Object.fromEntries(entries);
+    fs.mkdirSync(OUT_DIR, { recursive: true });
+    fs.writeFileSync(path.join(OUT_DIR, `${label}.json`), JSON.stringify(run, null, 2));
+    printSummary(run);
+    console.log(`saved ${path.join(OUT_DIR, `${label}.json`)}`);
+  }
 }
