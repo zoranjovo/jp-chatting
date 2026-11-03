@@ -188,6 +188,16 @@ test('starting a chat puts the keyboard in its composer', async ({ app }) => {
   expect(await focused(app)).toMatch(/^textarea/);
 });
 
+test('switching to another chat afterwards leaves focus where the learner put it', async ({ app }) => {
+  await startChat(app, 'One');
+  await startChat(app, 'Two');
+  const one = app.locator('.chat-item', { hasText: 'One' }).locator('.chat-item-main');
+  await one.focus();
+  await app.keyboard.press('Enter');
+  await expect(app.locator('h1')).toHaveText('One');
+  await expect(one).toBeFocused();
+});
+
 test('"Get a reply" leaves the keyboard in the composer, not on the page', async ({ app, request }) => {
   await startChat(app);
   await mockControl(request, { fail: true });

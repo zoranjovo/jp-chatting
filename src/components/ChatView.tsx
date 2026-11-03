@@ -14,6 +14,7 @@ export function ChatView({
   onMessageUpdated,
   onRewind,
   focusComposer,
+  onComposerFocused,
 }: {
   chat: Chat;
   waiting: boolean;
@@ -23,8 +24,9 @@ export function ChatView({
   onMessageUpdated: (m: Message) => void;
   /** Resolves true once the message and everything after it are gone. */
   onRewind: (m: Message) => Promise<boolean>;
-  /** Changing it moves focus to the composer, e.g. once a new chat has been started. */
-  focusComposer?: number;
+  /** Moves focus to the composer once (then calls onComposerFocused), e.g. for a chat just started. */
+  focusComposer?: boolean;
+  onComposerFocused?: () => void;
 }) {
   const t = useT();
   const end = useRef<HTMLDivElement>(null);
@@ -50,8 +52,10 @@ export function ChatView({
   }, [chat.messages.length, waiting]);
 
   useEffect(() => {
-    if (focusComposer) composer.current?.focus();
-  }, [focusComposer]);
+    if (!focusComposer) return;
+    composer.current?.focus();
+    onComposerFocused?.();
+  }, [focusComposer, onComposerFocused]);
 
   return (
     <div className="chat">
