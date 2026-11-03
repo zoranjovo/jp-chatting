@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
+import { CLAUDE_EFFORTS, ENDPOINT_REASONING } from '../../shared/types.ts';
 import { STRINGS } from '../../src/i18n.tsx';
 
 const { en, ja } = STRINGS;
@@ -45,6 +46,19 @@ describe('UI strings', () => {
     assert.match(en.wkLevelHint(5, 166), /166 kanji from levels 1–5/);
     assert.match(ja.wkLevelHint(0, 0), /かなのみ/);
     assert.match(ja.wkLevelHint(5, 166), /レベル1〜5の漢字166字/);
+  });
+
+  test('every effort and thinking value has its own label in both languages, and no API parameter name shows', () => {
+    for (const dict of [en, ja]) {
+      for (const e of CLAUDE_EFFORTS) assert.notEqual(dict.effortOption(e), e, `effort ${e}`);
+      for (const r of ENDPOINT_REASONING) assert.notEqual(dict.thinkingOption(r), r, `thinking ${r}`);
+      assert.doesNotMatch(dict.thinkingHint, /reasoning_effort/);
+    }
+    assert.deepEqual(CLAUDE_EFFORTS.map(en.effortOption), ['Model default', 'Low', 'Medium', 'High', 'Extra high', 'Max']);
+    assert.deepEqual(CLAUDE_EFFORTS.map(ja.effortOption), ['モデルの既定', '低', '中', '高', '超高', '最大']);
+    assert.deepEqual(ENDPOINT_REASONING.map(ja.thinkingOption), ['モデルの既定', 'オフ', '低', '中', '高']);
+    assert.equal(en.effortMeta('xhigh'), 'Effort: Extra high');
+    assert.equal(ja.effortMeta('max'), '思考レベル：最大');
   });
 
   test('every feedback verdict has a label in both languages', () => {

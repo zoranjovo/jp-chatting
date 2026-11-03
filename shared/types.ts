@@ -6,6 +6,7 @@ export type UiLanguage = 'en' | 'ja';
 export type Politeness = 'polite' | 'casual';
 export type ProviderKind = 'endpoint' | 'claude';
 export type ClaudeEffort = '' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+export const CLAUDE_EFFORTS: ClaudeEffort[] = ['', 'low', 'medium', 'high', 'xhigh', 'max'];
 /** Sent to an endpoint as reasoning_effort; '' sends nothing (the model's default), 'none' turns thinking off. */
 export type EndpointReasoning = '' | 'none' | 'low' | 'medium' | 'high';
 export const ENDPOINT_REASONING: EndpointReasoning[] = ['', 'none', 'low', 'medium', 'high'];

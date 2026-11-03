@@ -258,7 +258,7 @@ test('the Claude CLI option lists its models and its own settings', async ({ app
   const dialog = await openSettings(app);
   await dialog.getByText('Claude Code CLI', { exact: true }).click();
   await expect(dialog.getByLabel('CLI command')).toHaveValue('claude');
-  await expect(dialog.getByLabel('Effort')).toBeVisible();
+  await expect(dialog.getByLabel('Effort').locator('option')).toHaveText(['Model default', 'Low', 'Medium', 'High', 'Extra high', 'Max']);
   await expect(dialog.getByLabel('Endpoint URL')).toHaveCount(0);
   const model = dialog.getByLabel('Model', { exact: true });
   await expect(model.locator('option')).toHaveText(['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5']);
@@ -283,6 +283,9 @@ test('the interface switches to Japanese and stays that way', async ({ app }) =>
   const dialog = await openSettings(app);
   await expect(dialog.getByRole('heading', { name: '設定' })).toBeVisible();
   await expect(dialog).toContainText('WaniKaniレベル');
+  await expect(dialog.getByLabel('思考').locator('option')).toHaveText(['モデルの既定', 'オフ', '低', '中', '高']);
+  await dialog.getByText('Claude Code CLI', { exact: true }).click();
+  await expect(dialog.getByLabel('思考レベル').locator('option')).toHaveText(['モデルの既定', '低', '中', '高', '超高', '最大']);
 });
 
 test('switching back to English', async ({ app }) => {
