@@ -1,14 +1,20 @@
 // Renders Japanese with {漢字|かんじ} furigana markup as <ruby> (or just the
 // base text when furigana is off), and marks every kanji above the learner's
 // WaniKani level -- in text the AI wrote. The learner's own messages may use
-// any kanji they like, so those are not marked.
+// any kanji they like, so those are not marked. Inside a message the level is
+// the one it was written under (its stamp), so lowering the level later doesn't
+// make earlier messages look like they broke the rule.
 
-import { Fragment, type ReactNode } from 'react';
+import { createContext, Fragment, useContext, type ReactNode } from 'react';
 import { isAllowed, isKanji, kanjiInfo } from '../../shared/kanji.ts';
 import { useT } from '../i18n.tsx';
 import { useSettings } from '../settings.tsx';
 
 const MARKUP = /\{([^|{}]+)\|([^{}]*)\}/g;
+
+/** The WaniKani level the surrounding message was written under; unset means the current setting. */
+const WrittenAtLevel = createContext<number | undefined>(undefined);
+export const WrittenAtLevelProvider = WrittenAtLevel.Provider;
 
 /** `level` null: show the kanji's details but never mark it as above the level. */
 function Kanji({ ch, level }: { ch: string; level: number | null }) {
@@ -35,7 +41,8 @@ function marked(text: string, level: number | null): ReactNode[] {
  */
 export function JpText({ text, className = 'jp', highlight = true }: { text: string; className?: string; highlight?: boolean }) {
   const { settings } = useSettings();
-  const level = highlight ? settings.wkLevel : null;
+  const written = useContext(WrittenAtLevel);
+  const level = highlight ? (written ?? settings.wkLevel) : null;
   const parts: ReactNode[] = [];
   let last = 0;
   for (const match of text.matchAll(MARKUP)) {

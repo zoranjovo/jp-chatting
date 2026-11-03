@@ -45,13 +45,17 @@ test('kanji within the level keep their furigana and are not highlighted', async
   await expect(theirs(app).first().locator('.over-level')).toHaveCount(0);
 });
 
-test('lowering the level highlights kanji above it, with details on hover', async ({ app }) => {
+test('lowering the level leaves earlier messages judged by the level they were written at', async ({ app }) => {
   await startChat(app);
   await setLevel(app, 3);
-  const over = theirs(app).first().locator('.over-level');
-  // 何 and 飲 are above level 3
-  await expect(over).toHaveCount(2);
-  await expect(over.first()).toHaveAttribute('title', /Above your WaniKani level\n何 — What · WaniKani level \d+/);
+  // 何 and 飲 are above level 3, but the opener was written at level 10.
+  const message = theirs(app).first();
+  await expect(message.locator('.kanji')).toHaveCount(2);
+  await expect(message.locator('.over-level')).toHaveCount(0);
+  await expect(message.locator('.kanji').first()).toHaveAttribute('title', /^何 — What · WaniKani level \d+/);
+  await message.getByRole('button', { name: 'Breakdown' }).click();
+  await expect(message.locator('.analysis-line')).toHaveCount(2);
+  await expect(message.locator('.over-level')).toHaveCount(0);
 });
 
 test('a new reply at a low level spells those kanji out in kana', async ({ app }) => {
@@ -61,10 +65,10 @@ test('a new reply at a low level spells those kanji out in kana', async ({ app }
   await expect(theirs(app).first().locator('.over-level')).toHaveCount(0);
 });
 
-test('raising the level in settings removes the highlights', async ({ app, request }) => {
+test('raising the level in settings is saved, and leaves earlier messages unmarked', async ({ app, request }) => {
   await startChat(app);
   await setLevel(app, 3);
-  await expect(theirs(app).first().locator('.over-level')).toHaveCount(2);
+  await expect(theirs(app).first().locator('.over-level')).toHaveCount(0);
   const dialog = await openSettings(app);
   await dialog.locator('input[type="number"]').fill('60');
   await expect(dialog).toContainText('levels 1–60');

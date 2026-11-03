@@ -329,6 +329,27 @@ describe('message context line', () => {
 
 });
 
+describe('kanji marks follow the level a message was written at', () => {
+  const stamp: MessageContext = { provider: 'claude', model: 'claude-opus-5-5', effort: 'high', politeness: 'polite', wkLevel: 20, genkiLesson: 0, jlptLevel: 0 };
+  // 飲 is above level 3 and within 20.
+  const message: Message = { id: 'm', role: 'assistant', content: '{何|なに}を{飲|の}みますか', createdAt: '', context: stamp };
+  const bubble = (m: Message, wkLevel: number) => render(<MessageBubble chatId="c" message={m} onUpdated={() => {}} />, { wkLevel });
+
+  test('a message written at a higher level is not marked after the level is lowered', () => {
+    assert.equal(count(bubble(message, 3), 'over-level'), 0);
+  });
+
+  test('a message is still marked for kanji above the level it was written at', () => {
+    assert.ok(count(bubble({ ...message, context: { ...stamp, wkLevel: 3 } }, 60), 'over-level') > 0);
+  });
+
+  test('a message from before stamping uses the current level', () => {
+    const { context: _, ...old } = message;
+    assert.ok(count(bubble(old, 3), 'over-level') > 0);
+    assert.equal(count(bubble(old, 20), 'over-level'), 0);
+  });
+});
+
 describe('message info', () => {
   const ctx: MessageContext = { provider: 'claude', model: 'claude-opus-5-5', effort: 'high', politeness: 'casual', wkLevel: 12, genkiLesson: 6, jlptLevel: 4 };
   const message: Message = { id: 'm', role: 'assistant', content: 'こんにちは', createdAt: '2026-11-03T05:30:00.000Z', context: ctx };
