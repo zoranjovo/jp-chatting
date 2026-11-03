@@ -58,7 +58,7 @@ export function Sidebar({
         {chats.length === 0 && <p className="muted small">{t.noChats}</p>}
         {chats.map((chat) => (
           <div key={chat.id} className={`chat-item ${chat.id === activeId ? 'active' : ''}`}>
-            <button type="button" className="chat-item-main" onClick={() => onSelect(chat.id)}>
+            <button type="button" className="chat-item-main" onClick={() => onSelect(chat.id)} aria-current={chat.id === activeId ? 'page' : undefined}>
               <span className="chat-title jp">{chat.title || t.untitled}</span>
               <span className="chat-date">{new Date(chat.updatedAt).toLocaleDateString(settings.uiLanguage === 'ja' ? 'ja-JP' : 'en-GB', { month: 'short', day: 'numeric' })}</span>
             </button>
@@ -75,10 +75,10 @@ export function Sidebar({
       </nav>
       <div className="sidebar-footer">
         <div className="lang-switch" role="group" aria-label={t.uiLanguage}>
-          <button type="button" className={settings.uiLanguage === 'en' ? 'active' : ''} onClick={() => setLanguage('en')}>
+          <button type="button" className={settings.uiLanguage === 'en' ? 'active' : ''} aria-pressed={settings.uiLanguage === 'en'} onClick={() => setLanguage('en')}>
             EN
           </button>
-          <button type="button" className={settings.uiLanguage === 'ja' ? 'active' : ''} onClick={() => setLanguage('ja')}>
+          <button type="button" className={settings.uiLanguage === 'ja' ? 'active' : ''} aria-pressed={settings.uiLanguage === 'ja'} onClick={() => setLanguage('ja')}>
             日本語
           </button>
         </div>

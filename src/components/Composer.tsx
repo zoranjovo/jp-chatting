@@ -89,6 +89,7 @@ export function Composer({
         className={`romaji-toggle ${romaji ? 'on' : ''}`}
         onClick={() => update({ romajiInput: !romaji })}
         title={romaji ? t.romajiOn : t.romajiOff}
+        aria-label={t.romajiToggle}
         aria-pressed={romaji}
       >
         {romaji ? 'あ' : 'A'}
@@ -100,6 +101,7 @@ export function Composer({
         onChange={onChange}
         onKeyDown={onKeyDown}
         placeholder={romaji ? t.composerPlaceholderRomaji : t.composerPlaceholder}
+        aria-label={t.composerLabel}
         lang="ja"
         autoCapitalize="off"
         autoCorrect="off"

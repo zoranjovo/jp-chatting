@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { flushSync } from 'react-dom';
 import { genkiBook, MAX_GENKI_LESSON } from '../../shared/genki.ts';
 import { asJlptLevel, JLPT_LEVELS } from '../../shared/jlpt.ts';
@@ -89,6 +89,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const current = draft.provider === 'claude' ? draft.claude.model : draft.endpoint.model;
   const options = models?.models ?? [];
   const kanjiCount = allowedKanji(draft.wkLevel).length;
+  const wkHintId = useId();
 
   return (
     <Dialog title={t.settingsTitle} onClose={onClose}>
@@ -103,12 +104,21 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             </select>
           </label>
 
-          <label className="field">
+          {/* Not a <label>: one around both inputs names only the slider, with the number and the hint run into it. */}
+          <div className="field">
             <span>
               {t.wkLevelLabel}: <strong>{draft.wkLevel}</strong>
             </span>
             <div className="level-row">
-              <input type="range" min={0} max={MAX_WK_LEVEL} value={draft.wkLevel} onChange={(e) => setWkLevel(Number(e.target.value))} />
+              <input
+                type="range"
+                min={0}
+                max={MAX_WK_LEVEL}
+                value={draft.wkLevel}
+                onChange={(e) => setWkLevel(Number(e.target.value))}
+                aria-label={t.wkLevelLabel}
+                aria-describedby={wkHintId}
+              />
               <input
                 type="number"
                 min={0}
@@ -124,10 +134,14 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
                   // Enter submits straight from the box, so the box must show the clamped level before native validation runs.
                   if (e.key === 'Enter') flushSync(showWkLevel);
                 }}
+                aria-label={t.wkLevelLabel}
+                aria-describedby={wkHintId}
               />
             </div>
-            <small className="muted">{t.wkLevelHint(draft.wkLevel, kanjiCount)}</small>
-          </label>
+            <small className="muted" id={wkHintId}>
+              {t.wkLevelHint(draft.wkLevel, kanjiCount)}
+            </small>
+          </div>
 
           <label className="field">
             <span>{t.genkiLabel}</span>

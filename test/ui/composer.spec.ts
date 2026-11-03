@@ -44,6 +44,15 @@ test('with romaji input off, text is left as typed, and the choice is remembered
   await expect(app.locator('.romaji-toggle')).toHaveAttribute('aria-pressed', 'false');
 });
 
+test('the message box and the romaji switch have names of their own, and the switch says whether it is on', async ({ app }) => {
+  await startChat(app);
+  await expect(app.getByRole('textbox', { name: 'Message', exact: true })).toBeVisible();
+  const toggle = app.getByRole('button', { name: 'Convert romaji to kana', exact: true });
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+});
+
 test('Shift+Enter makes a new line instead of sending', async ({ app }) => {
   await startChat(app);
   await composer(app).pressSequentially('hai');

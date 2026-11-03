@@ -34,7 +34,7 @@ const saved = async (request: APIRequestContext) => (await (await request.get('/
 
 async function setLevel(page: Page, level: number) {
   const dialog = await openSettings(page);
-  await dialog.locator('input[type="number"]').fill(String(level));
+  await dialog.getByRole('spinbutton', { name: 'WaniKani level' }).fill(String(level));
   await dialog.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 }
@@ -70,7 +70,7 @@ test('raising the level in settings is saved, and leaves earlier messages unmark
   await setLevel(app, 3);
   await expect(theirs(app).first().locator('.over-level')).toHaveCount(0);
   const dialog = await openSettings(app);
-  await dialog.locator('input[type="number"]').fill('60');
+  await dialog.getByRole('spinbutton', { name: 'WaniKani level' }).fill('60');
   await expect(dialog).toContainText('levels 1–60');
   await dialog.getByRole('button', { name: 'Save' }).click();
   await expect(app.getByRole('dialog')).toHaveCount(0);
@@ -80,7 +80,7 @@ test('raising the level in settings is saved, and leaves earlier messages unmark
 
 test('level 0 means kana only', async ({ app }) => {
   const dialog = await openSettings(app);
-  await dialog.locator('input[type="number"]').fill('0');
+  await dialog.getByRole('spinbutton', { name: 'WaniKani level' }).fill('0');
   await expect(dialog).toContainText('Kana only');
 });
 
@@ -133,6 +133,18 @@ test('leaving the level box empty keeps the level it had', async ({ app }) => {
   await expect(box).toHaveValue('10');
   await expect(slider).toHaveValue('10');
   await expect(dialog).toContainText('levels 1–10');
+});
+
+test('the WaniKani slider and number box are named on their own, with the hint as their description', async ({ app }) => {
+  const dialog = await openSettings(app);
+  const slider = dialog.getByRole('slider', { name: 'WaniKani level', exact: true });
+  const box = dialog.getByRole('spinbutton', { name: 'WaniKani level', exact: true });
+  await expect(slider).toHaveValue('10');
+  await expect(box).toHaveValue('10');
+  await expect(slider).toHaveAccessibleDescription(/kanji from levels 1–10\./);
+  await box.fill('4');
+  await expect(slider).toHaveValue('4');
+  await expect(box).toHaveAccessibleDescription(/kanji from levels 1–4\./);
 });
 
 test('furigana can be turned off', async ({ app }) => {

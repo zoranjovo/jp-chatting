@@ -5,9 +5,11 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { DEFAULT_SETTINGS, type Breakdown, type Chat, type Feedback, type Message, type MessageContext, type Settings } from '../../shared/types.ts';
+import { DEFAULT_SETTINGS, type Breakdown, type Chat, type ChatSummary, type Feedback, type Message, type MessageContext, type Settings } from '../../shared/types.ts';
 import { BreakdownView, FeedbackView, glossSegments } from '../../src/components/Analysis.tsx';
 import { ChatSettingsDialog } from '../../src/components/ChatSettingsDialog.tsx';
+import { Composer } from '../../src/components/Composer.tsx';
+import { ConfirmDialog } from '../../src/components/Dialog.tsx';
 import { ContextLine } from '../../src/components/ContextLine.tsx';
 import { MessageBubble } from '../../src/components/MessageBubble.tsx';
 import { ContextDetails } from '../../src/components/MessageInfo.tsx';
@@ -15,8 +17,9 @@ import { JpText } from '../../src/components/JpText.tsx';
 import { parseInline } from '../../src/components/RichText.tsx';
 import { LanguageProvider } from '../../src/i18n.tsx';
 import { needsModel, SettingsContext } from '../../src/settings.tsx';
-import { SetupNotice } from '../../src/components/SetupNotice.tsx';
 import { SettingsDialog } from '../../src/components/SettingsDialog.tsx';
+import { SetupNotice } from '../../src/components/SetupNotice.tsx';
+import { Sidebar } from '../../src/components/Sidebar.tsx';
 
 function render(node: ReactNode, patch: Partial<Settings> = {}): string {
   const settings = { ...DEFAULT_SETTINGS, ...patch };
@@ -444,5 +447,54 @@ describe('SettingsDialog', () => {
     assert.match(html, /WaniKani level: <strong>17<\/strong>/);
     assert.match(html, /<input type="range"[^>]*value="17"/);
     assert.match(html, /<input type="number"[^>]*value="17"/);
+  });
+});
+
+describe('accessible names and states', () => {
+  const attr = (html: string, tag: string, name: string) => html.match(new RegExp(`<${tag}[^>]*\\s${name}="([^"]*)"`))?.[1];
+
+  test('a dialog is named by its heading', () => {
+    const chat: Chat = { id: 'c', title: 'Café', topic: '', politeness: 'polite', createdAt: '', updatedAt: '', messages: [] };
+    const html = render(<ChatSettingsDialog chat={chat} onSave={() => {}} onClose={() => {}} />);
+    const id = attr(html, 'dialog', 'aria-labelledby');
+    assert.ok(id);
+    assert.ok(html.includes(`<h2 id="${id}">Chat settings</h2>`));
+  });
+
+  test('a confirmation is described by its question', () => {
+    const html = render(<ConfirmDialog title="Delete chat" message="Delete it?" confirmLabel="Delete" cancelLabel="Cancel" onConfirm={() => {}} onCancel={() => {}} />);
+    const id = attr(html, 'dialog', 'aria-describedby');
+    assert.ok(id);
+    assert.ok(html.includes(`id="${id}">Delete it?</p>`));
+  });
+
+  test('the composer and the romaji toggle have names of their own', () => {
+    const html = render(<Composer chatId="c" disabled={false} onSend={() => {}} />);
+    assert.equal(attr(html, 'textarea', 'aria-label'), 'Message');
+    assert.match(html, /<button[^>]*aria-label="Convert romaji to kana" aria-pressed="true"[^>]*>あ</);
+    assert.equal(attr(render(<Composer chatId="c" disabled={false} onSend={() => {}} />, { uiLanguage: 'ja' }), 'textarea', 'aria-label'), 'メッセージ');
+  });
+
+  test('the sidebar marks the open chat and the chosen language', () => {
+    const chats: ChatSummary[] = ['a', 'b'].map((id) => ({ id, title: id.toUpperCase(), topic: '', createdAt: '', updatedAt: '2026-01-01T00:00:00Z' }));
+    const props = { chats, onSelect: () => {}, onNew: () => {}, onRename: () => {}, onDelete: () => {}, onSettings: () => {} };
+    const html = render(<Sidebar {...props} activeId="b" />);
+    assert.equal(count(html, 'aria-current'), 1);
+    assert.match(html, /aria-current="page"><span class="chat-title jp">B</);
+    assert.match(html, /aria-pressed="true"[^>]*>EN</);
+    assert.match(html, /aria-pressed="false"[^>]*>日本語</);
+    assert.match(render(<Sidebar {...props} activeId={null} />, { uiLanguage: 'ja' }), /aria-pressed="true"[^>]*>日本語</);
+  });
+
+  test('the WaniKani slider and number box are each named, with the hint as their description', () => {
+    const html = render(<SettingsDialog onClose={() => {}} />, { wkLevel: 5 });
+    const inputs = [...html.matchAll(/<input type="(range|number)"[^>]*>/g)].map((m) => m[0]);
+    assert.equal(inputs.length, 2);
+    const hint = html.match(/<small class="muted" id="([^"]+)">Your partner may use the \d+ kanji from levels 1–5/)?.[1];
+    assert.ok(hint);
+    for (const input of inputs) {
+      assert.match(input, /aria-label="WaniKani level"/);
+      assert.ok(input.includes(`aria-describedby="${hint}"`));
+    }
   });
 });

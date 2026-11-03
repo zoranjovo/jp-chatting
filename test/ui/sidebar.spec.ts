@@ -53,6 +53,48 @@ test('Back closes the rename dialog too, keeping the old name', async ({ app }) 
   await expect(app.locator('.chat-item.active .chat-title')).toHaveText('Keep me');
 });
 
+test('every dialog is named by its heading', async ({ app }) => {
+  await startChat(app, 'Named');
+  const closeWithEscape = async () => {
+    await app.keyboard.press('Escape');
+    await expect(app.getByRole('dialog')).toHaveCount(0);
+  };
+  await app.locator('.sidebar').getByRole('button', { name: '+ New chat' }).click();
+  await expect(app.getByRole('dialog', { name: 'Start a new chat' })).toBeVisible();
+  await closeWithEscape();
+  await app.locator('.topbar').getByRole('button', { name: 'Chat settings' }).click();
+  await expect(app.getByRole('dialog', { name: 'Chat settings' })).toBeVisible();
+  await closeWithEscape();
+  await app.locator('.chat-item.active').getByRole('button', { name: 'Rename chat' }).click();
+  await expect(app.getByRole('dialog', { name: 'Rename chat' })).toBeVisible();
+  await closeWithEscape();
+  await app.locator('.chat-item.active').getByRole('button', { name: 'Delete chat' }).click();
+  const confirm = app.getByRole('dialog', { name: 'Delete chat' });
+  await expect(confirm).toHaveAccessibleDescription('Delete “Named”? This cannot be undone.');
+  await closeWithEscape();
+  await app.locator('.sidebar').getByRole('button', { name: /Settings/ }).click();
+  await expect(app.getByRole('dialog', { name: 'Settings' })).toBeVisible();
+});
+
+test('the open chat and the chosen language are marked for screen readers', async ({ app }) => {
+  await startChat(app, 'First');
+  await startChat(app, 'Second');
+  const current = app.locator('.sidebar [aria-current="page"]');
+  await expect(current).toHaveCount(1);
+  await expect(current).toContainText('Second');
+  await app.locator('.chat-item', { hasText: 'First' }).locator('.chat-item-main').click();
+  await expect(current).toHaveCount(1);
+  await expect(current).toContainText('First');
+
+  const en = app.getByRole('button', { name: 'EN', exact: true });
+  const ja = app.getByRole('button', { name: '日本語' });
+  await expect(en).toHaveAttribute('aria-pressed', 'true');
+  await expect(ja).toHaveAttribute('aria-pressed', 'false');
+  await ja.click();
+  await expect(ja).toHaveAttribute('aria-pressed', 'true');
+  await expect(en).toHaveAttribute('aria-pressed', 'false');
+});
+
 test('deleting the open chat takes its id out of the URL', async ({ app }) => {
   await startChat(app, 'Doomed');
   await app.locator('.chat-item.active').getByRole('button', { name: 'Delete chat' }).click();
