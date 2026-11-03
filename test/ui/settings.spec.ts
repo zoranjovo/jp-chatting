@@ -84,6 +84,57 @@ test('level 0 means kana only', async ({ app }) => {
   await expect(dialog).toContainText('Kana only');
 });
 
+async function clearLevelBox(page: Page) {
+  const dialog = await openSettings(page);
+  const box = dialog.locator('input[type="number"]');
+  await box.click();
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.press('Backspace');
+  return { dialog, box, slider: dialog.locator('input[type="range"]'), label: dialog.locator('.field', { hasText: 'WaniKani level' }).locator('strong') };
+}
+
+test('the level box can be emptied and retyped without a 0 creeping in', async ({ app, request }) => {
+  const { dialog, box, slider, label } = await clearLevelBox(app);
+  await expect(box).toHaveValue('');
+  await box.pressSequentially('60');
+  await expect(box).toHaveValue('60');
+  await expect(label).toHaveText('60');
+  await expect(slider).toHaveValue('60');
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect(app.getByRole('dialog')).toHaveCount(0);
+  expect((await saved(request)).wkLevel).toBe(60);
+});
+
+test('a fractional level is rounded, and label, slider and box agree', async ({ app, request }) => {
+  const { dialog, box, slider, label } = await clearLevelBox(app);
+  await box.pressSequentially('2.5');
+  await expect(label).toHaveText('3');
+  await expect(slider).toHaveValue('3');
+  await box.press('Tab');
+  await expect(box).toHaveValue('3');
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect(app.getByRole('dialog')).toHaveCount(0);
+  expect((await saved(request)).wkLevel).toBe(3);
+});
+
+test('a negative level becomes 0, and Enter in the box saves it', async ({ app, request }) => {
+  const { box, label } = await clearLevelBox(app);
+  await box.pressSequentially('-3');
+  await expect(label).toHaveText('0');
+  await box.press('Enter');
+  await expect(app.getByRole('dialog')).toHaveCount(0);
+  expect((await saved(request)).wkLevel).toBe(0);
+});
+
+test('leaving the level box empty keeps the level it had', async ({ app }) => {
+  const { dialog, box, slider, label } = await clearLevelBox(app);
+  await expect(label).toHaveText('10');
+  await box.press('Tab');
+  await expect(box).toHaveValue('10');
+  await expect(slider).toHaveValue('10');
+  await expect(dialog).toContainText('levels 1–10');
+});
+
 test('furigana can be turned off', async ({ app }) => {
   await startChat(app);
   await expect(theirs(app).first().locator('rt').first()).toHaveText('なに');
