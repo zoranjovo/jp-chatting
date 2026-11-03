@@ -5,6 +5,7 @@ import { useSettings } from '../settings.tsx';
 import { type CloseDialog, ConfirmDialog, Dialog } from './Dialog.tsx';
 
 export function Sidebar({
+  inert,
   chats,
   activeId,
   onSelect,
@@ -13,6 +14,7 @@ export function Sidebar({
   onDelete,
   onSettings,
 }: {
+  inert?: boolean;
   chats: ChatSummary[];
   activeId: string | null;
   onSelect: (id: string) => void;
@@ -42,7 +44,7 @@ export function Sidebar({
   const setLanguage = (uiLanguage: UiLanguage) => update({ uiLanguage });
 
   return (
-    <aside className="sidebar" ref={aside}>
+    <aside className="sidebar" id="sidebar" inert={inert} ref={aside}>
       <div className="brand">
         <span className="brand-mark" aria-hidden>
           話

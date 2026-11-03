@@ -77,6 +77,12 @@ test('after deleting a chat, focus moves to the chat that took its place, or to 
   await expect.poll(() => focusedText(app)).toBe('+ New chat');
 });
 
+test('on a wide screen the sidebar is always in the tab order', async ({ app }) => {
+  await startChat(app, 'Desk');
+  await expect(app.locator('.sidebar')).not.toHaveAttribute('inert');
+  await expect(app.locator('.main')).not.toHaveAttribute('inert');
+});
+
 test('a chat can be renamed', async ({ app, request }) => {
   await startChat(app, 'Old name');
   await app.locator('.chat-item.active').getByRole('button', { name: 'Rename chat' }).click();

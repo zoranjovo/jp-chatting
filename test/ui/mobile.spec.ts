@@ -48,6 +48,48 @@ test('picking a chat from the menu, then Back, returns to the chat before', asyn
   await expect(app.locator('.sidebar')).not.toBeInViewport();
 });
 
+test('the closed menu is out of the tab order, and the open one is all there is', async ({ app }) => {
+  await startChat(app, 'Phone chat');
+  const sidebar = app.locator('.sidebar');
+  const menu = app.getByRole('button', { name: 'Menu' });
+  await expect(sidebar).toHaveAttribute('inert', '');
+  await expect(menu).toHaveAttribute('aria-expanded', 'false');
+
+  await menu.focus();
+  await app.keyboard.press('Enter');
+  await expect(menu).toHaveAttribute('aria-expanded', 'true');
+  await expect(sidebar).not.toHaveAttribute('inert');
+  await expect(app.locator('.main')).toHaveAttribute('inert', '');
+  await expect(sidebar.getByRole('button', { name: '+ New chat' })).toBeFocused();
+  for (let i = 0; i < 8; i += 1) {
+    await app.keyboard.press('Tab');
+    expect(await app.evaluate(() => !!document.activeElement?.closest('.main'))).toBe(false);
+  }
+});
+
+test('Escape closes the menu and puts focus back on the menu button', async ({ app }) => {
+  await startChat(app, 'Phone chat');
+  const menu = app.getByRole('button', { name: 'Menu' });
+  await menu.focus();
+  await app.keyboard.press('Enter');
+  await expect(app.locator('.sidebar')).toBeInViewport();
+  await app.keyboard.press('Escape');
+  await expect(app.locator('.sidebar')).not.toBeInViewport();
+  await expect(menu).toBeFocused();
+});
+
+test('picking a chat from the menu with the keyboard leaves focus on the menu button, not the page', async ({ app }) => {
+  await startChat(app, 'One');
+  await startChat(app, 'Two');
+  const menu = app.getByRole('button', { name: 'Menu' });
+  await menu.focus();
+  await app.keyboard.press('Enter');
+  await app.locator('.chat-item', { hasText: 'One' }).locator('.chat-item-main').focus();
+  await app.keyboard.press('Enter');
+  await expect(app.locator('h1')).toHaveText('One');
+  await expect(menu).toBeFocused();
+});
+
 test('the page never scrolls sideways and the composer fits', async ({ app }) => {
   await startChat(app);
   await composer(app).fill('ながいメッセージ'.repeat(20));
