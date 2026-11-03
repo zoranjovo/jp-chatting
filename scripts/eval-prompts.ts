@@ -6,8 +6,8 @@
 //   pnpm eval --compare before after
 //
 // Results go to .cache/eval/<label>.json; a comparison writes .cache/eval/<a>-vs-<b>.md
-// with every output side by side for reading. An endpoint model can take a Thinking level,
-// e.g. endpoint:qwen3.6-35b-a3b#none for thinking off.
+// with every output side by side for reading. A model can take an effort or Thinking level:
+// claude:claude-opus-5-5#high, or endpoint:qwen3.6-35b-a3b#none for thinking off.
 //
 // The scenarios, scoring and runner are exported for other scripts (such as a local
 // model benchmark); the command line below only runs when this file is run directly.
@@ -19,7 +19,7 @@ import { generateBreakdown, generateFeedback, generateReply, type CallAi } from 
 import type { JlptLevel } from '../shared/jlpt.ts';
 import { stripFurigana } from '../shared/kanji.ts';
 import { problemCount, replyProblems, type ReplyProblems } from '../shared/quality.ts';
-import { DEFAULT_SETTINGS, type Breakdown, type EndpointReasoning, type Feedback, type Message, type Politeness, type Settings } from '../shared/types.ts';
+import { DEFAULT_SETTINGS, type Breakdown, type ClaudeEffort, type EndpointReasoning, type Feedback, type Message, type Politeness, type Settings } from '../shared/types.ts';
 
 export const OUT_DIR = path.join(import.meta.dirname, '..', '.cache', 'eval');
 export const msg = (role: Message['role'], content: string, id = content): Message => ({ id, role, content, createdAt: '' });
@@ -234,12 +234,17 @@ function scoreFeedback(c: FeedbackCase, f: Feedback): Pick<Result, 'problems' | 
 
 // --- running ---
 
-/** "claude:<model>", or "endpoint:<model>" with an optional "#<reasoning_effort>" (e.g. "#none" for thinking off). */
+/**
+ * "claude:<model>" or "endpoint:<model>", each with an optional "#<level>": Claude's effort (e.g. "#high"),
+ * or an endpoint's reasoning_effort (e.g. "#none" for thinking off). Without one Claude gets the CLI's own
+ * default effort, as runs did before the app's default became "high", so old and new runs compare.
+ */
 function settingsFor(model: string, level: number, genki = 0, jlpt: JlptLevel = 0): Settings {
   const [provider, spec] = model.split(/:(.*)/s);
-  const [name, reasoning = ''] = spec.split('#');
-  if (provider === 'claude') return { ...DEFAULT_SETTINGS, wkLevel: level, genkiLesson: genki, jlptLevel: jlpt, provider: 'claude', claude: { ...DEFAULT_SETTINGS.claude, model: name, timeoutMs: 240_000 } };
-  return { ...DEFAULT_SETTINGS, wkLevel: level, genkiLesson: genki, jlptLevel: jlpt, provider: 'endpoint', endpoint: { baseUrl: 'http://localhost:1234/v1', apiKey: '', model: name, reasoning: reasoning as EndpointReasoning } };
+  const [name, suffix = ''] = spec.split('#');
+  const base = { ...DEFAULT_SETTINGS, wkLevel: level, genkiLesson: genki, jlptLevel: jlpt };
+  if (provider === 'claude') return { ...base, provider: 'claude', claude: { ...DEFAULT_SETTINGS.claude, model: name, effort: suffix as ClaudeEffort, timeoutMs: 600_000 } };
+  return { ...base, provider: 'endpoint', endpoint: { baseUrl: 'http://localhost:1234/v1', apiKey: '', model: name, reasoning: suffix as EndpointReasoning } };
 }
 
 async function runCase(model: string, c: Case, sample: number): Promise<Result> {
