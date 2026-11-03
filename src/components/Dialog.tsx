@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 
 /** Matches the dialog-out animation in styles.css. */
 const CLOSE_MS = 140;
@@ -24,9 +24,13 @@ export function Dialog({
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [closing, setClosing] = useState(false);
+  // A ref as well as the state: a `close` from an earlier render (one awaited in a submit handler) must still see it.
+  const closed = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  useEffect(() => {
+  // A layout effect, so the cleanup's close() runs while the dialog is still in the document and the
+  // browser can hand focus back to whatever opened it.
+  useLayoutEffect(() => {
     const el = ref.current;
     el?.showModal();
     return () => {
@@ -36,7 +40,8 @@ export function Dialog({
   }, []);
 
   const close: CloseDialog = (then = onClose) => {
-    if (closing) return;
+    if (closed.current) return;
+    closed.current = true;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return then();
     setClosing(true);
     timer.current = setTimeout(then, CLOSE_MS);

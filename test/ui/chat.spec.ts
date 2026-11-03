@@ -270,6 +270,9 @@ test('the message actions are icons that name themselves on hover', async ({ app
     await expect(tooltip.locator('strong')).toHaveText(name);
   }
   await expect(tooltip).toContainText('Delete this message and everything after it');
+  await expect(mine(app).first().getByRole('button', { name: 'Rewind' })).toHaveAccessibleDescription(
+    /Delete this message and everything after it/,
+  );
 
   await theirs(app).first().getByRole('button', { name: 'Breakdown' }).click();
   await expect(tooltip.locator('strong')).toHaveText('Hide');

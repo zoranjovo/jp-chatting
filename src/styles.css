@@ -1262,10 +1262,6 @@ ruby rt {
 }
 
 /* The ⓘ on the partner's messages and the popup it opens, below the bubble's actions. */
-.bubble {
-  position: relative;
-}
-
 .message-info {
   margin-right: auto;
 }
