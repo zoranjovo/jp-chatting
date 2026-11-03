@@ -119,7 +119,7 @@ test('the Claude CLI option lists its models and its own settings', async ({ app
   await expect(dialog.getByLabel('Effort')).toBeVisible();
   await expect(dialog.getByLabel('Endpoint URL')).toHaveCount(0);
   const model = dialog.getByLabel('Model', { exact: true });
-  await expect(model.locator('option')).toHaveText(['Default (claude-sonnet-5-5)', 'claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5']);
+  await expect(model.locator('option')).toHaveText(['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5']);
   await model.selectOption('claude-haiku-5-5');
   await dialog.getByLabel('Effort').selectOption('low');
   await dialog.getByRole('button', { name: 'Save' }).click();
@@ -198,13 +198,6 @@ test('changing the model clears an old test result, and with no model the test i
   await expect(dialog.getByRole('status')).toHaveCount(0);
   await dialog.getByLabel('Model', { exact: true }).selectOption('');
   await expect(dialog.getByRole('button', { name: 'Test model' })).toBeDisabled();
-});
-
-test('with Claude and no model picked, the default can still be tested', async ({ app }) => {
-  const dialog = await openSettings(app);
-  await dialog.getByText('Claude Code CLI', { exact: true }).click();
-  await dialog.getByLabel('Model', { exact: true }).selectOption('');
-  await expect(dialog.getByRole('button', { name: 'Test model' })).toBeEnabled();
 });
 
 test('the JLPT level is saved', async ({ app, request }) => {

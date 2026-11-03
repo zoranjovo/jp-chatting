@@ -390,7 +390,7 @@ describe('ChatSettingsDialog', () => {
   test('shows the chat\'s title, topic and style, and the app-wide model and levels the next message will use', () => {
     const html = render(<ChatSettingsDialog chat={chat} onSave={() => {}} onClose={() => {}} />, {
       provider: 'claude',
-      claude: { ...DEFAULT_SETTINGS.claude, model: 'claude-haiku-5-5' },
+      claude: { ...DEFAULT_SETTINGS.claude, model: 'claude-haiku-5-5', effort: '' },
       wkLevel: 8,
     });
     assert.match(html, /value="Café"/);

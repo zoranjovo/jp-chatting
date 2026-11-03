@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { genkiBook, MAX_GENKI_LESSON } from '../../shared/genki.ts';
 import { asJlptLevel, JLPT_LEVELS } from '../../shared/jlpt.ts';
 import { allowedKanji, MAX_WK_LEVEL } from '../../shared/kanji.ts';
-import { DEFAULT_SETTINGS, ENDPOINT_REASONING, type ClaudeEffort, type EndpointReasoning, type ModelList, type Settings } from '../../shared/types.ts';
+import { ENDPOINT_REASONING, type ClaudeEffort, type EndpointReasoning, type ModelList, type Settings } from '../../shared/types.ts';
 import { api } from '../api.ts';
 import { useT } from '../i18n.tsx';
 import { useSettings } from '../settings.tsx';
@@ -226,7 +226,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               value={current}
               onChange={(e) => (draft.provider === 'claude' ? setClaude({ model: e.target.value }) : setEndpoint({ model: e.target.value }))}
             >
-              <option value="">{loading ? t.loadingModels : draft.provider === 'claude' ? t.defaultModel(DEFAULT_SETTINGS.claude.model) : t.chooseModel}</option>
+              {draft.provider !== 'claude' && <option value="">{loading ? t.loadingModels : t.chooseModel}</option>}
               {current && !options.includes(current) && <option value={current}>{current}</option>}
               {options.map((m) => (
                 <option key={m} value={m}>
@@ -248,7 +248,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
 
         <div className="field model-test">
           <div>
-            <button type="button" className="secondary" onClick={runTest} disabled={(draft.provider === 'endpoint' && !current) || test.state === 'testing'}>
+            <button type="button" className="secondary" onClick={runTest} disabled={!current || test.state === 'testing'}>
               {test.state === 'testing' ? t.testingModel : t.testModel}
             </button>
           </div>

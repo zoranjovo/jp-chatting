@@ -17,6 +17,7 @@ const chat = (id: string, updatedAt: string): Chat => ({ id, title: id, topic: '
 describe('settings', () => {
   test('defaults when nothing is saved', async () => {
     assert.deepEqual(await store.getSettings(), DEFAULT_SETTINGS);
+    assert.deepEqual([DEFAULT_SETTINGS.claude.model, DEFAULT_SETTINGS.claude.effort], ['claude-opus-5-5', 'high']);
   });
 
   test('a patch merges into what is saved, nested sections included', async () => {
@@ -126,8 +127,8 @@ describe('chats', () => {
 });
 
 describe('settings migration', () => {
-  test('old Claude model aliases are pinned to their 5.5 ids', async () => {
-    for (const [alias, id] of [['haiku', 'claude-haiku-5-5'], ['sonnet', 'claude-sonnet-5-5'], ['opus', 'claude-opus-5-5']]) {
+  test('old Claude model aliases, and the old empty Default, are pinned to their 5.5 ids', async () => {
+    for (const [alias, id] of [['', 'claude-sonnet-5-5'], ['haiku', 'claude-haiku-5-5'], ['sonnet', 'claude-sonnet-5-5'], ['opus', 'claude-opus-5-5']]) {
       await fs.writeFile(path.join(dir, 'settings.json'), JSON.stringify({ claude: { model: alias } }));
       assert.equal((await store.getSettings()).claude.model, id, alias);
     }

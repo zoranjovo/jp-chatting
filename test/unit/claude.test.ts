@@ -7,7 +7,7 @@ import type { AiRequest } from '../../server/ai/types.ts';
 import { DEFAULT_SETTINGS } from '../../shared/types.ts';
 import { fakeSpawn, INIT_OK, resultEvent } from './helpers.ts';
 
-const config = { ...DEFAULT_SETTINGS.claude, model: 'haiku', timeoutMs: 5_000 };
+const config = { ...DEFAULT_SETTINGS.claude, model: 'haiku', effort: '' as const, timeoutMs: 5_000 };
 const textRequest: AiRequest = { system: 'SYSTEM PROMPT', turns: [{ role: 'user', content: 'こんにちは' }] };
 const schemaRequest: AiRequest = { ...textRequest, schema: { type: 'object', properties: { a: { type: 'string' } } } };
 
@@ -53,8 +53,8 @@ describe('claudeArgs', () => {
     assert.equal(flag(claudeArgs(textRequest, { ...config, effort: 'low' }, 's'), '--effort'), 'low');
   });
 
-  test('an empty model falls back to the default, Sonnet 5.5', () => {
-    assert.equal(flag(claudeArgs(textRequest, { ...config, model: '' }, 's'), '--model'), 'claude-sonnet-5-5');
+  test('an empty model falls back to the default model', () => {
+    assert.equal(flag(claudeArgs(textRequest, { ...config, model: '' }, 's'), '--model'), DEFAULT_SETTINGS.claude.model);
   });
 });
 
