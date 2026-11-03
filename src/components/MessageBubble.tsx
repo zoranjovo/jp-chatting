@@ -3,8 +3,10 @@ import type { Message } from '../../shared/types.ts';
 import { api } from '../api.ts';
 import { useT } from '../i18n.tsx';
 import { BreakdownView, FeedbackView } from './Analysis.tsx';
+import { BreakdownIcon, CheckIcon, RewindIcon } from './Icons.tsx';
 import { MessageInfo } from './MessageInfo.tsx';
 import { JpText } from './JpText.tsx';
+import { Tooltip } from './Tooltip.tsx';
 
 /** Matches the open/close transition in styles.css. */
 const SLIDE_MS = 260;
@@ -75,23 +77,30 @@ export function MessageBubble({
         <div className="bubble-actions">
           {!mine && message.context && <MessageInfo context={message.context} createdAt={message.createdAt} />}
           {onRewind && (
-            <button type="button" className="chip" onClick={onRewind} disabled={rewindDisabled} title={t.rewindTitle}>
-              ↶ {t.rewind}
-            </button>
+            <Tooltip
+              label={
+                <>
+                  <strong>{t.rewind}</strong>
+                  <span className="tooltip-hint">{t.rewindTitle}</span>
+                </>
+              }
+            >
+              <button type="button" className="icon-button" onClick={onRewind} disabled={rewindDisabled} aria-label={t.rewind}>
+                <RewindIcon />
+              </button>
+            </Tooltip>
           )}
-          <button
-            type="button"
-            className={`chip ${open ? 'active' : ''}`}
-            onClick={() => (open ? setOpen(false) : analyze(false))}
-            aria-expanded={open}
-            aria-label={open ? t.hide : label}
-          >
-            {/* Both labels take up space, so the button -- and the bubble -- never change width. */}
-            <span className="chip-labels" aria-hidden>
-              <span className={open ? 'chip-off' : ''}>{label}</span>
-              <span className={open ? '' : 'chip-off'}>{t.hide}</span>
-            </span>
-          </button>
+          <Tooltip label={<strong>{open ? t.hide : label}</strong>}>
+            <button
+              type="button"
+              className={`icon-button ${open ? 'active' : ''}`}
+              onClick={() => (open ? setOpen(false) : analyze(false))}
+              aria-expanded={open}
+              aria-label={open ? t.hide : label}
+            >
+              {mine ? <CheckIcon /> : <BreakdownIcon />}
+            </button>
+          </Tooltip>
         </div>
       </div>
       {mounted && (

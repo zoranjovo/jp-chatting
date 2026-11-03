@@ -23,6 +23,7 @@
     "node": ">=20"
   },
   "dependencies": {
+    "@floating-ui/react": "^0.27.20",
     "express": "^5.1.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"

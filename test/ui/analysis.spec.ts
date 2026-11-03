@@ -88,7 +88,7 @@ test('opening and closing the panel never resizes the message bubble or its butt
   await startChat(app);
   const message = theirs(app).first();
   const bubble = message.locator('.bubble');
-  const button = message.locator('.bubble .chip');
+  const button = message.locator('.bubble .tooltip-anchor button');
   const size = async () => [(await bubble.boundingBox())!.width, (await button.boundingBox())!.width];
   const before = await size();
 
