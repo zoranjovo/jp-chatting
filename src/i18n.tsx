@@ -11,8 +11,8 @@ const en = {
   noChats: 'No chats yet.',
   deleteChat: 'Delete chat',
   renameChat: 'Rename chat',
-  confirmDelete: 'Delete this chat? This cannot be undone.',
-  renamePrompt: 'New name for this chat:',
+  confirmDelete: (title: string) => `Delete “${title}”? This cannot be undone.`,
+  delete: 'Delete',
   untitled: 'Untitled chat',
   menu: 'Menu',
 
@@ -138,8 +138,8 @@ const ja: Strings = {
   noChats: 'まだチャットがありません。',
   deleteChat: 'チャットを削除',
   renameChat: '名前を変更',
-  confirmDelete: 'このチャットを削除しますか？元に戻せません。',
-  renamePrompt: 'チャットの新しい名前：',
+  confirmDelete: (title: string) => `「${title}」を削除しますか？元に戻せません。`,
+  delete: '削除',
   untitled: '無題のチャット',
   menu: 'メニュー',
 

@@ -280,6 +280,7 @@ test('the next message after a change is stamped with the new settings', async (
   const dialog = await openChatSettings(app);
   await dialog.getByText('Casual (plain form)').click();
   await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect(dialog).toHaveCount(0);
   await composer(app).fill('うん');
   await composer(app).press('Enter');
   await expect(theirs(app)).toHaveCount(2);

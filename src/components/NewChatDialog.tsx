@@ -1,47 +1,49 @@
 import { useState, type FormEvent } from 'react';
 import type { Politeness } from '../../shared/types.ts';
 import { useT } from '../i18n.tsx';
-import { Dialog } from './Dialog.tsx';
+import { type CloseDialog, Dialog } from './Dialog.tsx';
 
 export function NewChatDialog({ onStart, onClose }: { onStart: (topic: string, politeness: Politeness) => void; onClose: () => void }) {
   const t = useT();
   const [topic, setTopic] = useState('');
   const [politeness, setPoliteness] = useState<Politeness>('polite');
 
-  const submit = (e: FormEvent) => {
+  const submit = (e: FormEvent, close: CloseDialog) => {
     e.preventDefault();
-    onStart(topic.trim(), politeness);
+    close(() => onStart(topic.trim(), politeness));
   };
 
   return (
     <Dialog title={t.newChatTitle} onClose={onClose}>
-      <form onSubmit={submit} className="form">
-        <label className="field">
-          <span>{t.topicLabel}</span>
-          <input autoFocus value={topic} onChange={(e) => setTopic(e.target.value)} placeholder={t.topicPlaceholder} />
-        </label>
-        <div className="topic-examples">
-          {t.topicExamples.map((ex) => (
-            <button key={ex} type="button" className="chip" onClick={() => setTopic(ex)}>
-              {ex}
+      {(close) => (
+        <form onSubmit={(e) => submit(e, close)} className="form">
+          <label className="field">
+            <span>{t.topicLabel}</span>
+            <input autoFocus value={topic} onChange={(e) => setTopic(e.target.value)} placeholder={t.topicPlaceholder} />
+          </label>
+          <div className="topic-examples">
+            {t.topicExamples.map((ex) => (
+              <button key={ex} type="button" className="chip" onClick={() => setTopic(ex)}>
+                {ex}
+              </button>
+            ))}
+          </div>
+          <p className="muted small">{t.topicHint}</p>
+          <div className="field">
+            <span>{t.politeness}</span>
+            <StyleSwitch value={politeness} onChange={setPoliteness} />
+            <small className="muted">{t.speechStyleHint}</small>
+          </div>
+          <div className="dialog-actions">
+            <button type="button" className="secondary" onClick={() => close()}>
+              {t.cancel}
             </button>
-          ))}
-        </div>
-        <p className="muted small">{t.topicHint}</p>
-        <div className="field">
-          <span>{t.politeness}</span>
-          <StyleSwitch value={politeness} onChange={setPoliteness} />
-          <small className="muted">{t.speechStyleHint}</small>
-        </div>
-        <div className="dialog-actions">
-          <button type="button" className="secondary" onClick={onClose}>
-            {t.cancel}
-          </button>
-          <button type="submit" className="primary">
-            {t.start}
-          </button>
-        </div>
-      </form>
+            <button type="submit" className="primary">
+              {t.start}
+            </button>
+          </div>
+        </form>
+      )}
     </Dialog>
   );
 }
