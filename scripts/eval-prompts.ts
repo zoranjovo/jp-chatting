@@ -54,6 +54,8 @@ export interface FeedbackCase {
   level: number;
   genki?: number;
   previous: string;
+  /** The conversation before `previous`. */
+  earlier?: Message[];
   message: string;
   verdicts: Feedback['verdict'][];
   /** The corrected Japanese should contain one of these. */
@@ -115,6 +117,27 @@ export const CASES: Case[] = [
     message: 'ともだちと えいがを みます。',
     verdicts: ['minor', 'incorrect'],
     expect: ['みました', '{見|み}ました', '見ました'],
+  },
+  // Who said what: the partner introduces itself and asks; the learner answers. The feedback must not swap them.
+  {
+    kind: 'feedback',
+    name: "feedback · answers the partner's question",
+    level: 10,
+    earlier: [msg('assistant', 'はじめまして！ユキです。{大学生|だいがくせい}です。'), msg('user', 'はじめまして。サムです。')],
+    previous: 'サムさんは アメリカの どこから {来|き}ましたか？',
+    message: 'ボストンから きました。ユキさんは どこから きましたか？',
+    verdicts: ['correct', 'minor'],
+    expect: ['ボストン'],
+  },
+  {
+    kind: 'feedback',
+    name: 'feedback · English question to the partner',
+    level: 10,
+    earlier: [msg('assistant', 'どんな {音楽|おんがく}が {好|す}きですか？')],
+    previous: 'ジャズですか？ロックですか？',
+    message: "I don't understand. What does ongaku mean?",
+    verdicts: ['english'],
+    expect: ['{音楽|おんがく}', '音楽', 'おんがく'],
   },
   // Genki: the same kinds of scenario with the grammar guided to early lessons.
   { kind: 'reply', name: 'genki · opener · café · lesson 3', level: 10, genki: 3, politeness: 'polite', topic: 'Ordering at a café', messages: [] },
@@ -264,6 +287,8 @@ function scoreFeedback(c: FeedbackCase, f: Feedback): Pick<Result, 'problems' | 
       lines: f.lines.length > 0 && f.lines.every((l) => l.translation.trim() && l.explanation.trim()),
       originalTranslated: f.lines.every((l) => l.ok || (l.originalTranslation ?? '').trim().length > 0),
       noBrackets: ![f.meaning, f.summary, ...f.lines.flatMap((l) => [l.translation, l.explanation])].some((t) => /[「」]/.test(t)),
+      // Shown under "You said" and spoken to the learner, so never about "the learner" in the third person.
+      addressesLearner: ![f.meaning, f.summary, ...f.lines.map((l) => l.explanation)].some((t) => /\bthe (learner|student)\b/i.test(t)),
     },
   };
 }
