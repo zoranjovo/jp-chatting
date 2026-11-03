@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { stripFurigana } from '../../shared/kanji.ts';
 import type { Chat, Message } from '../../shared/types.ts';
 import { useT } from '../i18n.tsx';
 import { Composer, type ComposerHandle } from './Composer.tsx';
@@ -32,6 +33,15 @@ export function ChatView({
   const last = chat.messages.at(-1);
   const needsReply = !waiting && (!last || last.role === 'user');
 
+  // Screen readers hear the partner's new messages; the ones already there when a chat opens stay quiet.
+  const [announcement, setAnnouncement] = useState('');
+  const seen = useRef({ chat: chat.id, message: last?.id });
+  useEffect(() => {
+    const fresh = seen.current.chat === chat.id && last && last.id !== seen.current.message && last.role === 'assistant';
+    setAnnouncement(fresh ? `${t.partnerSays} ${stripFurigana(last.content)}` : '');
+    seen.current = { chat: chat.id, message: last?.id };
+  }, [chat.id, last, t.partnerSays]);
+
   useEffect(() => {
     end.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [chat.messages.length, waiting]);
@@ -51,8 +61,8 @@ export function ChatView({
           />
         ))}
         {waiting && (
-          <div className="message theirs">
-            <div className="bubble typing" aria-label={t.typing}>
+          <div className="message theirs" aria-hidden>
+            <div className="bubble typing">
               <span />
               <span />
               <span />
@@ -60,7 +70,7 @@ export function ChatView({
           </div>
         )}
         {error && (
-          <div className="error">
+          <div className="error" role="alert">
             {t.errorPrefix} {error}
           </div>
         )}
@@ -70,6 +80,9 @@ export function ChatView({
           </button>
         )}
         <div ref={end} />
+      </div>
+      <div className="sr-only" role="status">
+        {waiting ? t.typing : announcement}
       </div>
       <Composer chatId={chat.id} disabled={waiting} onSend={onSend} handle={composer} />
     </div>

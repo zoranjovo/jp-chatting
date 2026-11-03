@@ -153,6 +153,31 @@ test('after a failed reply and a reload, the reply can still be asked for', asyn
   await expect(theirs(app)).toHaveCount(2);
 });
 
+test('screen readers hear that the partner is typing, then what it said, and errors as alerts', async ({ app, request }) => {
+  await startChat(app);
+  const status = app.locator('.chat > [role="status"]');
+  await expect(status).toHaveText(/^Your partner: いらっしゃいませ/);
+  await mockControl(request, { delayMs: 800 });
+  await composer(app).fill('コーヒーをください');
+  await composer(app).press('Enter');
+  await expect(status).toHaveText('Typing…');
+  await expect(theirs(app)).toHaveCount(2);
+  await expect(status).toHaveText(/^Your partner: はい、大きいサイズと小さいサイズ/);
+
+  await mockControl(request, { delayMs: 0, fail: true });
+  await composer(app).fill('もしもし');
+  await composer(app).press('Enter');
+  await expect(app.getByRole('alert')).toContainText('mock model is down');
+});
+
+test('a chat opened from the list does not read out its old messages', async ({ app }) => {
+  await startChat(app, 'One');
+  await startChat(app, 'Two');
+  await app.locator('.chat-item', { hasText: 'One' }).locator('.chat-item-main').click();
+  await expect(app.locator('h1')).toHaveText('One');
+  await expect(app.locator('.chat > [role="status"]')).toHaveText('');
+});
+
 const chatSettingsButton = (app: Page) => app.locator('.topbar').getByRole('button', { name: 'Chat settings' });
 
 async function openChatSettings(app: Page) {

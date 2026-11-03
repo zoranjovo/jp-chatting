@@ -33,6 +33,8 @@ export function MessageBubble({
   const [shown, setShown] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Said to screen readers once a requested analysis has arrived. */
+  const [ready, setReady] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const mine = message.role === 'user';
@@ -60,8 +62,10 @@ export function MessageBubble({
     if (analysis && !refresh) return;
     setBusy(true);
     setError(null);
+    setReady(false);
     try {
       onUpdated(await api.analyze(chatId, message.id, refresh));
+      setReady(true);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -115,13 +119,16 @@ export function MessageBubble({
           </Tooltip>
         </div>
       </div>
+      <span className="sr-only" role="status">
+        {busy ? t.analyzing : ready && open ? (mine ? t.feedbackReady : t.breakdownReady) : ''}
+      </span>
       {mounted && (
         <div ref={wrap} className={`analysis-wrap ${shown ? 'open' : ''}`} inert={!open}>
           <div className="analysis-clip">
             <div className="analysis" ref={panel}>
               {busy && <div className="analysis-busy">{t.analyzing}</div>}
               {error && (
-                <div className="error">
+                <div className="error" role="alert">
                   {t.errorPrefix} {error}
                 </div>
               )}
