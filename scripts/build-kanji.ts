@@ -8,21 +8,11 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { type KanjiRow, type SourceKanji, toRow } from './kanji-source.ts';
 
 /** Pinned so a rebuild gives the same levels every time. */
 const SOURCE = 'https://raw.githubusercontent.com/davidluzgouveia/kanji-data/00fd7079c3890f430759536f91aa5e854ec0ca4f/kanji.json';
 const OUT = path.join(import.meta.dirname, '..', 'shared', 'wanikani-kanji.json');
-
-interface SourceKanji {
-  wk_level?: number | null;
-  wk_meanings?: string[] | null;
-  meanings?: string[] | null;
-  wk_readings_on?: string[] | null;
-  wk_readings_kun?: string[] | null;
-}
-
-/** WaniKani marks readings it doesn't teach first with "!". */
-const readings = (list: string[] | null | undefined) => (list ?? []).map((r) => r.replace(/^!/, '')).filter(Boolean).join('、');
 
 async function main() {
   if (process.argv.includes('--if-missing') && fs.existsSync(OUT)) return;
@@ -39,8 +29,8 @@ async function main() {
   }
 
   const rows = Object.entries(raw)
-    .filter(([, k]) => typeof k.wk_level === 'number')
-    .map(([kanji, k]) => [kanji, k.wk_level!, (k.wk_meanings ?? k.meanings ?? []).slice(0, 2).join(', '), readings(k.wk_readings_on), readings(k.wk_readings_kun)] as const)
+    .map(([kanji, k]) => toRow(kanji, k))
+    .filter((r): r is KanjiRow => !!r)
     .sort((a, b) => a[1] - b[1]);
 
   fs.writeFileSync(OUT, `[\n${rows.map((r) => JSON.stringify(r)).join(',\n')}\n]\n`);

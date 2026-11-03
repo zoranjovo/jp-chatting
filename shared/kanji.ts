@@ -14,8 +14,14 @@ export interface KanjiInfo {
   kun: string;
 }
 
+/** Files built before the build script dropped the dataset's "^"/"!" answer markers still carry them. */
+const unmark = (list: string) => list.replace(/(^|, |、)[\^!]/g, '$1');
+
 const KANJI = new Map<string, KanjiInfo>(
-  (rows as [string, number, string, string, string][]).map(([kanji, level, meaning, on, kun]) => [kanji, { kanji, level, meaning, on, kun }]),
+  (rows as [string, number, string, string, string][]).map(([kanji, level, meaning, on, kun]) => [
+    kanji,
+    { kanji, level, meaning: unmark(meaning), on: unmark(on), kun: unmark(kun) },
+  ]),
 );
 
 export const MAX_WK_LEVEL = 60;

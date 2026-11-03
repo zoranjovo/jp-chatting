@@ -33,6 +33,14 @@ describe('the bundled WaniKani list', () => {
     assert.match(info.kun, /ひと/);
     assert.equal(kanjiInfo('a'), undefined);
   });
+
+  test("kanjiInfo drops the dataset's answer markers, even from a file built before the script did", () => {
+    assert.equal(kanjiInfo('大')!.meaning, 'Big, Large');
+    for (const [k] of rows as [string][]) {
+      const { meaning, on, kun } = kanjiInfo(k)!;
+      for (const list of [meaning, on, kun]) assert.doesNotMatch(list, /(^|, |、)[\^!]/, `${k}: ${list}`);
+    }
+  });
 });
 
 describe('isKanji', () => {
