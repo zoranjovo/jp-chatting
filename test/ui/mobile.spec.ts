@@ -1,5 +1,5 @@
 import { devices } from '@playwright/test';
-import { composer, expect, startChat, test } from './fixtures.ts';
+import { composer, expect, expectTooltipBeside, mine, startChat, test, theirs } from './fixtures.ts';
 
 test.use({ viewport: devices['Pixel 7'].viewport, hasTouch: true });
 
@@ -109,4 +109,20 @@ test('on a phone each explanation sits under its sentence', async ({ app }) => {
   expect(explain.y).toBeGreaterThanOrEqual(main.y + main.height - 1);
   const overflow = await app.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
+});
+
+test('on a phone, the action tooltips leave the message text uncovered too', async ({ app }) => {
+  await startChat(app);
+  await composer(app).fill('コーヒーをください');
+  await app.getByRole('button', { name: 'Send' }).click();
+  await expect(theirs(app)).toHaveCount(2);
+  // Tab, not focus(): the tooltips open on focus only when it is visible, as after a key.
+  for (const [message, before, name] of [
+    [mine(app).first(), 'Rewind', 'Check'],
+    [theirs(app).first(), 'How this message was written', 'Breakdown'],
+  ] as const) {
+    await message.getByRole('button', { name: before }).focus();
+    await app.keyboard.press('Tab');
+    await expectTooltipBeside(app, message.getByRole('button', { name }), message.locator('.bubble-text'));
+  }
 });

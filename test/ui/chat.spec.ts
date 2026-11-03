@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { chatsOnDisk, composer, expect, mine, mockCalls, mockControl, startChat, test, theirs } from './fixtures.ts';
+import { chatsOnDisk, composer, expect, expectTooltipBeside, mine, mockCalls, mockControl, startChat, test, theirs } from './fixtures.ts';
 
 test('the empty state invites starting a chat', async ({ app }) => {
   await expect(app.getByRole('heading', { name: 'Practise Japanese by chatting' })).toBeVisible();
@@ -364,6 +364,46 @@ test('the message actions are icons that name themselves on hover', async ({ app
 
   await theirs(app).first().getByRole('button', { name: 'Breakdown' }).click();
   await expect(tooltip.locator('strong')).toHaveText('Hide');
+});
+
+test('the action tooltips leave the message text uncovered, on hover and on keyboard focus', async ({ app }) => {
+  await startChat(app);
+  await sendAndWait(app, 'はい');
+  for (const [message, name] of [
+    [theirs(app).first(), 'Breakdown'],
+    [mine(app).first(), 'Check'],
+    [mine(app).first(), 'Rewind'],
+  ] as const) {
+    const button = message.getByRole('button', { name });
+    await button.hover();
+    await expectTooltipBeside(app, button, message.locator('.bubble-text'));
+    await app.locator('.topbar h1').hover();
+    await expect(app.locator('.tooltip')).toHaveCount(0);
+  }
+
+  // Tab, not focus(): the tooltips open on focus only when it is visible, as after a key.
+  const message = mine(app).first();
+  await message.getByRole('button', { name: 'Rewind' }).focus();
+  await app.keyboard.press('Tab');
+  await expectTooltipBeside(app, message.getByRole('button', { name: 'Check' }), message.locator('.bubble-text'));
+  await app.keyboard.press('Shift+Tab');
+  await expectTooltipBeside(app, message.getByRole('button', { name: 'Rewind' }), message.locator('.bubble-text'));
+});
+
+test('a tooltip goes away once its button scrolls out of view', async ({ app }) => {
+  await app.setViewportSize({ width: 1000, height: 420 });
+  await startChat(app);
+  for (const text of ['コーヒーをください', 'ありがとう', 'はい', 'またね']) await sendAndWait(app, text);
+  const message = mine(app).first();
+  await message.getByRole('button', { name: 'Rewind' }).focus();
+  await app.keyboard.press('Tab');
+  // Rewind's tooltip may still be fading out for a moment, so look for Check's by its text.
+  await expect(app.locator('.tooltip', { hasText: 'Check' })).toBeVisible();
+
+  await app.locator('.messages').evaluate((list) => list.scrollTo({ top: list.scrollHeight }));
+  await expect(message.getByRole('button', { name: 'Check' })).not.toBeInViewport();
+  await expect(message.getByRole('button', { name: 'Check' })).toBeFocused();
+  await expect(app.locator('.tooltip')).toHaveCount(0);
 });
 
 test('the next message after a change is stamped with the new settings', async ({ app, request }) => {

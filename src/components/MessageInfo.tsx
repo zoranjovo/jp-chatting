@@ -2,6 +2,7 @@ import {
   FloatingPortal,
   autoUpdate,
   flip,
+  hide,
   offset,
   safePolygon,
   shift,
@@ -19,6 +20,7 @@ import type { MessageContext } from '../../shared/types.ts';
 import { useT } from '../i18n.tsx';
 import { useSettings } from '../settings.tsx';
 import { InfoIcon } from './Icons.tsx';
+import { useCloseWhenAnchorHidden } from './Tooltip.tsx';
 
 /** The settings a message was written with, one labelled row each. */
 export function ContextDetails({ context, createdAt }: { context: MessageContext; createdAt: string }) {
@@ -54,11 +56,11 @@ export function ContextDetails({ context, createdAt }: { context: MessageContext
 export function MessageInfo({ context, createdAt }: { context: MessageContext; createdAt: string }) {
   const t = useT();
   const [open, setOpen] = useState(false);
-  const { refs, floatingStyles, context: floating } = useFloating({
+  const { refs, floatingStyles, context: floating, middlewareData, isPositioned } = useFloating({
     open,
     onOpenChange: setOpen,
     placement: 'bottom-start',
-    middleware: [offset(6), flip(), shift({ padding: 8 })],
+    middleware: [offset(6), flip(), shift({ padding: 8 }), hide()],
     whileElementsMounted: autoUpdate,
   });
   const { getReferenceProps, getFloatingProps } = useInteractions([
@@ -67,6 +69,7 @@ export function MessageInfo({ context, createdAt }: { context: MessageContext; c
     useDismiss(floating),
     useRole(floating, { role: 'dialog' }),
   ]);
+  const hidden = useCloseWhenAnchorHidden(middlewareData, isPositioned, setOpen);
 
   return (
     <div className="message-info">
@@ -84,7 +87,7 @@ export function MessageInfo({ context, createdAt }: { context: MessageContext; c
           <div
             className="message-info-pop"
             ref={refs.setFloating}
-            style={floatingStyles}
+            style={{ ...floatingStyles, visibility: hidden ? 'hidden' : undefined }}
             aria-label={t.messageInfo}
             {...getFloatingProps()}
           >

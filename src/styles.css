@@ -452,6 +452,7 @@ button[aria-disabled='true'] {
 }
 
 .tooltip {
+  width: max-content;
   z-index: 20;
   max-width: min(260px, calc(100vw - 16px));
   padding: 5px 9px;
