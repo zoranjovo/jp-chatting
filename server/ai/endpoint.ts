@@ -49,6 +49,7 @@ export async function callEndpoint(request: AiRequest, config: EndpointConfig): 
     model: config.model,
     messages: [{ role: 'system', content: request.system }, ...request.turns],
     temperature: request.schema ? 0.3 : 0.8,
+    ...(config.reasoning ? { reasoning_effort: config.reasoning } : {}),
   };
   if (request.schema) {
     body.response_format = { type: 'json_schema', json_schema: { name: 'answer', strict: true, schema: request.schema } };
@@ -62,8 +63,12 @@ export async function callEndpoint(request: AiRequest, config: EndpointConfig): 
   }
   if (!res.ok) throw new AiError(`the endpoint answered ${res.status}: ${(await res.text()).slice(0, 300)}`);
 
-  const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-  const text = data.choices?.[0]?.message?.content ?? '';
+  const data = (await res.json()) as { choices?: { message?: { content?: string; reasoning_content?: string }; finish_reason?: string }[] };
+  const choice = data.choices?.[0];
+  let text = choice?.message?.content ?? '';
+  // LM Studio can misread a model as a thinking one and file its whole answer under reasoning_content,
+  // leaving content empty (seen with Qwen3 4B 2507). A reply that finished with nothing else is that answer.
+  if (!text.trim() && choice?.finish_reason === 'stop') text = choice.message?.reasoning_content ?? '';
   if (!text.trim()) throw new AiError('the endpoint returned an empty reply');
   return request.schema ? parseJsonReply(text) : stripThinking(text);
 }

@@ -182,3 +182,13 @@ describe('JLPT level setting', () => {
     assert.equal((await store.saveSettings({ jlptLevel: 9 as never })).jlptLevel, 0);
   });
 });
+
+describe('endpoint thinking', () => {
+  test('defaults to the model default, keeps a known level and drops anything else', async () => {
+    assert.equal(DEFAULT_SETTINGS.endpoint.reasoning, '');
+    assert.equal((await store.saveSettings({ endpoint: { reasoning: 'none' } as never })).endpoint.reasoning, 'none');
+    assert.equal((await store.saveSettings({ endpoint: { reasoning: 'max' } as never })).endpoint.reasoning, '');
+    const kept = await store.saveSettings({ endpoint: { reasoning: 'low' } as never });
+    assert.equal(kept.endpoint.baseUrl, DEFAULT_SETTINGS.endpoint.baseUrl, 'a partial endpoint patch keeps the rest');
+  });
+});

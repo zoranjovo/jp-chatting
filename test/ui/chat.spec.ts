@@ -204,6 +204,7 @@ async function messageInfo(app: Page, index: number) {
 const MOCK_INFO = [
   'Model: mock-small',
   'AI provider: Model endpoint (OpenAI-compatible)',
+  'Thinking: Model default',
   'Partner’s speech style: Polite (です/ます)',
   'WaniKani level: 10',
   'Genki lesson: Not using Genki',

@@ -13,7 +13,7 @@ export function ContextDetails({ context, createdAt }: { context: MessageContext
   const rows: [string, string][] = [
     [t.model, modelLabel(context.model)],
     [t.provider, context.provider === 'claude' ? t.providerClaude : t.providerEndpoint],
-    ...(context.provider === 'claude' ? [[t.effort, context.effort ?? t.effortDefault] as [string, string]] : []),
+    context.provider === 'claude' ? [t.effort, context.effort ?? t.effortDefault] : [t.thinking, t.thinkingOption(context.effort ?? '')],
     [t.politeness, context.politeness === 'casual' ? t.casual : t.polite],
     [t.wkLevelLabel, context.wkLevel === 0 ? t.wkMeta(0) : String(context.wkLevel)],
     [t.genkiLabel, context.genkiLesson > 0 ? t.genkiLesson(genkiBook(context.genkiLesson), context.genkiLesson) : t.genkiNone],

@@ -99,6 +99,16 @@ describe('callEndpoint', () => {
     await assert.rejects(callEndpoint(request, config()), /empty reply/);
   });
 
+  test('an answer filed under reasoning_content with empty content is used, when the reply finished', async () => {
+    const reply = (finish: string) => ({ choices: [{ message: { role: 'assistant', content: '', reasoning_content: 'こんにちは！' }, finish_reason: finish }] });
+    next = () => ({ body: reply('stop') });
+    assert.equal(await callEndpoint(request, config()), 'こんにちは！');
+    next = () => ({ body: reply('length') });
+    await assert.rejects(callEndpoint(request, config()), /empty reply/, 'cut off mid-thought is not an answer');
+    next = () => ({ body: { choices: [{ message: { content: 'ほんとう', reasoning_content: 'thinking…' }, finish_reason: 'stop' }] } });
+    assert.equal(await callEndpoint(request, config()), 'ほんとう', 'real content wins');
+  });
+
   test('a schema reply that is not JSON is an error', async () => {
     next = () => ({ body: chatCompletion('Sorry, I cannot help.') });
     await assert.rejects(callEndpoint({ ...request, schema: { type: 'object' } }, config()), /did not return valid JSON/);
@@ -111,5 +121,16 @@ describe('callEndpoint', () => {
     next = () => ({ body: chatCompletion('hi') });
     await callEndpoint(request, config());
     assert.ok(structured < last().body.temperature);
+  });
+
+  test('sends the thinking setting as reasoning_effort, and nothing for the model default', async () => {
+    next = () => ({ body: chatCompletion('hi') });
+    await callEndpoint(request, config());
+    assert.ok(!('reasoning_effort' in last().body));
+    await callEndpoint(request, config({ reasoning: 'none' }));
+    assert.equal(last().body.reasoning_effort, 'none');
+    next = () => ({ body: chatCompletion('{}') });
+    await callEndpoint({ ...request, schema: { type: 'object' } }, config({ reasoning: 'high' }));
+    assert.equal(last().body.reasoning_effort, 'high');
   });
 });

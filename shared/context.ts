@@ -1,7 +1,7 @@
 // The settings stamped on each message (MessageContext), and applying a stamp
 // back over the current settings when a message is analysed later.
 
-import { DEFAULT_SETTINGS, type MessageContext, type Politeness, type Settings } from './types.ts';
+import { DEFAULT_SETTINGS, ENDPOINT_REASONING, type ClaudeEffort, type EndpointReasoning, type MessageContext, type Politeness, type Settings } from './types.ts';
 
 /** What a message is stamped with. The Claude model is resolved, since an empty one means the default. */
 export function contextOf(settings: Settings, politeness: Politeness): MessageContext {
@@ -10,6 +10,7 @@ export function contextOf(settings: Settings, politeness: Politeness): MessageCo
     provider: settings.provider,
     model: claude ? settings.claude.model || DEFAULT_SETTINGS.claude.model : settings.endpoint.model,
     ...(claude && settings.claude.effort ? { effort: settings.claude.effort } : {}),
+    ...(!claude && settings.endpoint.reasoning ? { effort: settings.endpoint.reasoning } : {}),
     politeness,
     wkLevel: settings.wkLevel,
     genkiLesson: settings.genkiLesson,
@@ -30,10 +31,13 @@ export function settingsFor(settings: Settings, context: MessageContext | undefi
     wkLevel,
     genkiLesson,
     jlptLevel,
-    endpoint: provider === 'endpoint' ? { ...settings.endpoint, model } : settings.endpoint,
-    claude: provider === 'claude' ? { ...settings.claude, model, effort: effort ?? '' } : settings.claude,
+    endpoint: provider === 'endpoint' ? { ...settings.endpoint, model, reasoning: asReasoning(effort) } : settings.endpoint,
+    claude: provider === 'claude' ? { ...settings.claude, model, effort: asEffort(effort) } : settings.claude,
   };
 }
+
+const asReasoning = (e: string | undefined): EndpointReasoning => (ENDPOINT_REASONING.includes(e as EndpointReasoning) ? (e as EndpointReasoning) : '');
+const asEffort = (e: string | undefined): ClaudeEffort => (e && e !== 'none' ? (e as ClaudeEffort) : '');
 
 /** "claude-opus-5-5" → "Opus 5.5"; endpoint model names as they are. */
 export function modelLabel(model: string): string {

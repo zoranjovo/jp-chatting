@@ -366,7 +366,15 @@ describe('message info', () => {
       <ContextDetails context={{ provider: 'endpoint', model: 'qwen3', politeness: 'polite', wkLevel: 0, genkiLesson: 0, jlptLevel: 0 }} createdAt="" />,
     );
     assert.ok(!html.includes('<dt>Effort</dt>'));
+    assert.ok(html.includes('<dt>Thinking</dt><dd>Model default</dd>'));
     for (const text of ['<dd>qwen3</dd>', '<dd>Kana only</dd>', '<dd>Not using Genki</dd>', '<dd>Not set</dd>', '<dd>Polite (です/ます)</dd>']) assert.ok(html.includes(text), text);
+  });
+
+  test('an endpoint shows its thinking setting, in the row and the one-line stamp', () => {
+    const off: MessageContext = { provider: 'endpoint', model: 'qwen3', effort: 'none', politeness: 'polite', wkLevel: 5, genkiLesson: 0, jlptLevel: 0 };
+    assert.ok(render(<ContextDetails context={off} createdAt="" />).includes('<dt>Thinking</dt><dd>Off</dd>'));
+    assert.ok(render(<ContextDetails context={{ ...off, effort: undefined }} createdAt="" />).includes('<dt>Thinking</dt><dd>Model default</dd>'));
+    assert.ok(render(<ContextLine context={off} />).includes('>qwen3 · thinking off · Polite · WK 5<'));
   });
 
   test('Claude\'s default effort is named, and the labels follow the UI language', () => {

@@ -6,6 +6,9 @@ export type UiLanguage = 'en' | 'ja';
 export type Politeness = 'polite' | 'casual';
 export type ProviderKind = 'endpoint' | 'claude';
 export type ClaudeEffort = '' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+/** Sent to an endpoint as reasoning_effort; '' sends nothing (the model's default), 'none' turns thinking off. */
+export type EndpointReasoning = '' | 'none' | 'low' | 'medium' | 'high';
+export const ENDPOINT_REASONING: EndpointReasoning[] = ['', 'none', 'low', 'medium', 'high'];
 
 export interface Settings {
   uiLanguage: UiLanguage;
@@ -24,6 +27,8 @@ export interface Settings {
     baseUrl: string;
     apiKey: string;
     model: string;
+    /** How much the model thinks before answering, for servers that take reasoning_effort (LM Studio does). */
+    reasoning: EndpointReasoning;
   };
   claude: {
     /** The Claude Code CLI executable. */
@@ -42,7 +47,7 @@ export const DEFAULT_SETTINGS: Settings = {
   furigana: true,
   romajiInput: true,
   provider: 'endpoint',
-  endpoint: { baseUrl: 'http://localhost:1234/v1', apiKey: '', model: '' },
+  endpoint: { baseUrl: 'http://localhost:1234/v1', apiKey: '', model: '', reasoning: '' },
   claude: { command: 'claude', model: 'claude-sonnet-5-5', effort: '', timeoutMs: 180_000 },
 };
 
@@ -84,8 +89,8 @@ export interface Feedback {
 export interface MessageContext {
   provider: ProviderKind;
   model: string;
-  /** Claude only; absent for the CLI default and for endpoints. */
-  effort?: Exclude<ClaudeEffort, ''>;
+  /** Claude's effort, or an endpoint's reasoning setting; absent when left to the default. */
+  effort?: Exclude<ClaudeEffort | EndpointReasoning, ''>;
   politeness: Politeness;
   wkLevel: number;
   genkiLesson: number;

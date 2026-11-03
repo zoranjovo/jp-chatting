@@ -78,7 +78,7 @@ test/ui/           Playwright specs, fixtures.ts, mock-llm.ts (scripted model se
 
 ## AI providers
 
-**Endpoint** (`provider: 'endpoint'`): any OpenAI-compatible server. Schema requests send `response_format: json_schema` (strict) and fall back to a plain request on a 4xx, relying on the prompt + `parseJsonReply` (handles code fences, prose, `<think>` blocks). The models dropdown comes live from `GET {baseUrl}/models`.
+**Endpoint** (`provider: 'endpoint'`): any OpenAI-compatible server. Schema requests send `response_format: json_schema` (strict) and fall back to a plain request on a 4xx, relying on the prompt + `parseJsonReply` (handles code fences, prose, `<think>` blocks). The models dropdown comes live from `GET {baseUrl}/models`. The Thinking setting (`endpoint.reasoning`) is sent as `reasoning_effort` — LM Studio honours it for models that can think (`none` turns thinking off; nothing is sent for the model default). LM Studio sometimes files a non-thinking model's whole answer under `reasoning_content` with empty `content` (a wrong chat template does it); a reply that finished (`finish_reason: stop`) with nothing else is taken from there.
 
 **Claude Code CLI** (`provider: 'claude'`). Invariants — keep all of them:
 - Runs on the **subscription** the CLI is signed in to, never API credits. `claudeEnv()` strips every `ANTHROPIC_*` / `CLAUDE_*` variable (except `CLAUDE_CONFIG_DIR`) — that also removes a parent Claude Code session's wiring, which otherwise makes the child expect the parent to supply auth.
@@ -128,5 +128,6 @@ Replies are sampled twice per scenario at the model's normal temperature, so exp
 - Don't read `PORT` — preview tools set it to the Vite port. The API uses `JP_CHATTING_PORT`.
 - The Claude desktop app's environment can't authenticate a child `claude -p`; for live Claude testing the standalone CLI must be signed in (`claude auth login` in a normal terminal).
 - `shared/wanikani-kanji.json` is **not committed** — keep it that way. `scripts/build-kanji.ts` builds it from davidluzgouveia/kanji-data (MIT, pinned commit); `postinstall` runs it when the file is missing, `pnpm kanji` rebuilds. Without it the app, typecheck and tests fail on the import. It comes from kanji-data; its levels reflect WaniKani when that dataset was compiled, so a few kanji may be a level off today. Some common kanji (e.g. 薔) aren't on WaniKani at all and are always "above level".
+- LM Studio keeps per-model settings in `~/.lmstudio/.internal/user-concrete-model-default-config/`. A chat template forced on from another model family garbles every prompt (on Qwen3 4B a Qwen 3.6 template made every answer come back empty), so check there first when a local model misbehaves.
 - Replies are not streamed (the kanji check needs the whole reply first); the UI shows a typing indicator.
 - The whole chat history is sent on every reply. Fine for practice-length chats; trim in `conversationTurns()` if long chats start hitting context limits.

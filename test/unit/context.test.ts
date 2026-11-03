@@ -28,7 +28,7 @@ describe('message context', () => {
     const now: Settings = {
       ...DEFAULT_SETTINGS,
       provider: 'endpoint',
-      endpoint: { baseUrl: 'http://new/v1', apiKey: 'k', model: 'gemma' },
+      endpoint: { baseUrl: 'http://new/v1', apiKey: 'k', model: 'gemma', reasoning: 'high' },
       claude: { command: 'claude2', model: 'claude-haiku-5-5', effort: 'low', timeoutMs: 5 },
       wkLevel: 3,
       uiLanguage: 'ja',
@@ -41,8 +41,19 @@ describe('message context', () => {
   test('a stamp without effort clears the current one; an endpoint stamp sets only the endpoint model', () => {
     const s = settingsFor(claude, { ...contextOf(claude, 'polite'), effort: undefined });
     assert.equal(s.claude.effort, '');
-    const e = settingsFor({ ...claude, endpoint: { baseUrl: 'u', apiKey: '', model: 'now' } }, { ...contextOf(claude, 'polite'), provider: 'endpoint', model: 'then' });
+    const e = settingsFor({ ...claude, endpoint: { baseUrl: 'u', apiKey: '', model: 'now', reasoning: 'high' } }, { ...contextOf(claude, 'polite'), provider: 'endpoint', model: 'then' });
     assert.deepEqual([e.provider, e.endpoint.model, e.endpoint.baseUrl, e.claude.model], ['endpoint', 'then', 'u', 'claude-opus-5-5']);
+    assert.equal(e.endpoint.reasoning, 'high', 'a Claude effort level that is also a reasoning level carries over');
+  });
+
+  test("an endpoint's thinking setting is stamped as its effort and restored from it", () => {
+    const off: Settings = { ...DEFAULT_SETTINGS, provider: 'endpoint', endpoint: { ...DEFAULT_SETTINGS.endpoint, model: 'qwen3', reasoning: 'none' } };
+    const ctx = contextOf(off, 'polite');
+    assert.equal(ctx.effort, 'none');
+    assert.equal(settingsFor({ ...off, endpoint: { ...off.endpoint, reasoning: 'high' } }, ctx).endpoint.reasoning, 'none');
+    assert.ok(!('effort' in contextOf({ ...off, endpoint: { ...off.endpoint, reasoning: '' } }, 'polite')), 'the default is not stamped');
+    const claude = settingsFor(DEFAULT_SETTINGS, { ...ctx, provider: 'claude', model: 'claude-opus-5-5' });
+    assert.equal(claude.claude.effort, '', '"none" is not a Claude effort');
   });
 
   test('no stamp leaves the settings as they are', () => {

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { genkiBook, MAX_GENKI_LESSON } from '../../shared/genki.ts';
 import { asJlptLevel, JLPT_LEVELS } from '../../shared/jlpt.ts';
 import { allowedKanji, MAX_WK_LEVEL } from '../../shared/kanji.ts';
-import { DEFAULT_SETTINGS, type ClaudeEffort, type ModelList, type Settings } from '../../shared/types.ts';
+import { DEFAULT_SETTINGS, ENDPOINT_REASONING, type ClaudeEffort, type EndpointReasoning, type ModelList, type Settings } from '../../shared/types.ts';
 import { api } from '../api.ts';
 import { useT } from '../i18n.tsx';
 import { useSettings } from '../settings.tsx';
@@ -185,6 +185,17 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             <label className="field">
               <span>{t.apiKey}</span>
               <input type="password" value={draft.endpoint.apiKey} onChange={(e) => setEndpoint({ apiKey: e.target.value })} autoComplete="off" />
+            </label>
+            <label className="field">
+              <span>{t.thinking}</span>
+              <select value={draft.endpoint.reasoning} onChange={(e) => setEndpoint({ reasoning: e.target.value as EndpointReasoning })}>
+                {ENDPOINT_REASONING.map((r) => (
+                  <option key={r} value={r}>
+                    {t.thinkingOption(r)}
+                  </option>
+                ))}
+              </select>
+              <small className="muted">{t.thinkingHint}</small>
             </label>
           </>
         ) : (

@@ -233,7 +233,7 @@ function scoreFeedback(c: FeedbackCase, f: Feedback): Pick<Result, 'problems' | 
 function settingsFor(model: string, level: number, genki = 0, jlpt: JlptLevel = 0): Settings {
   const [provider, name] = model.split(/:(.*)/s);
   if (provider === 'claude') return { ...DEFAULT_SETTINGS, wkLevel: level, genkiLesson: genki, jlptLevel: jlpt, provider: 'claude', claude: { ...DEFAULT_SETTINGS.claude, model: name, timeoutMs: 240_000 } };
-  return { ...DEFAULT_SETTINGS, wkLevel: level, genkiLesson: genki, jlptLevel: jlpt, provider: 'endpoint', endpoint: { baseUrl: 'http://localhost:1234/v1', apiKey: '', model: name } };
+  return { ...DEFAULT_SETTINGS, wkLevel: level, genkiLesson: genki, jlptLevel: jlpt, provider: 'endpoint', endpoint: { baseUrl: 'http://localhost:1234/v1', apiKey: '', model: name, reasoning: '' } };
 }
 
 async function runCase(model: string, c: Case, sample: number): Promise<Result> {

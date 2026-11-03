@@ -6,7 +6,7 @@ import { useT, type Strings } from '../i18n.tsx';
 export function contextParts(t: Strings, c: MessageContext): string[] {
   return [
     modelLabel(c.model),
-    c.effort ? t.effortMeta(c.effort) : '',
+    c.effort ? (c.provider === 'claude' ? t.effortMeta(c.effort) : t.thinkingMeta(c.effort)) : '',
     c.politeness === 'casual' ? t.casualShort : t.politeShort,
     t.wkMeta(c.wkLevel),
     c.genkiLesson > 0 ? t.genkiMeta(c.genkiLesson) : '',

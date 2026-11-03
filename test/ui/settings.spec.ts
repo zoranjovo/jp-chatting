@@ -217,3 +217,15 @@ test('the JLPT level is saved', async ({ app, request }) => {
   await dialog.getByRole('button', { name: 'Save' }).click();
   await expect.poll(async () => (await saved(request)).jlptLevel).toBe(3);
 });
+
+test('the endpoint\'s thinking setting is saved and sent to the model', async ({ app, request }) => {
+  const dialog = await openSettings(app);
+  const thinking = dialog.getByLabel('Thinking');
+  await expect(thinking).toHaveValue('');
+  await expect(thinking.locator('option')).toHaveText(['Model default', 'Off', 'Low', 'Medium', 'High']);
+  await thinking.selectOption({ label: 'Off' });
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect.poll(async () => (await saved(request)).endpoint.reasoning).toBe('none');
+  await startChat(app);
+  expect((await mockCalls(request)).at(-1)?.reasoning).toBe('none');
+});

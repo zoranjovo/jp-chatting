@@ -122,6 +122,10 @@ const en = {
   claudeNoticeCodeTerms: 'Claude Code legal and compliance',
   effort: 'Effort',
   effortDefault: 'Default',
+  thinking: 'Thinking',
+  thinkingOption: (r: string) => ({ '': 'Model default', none: 'Off', low: 'Low', medium: 'Medium', high: 'High' })[r] ?? r,
+  thinkingHint: 'Sent as reasoning_effort, which LM Studio honours for models that can think. Off answers much faster.',
+  thinkingMeta: (r: string) => (r === 'none' ? 'thinking off' : `thinking ${r}`),
   save: 'Save',
   saved: 'Saved',
 };
@@ -246,6 +250,10 @@ const ja: Strings = {
   claudeNoticeCodeTerms: 'Claude Code 法務・コンプライアンス',
   effort: '思考レベル',
   effortDefault: 'デフォルト',
+  thinking: '思考',
+  thinkingOption: (r: string) => ({ '': 'モデルの既定', none: 'オフ', low: '低', medium: '中', high: '高' })[r] ?? r,
+  thinkingHint: 'reasoning_effort として送ります。LM Studioは思考できるモデルでこれに従います。オフにするとずっと速く答えます。',
+  thinkingMeta: (r: string) => (r === 'none' ? '思考オフ' : `思考 ${r}`),
   save: '保存',
   saved: '保存しました',
 };

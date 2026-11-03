@@ -87,7 +87,7 @@ describe('settings API', () => {
     await api('PUT', '/api/settings', { endpoint: { baseUrl: 'http://saved/v1', apiKey: 'saved-key' } });
     const res = await api<ModelList>('POST', '/api/models', { provider: 'endpoint', endpoint: { baseUrl: 'http://draft/v1' } });
     assert.deepEqual(res.body, { models: ['endpoint-model'] });
-    assert.deepEqual(modelsAsked[0], { provider: 'endpoint', endpoint: { baseUrl: 'http://draft/v1', apiKey: 'saved-key', model: '' } });
+    assert.deepEqual(modelsAsked[0], { provider: 'endpoint', endpoint: { baseUrl: 'http://draft/v1', apiKey: 'saved-key', model: '', reasoning: '' } });
   });
 
   test('defaults to the saved provider', async () => {

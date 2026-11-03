@@ -12,7 +12,7 @@ export const TEST_SETTINGS: Partial<Settings> = {
   jlptLevel: 0,
   romajiInput: true,
   provider: 'endpoint',
-  endpoint: { baseUrl: `${MOCK_URL}/v1`, apiKey: '', model: 'mock-small' },
+  endpoint: { baseUrl: `${MOCK_URL}/v1`, apiKey: '', model: 'mock-small', reasoning: '' },
   claude: { command: 'claude', model: 'claude-sonnet-5-5', effort: '', timeoutMs: 180_000 },
 };
 
@@ -23,7 +23,7 @@ export async function resetApp(request: APIRequestContext) {
   await request.post(`${MOCK_URL}/__reset`);
 }
 
-export async function mockCalls(request: APIRequestContext): Promise<{ kind: string; turns: number; model: string }[]> {
+export async function mockCalls(request: APIRequestContext): Promise<{ kind: string; turns: number; model: string; reasoning?: string }[]> {
   return (await request.get(`${MOCK_URL}/__calls`)).json();
 }
 
