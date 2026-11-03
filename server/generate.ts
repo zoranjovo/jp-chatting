@@ -51,8 +51,9 @@ export async function generateReply(callAi: CallAi, settings: Settings, chat: Pi
   return best();
 }
 
-export async function generateBreakdown(callAi: CallAi, settings: Settings, message: Message): Promise<Breakdown> {
-  const b = toBreakdown(await callAi({ ...breakdownRequest(message, settings.genkiLesson), schema: BREAKDOWN_SCHEMA }, settings));
+/** `earlier` is the conversation before the message, for context. */
+export async function generateBreakdown(callAi: CallAi, settings: Settings, message: Message, earlier: Message[] = []): Promise<Breakdown> {
+  const b = toBreakdown(await callAi({ ...breakdownRequest(message, settings, earlier), schema: BREAKDOWN_SCHEMA }, settings));
   for (const line of b.lines) {
     line.japanese = dropKanaFurigana(line.japanese);
     for (const w of line.words) w.text = dropKanaFurigana(w.text);

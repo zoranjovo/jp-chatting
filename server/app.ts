@@ -227,7 +227,7 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
       const settings = settingsFor(await store.getSettings(), message.context);
       let patch: Partial<Message>;
       if (message.role === 'assistant') {
-        patch = { breakdown: await generateBreakdown(deps.callAi, settings, message) };
+        patch = { breakdown: await generateBreakdown(deps.callAi, settings, message, chat.messages.slice(0, index)) };
       } else {
         const previous = chat.messages.slice(0, index).findLast((m) => m.role === 'assistant');
         const politeness = message.context?.politeness ?? chat.politeness;
