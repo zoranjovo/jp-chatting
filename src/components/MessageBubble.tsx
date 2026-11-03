@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { Message } from '../../shared/types.ts';
 import { api } from '../api.ts';
 import { useT } from '../i18n.tsx';
@@ -38,6 +38,7 @@ export function MessageBubble({
   const mine = message.role === 'user';
   const analysis = mine ? message.feedback : message.breakdown;
   const label = mine ? t.check : t.breakdown;
+  const rewindHint = useId();
 
   useLayoutEffect(() => {
     if (!open) return setShown(false);
@@ -85,9 +86,20 @@ export function MessageBubble({
                 </>
               }
             >
-              <button type="button" className="icon-button" onClick={onRewind} disabled={rewindDisabled} aria-label={t.rewind}>
+              <button
+                type="button"
+                className="icon-button"
+                onClick={onRewind}
+                disabled={rewindDisabled}
+                aria-label={t.rewind}
+                aria-describedby={rewindHint}
+              >
                 <RewindIcon />
               </button>
+              {/* The tooltip only exists while shown, so screen readers get the warning from here. */}
+              <span id={rewindHint} hidden>
+                {t.rewindTitle}
+              </span>
             </Tooltip>
           )}
           <Tooltip label={<strong>{open ? t.hide : label}</strong>}>
