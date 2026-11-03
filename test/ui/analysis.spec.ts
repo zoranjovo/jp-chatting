@@ -70,6 +70,24 @@ test('Check gives feedback on the learner\'s message', async ({ app }) => {
   await expect(message.locator('.line-fix')).toHaveCount(1);
 });
 
+test("furigana in the learner's feedback uses the panel's colour, not the dark bubble's", async ({ app, request }) => {
+  // 願 is WaniKani level 13, so at the default 10 the correction would be spelled out in kana.
+  await request.put('/api/settings', { data: { wkLevel: 20 } });
+  await startChat(app);
+  await composer(app).fill('コーヒーがおねがいします。');
+  await composer(app).press('Enter');
+  await expect(theirs(app)).toHaveCount(2);
+  const message = mine(app).first();
+  await message.getByRole('button', { name: 'Check' }).click();
+  const rt = message.locator('.fix-row-fix rt').first();
+  await expect(rt).toHaveText('ねが');
+  const [rtColour, partnerRt] = await Promise.all([
+    rt.evaluate((el) => getComputedStyle(el).color),
+    theirs(app).first().locator('rt').first().evaluate((el) => getComputedStyle(el).color),
+  ]);
+  expect(rtColour).toBe(partnerRt);
+});
+
 test('the partner\'s and the learner\'s analyses are independent', async ({ app, request }) => {
   await startChat(app);
   await composer(app).fill('コーヒーがおねがいします。');

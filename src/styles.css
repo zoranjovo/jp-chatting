@@ -478,7 +478,7 @@ ruby rt {
   font-weight: 400;
 }
 
-.mine ruby rt {
+.mine .bubble ruby rt {
   color: color-mix(in srgb, var(--mine-ink) 70%, transparent);
 }
 
