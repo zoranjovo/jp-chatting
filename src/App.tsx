@@ -8,6 +8,7 @@ import { SettingsDialog } from './components/SettingsDialog.tsx';
 import { SetupNotice } from './components/SetupNotice.tsx';
 import { Sidebar } from './components/Sidebar.tsx';
 import { LanguageProvider, useT } from './i18n.tsx';
+import { useBackToClose } from './back.ts';
 import { SettingsContext } from './settings.tsx';
 
 export function App() {
@@ -52,6 +53,17 @@ function Shell({ loadError }: { loadError: string | null }) {
 
   const refreshList = useCallback(() => api.chats().then(setChats).catch(() => {}), []);
 
+  /**
+   * Each chat has its own history entry (#<id>), so Back goes to the previous chat and a reload stays put.
+   * An open menu or dialog sits on its own entry (see below); moving to a chat from there takes that entry over.
+   */
+  const showInUrl = useCallback((id: string | null, replace = false) => {
+    const url = id ? `#${id}` : location.pathname + location.search;
+    if (id ? location.hash === url : !location.hash) return;
+    if (replace || history.state?.overlay) history.replaceState({ chat: id }, '', url);
+    else history.pushState({ chat: id }, '', url);
+  }, []);
+
   /** Shows a chat the server returned, if it is still the one on screen. */
   const show = useCallback((next: Chat) => {
     if (activeId.current === next.id) setChat(next);
@@ -81,8 +93,9 @@ function Shell({ loadError }: { loadError: string | null }) {
     }
   }, [show, refreshList, setBusy]);
 
-  const select = useCallback(async (id: string) => {
+  const select = useCallback(async (id: string, replace = false) => {
     activeId.current = id;
+    showInUrl(id, replace);
     setNavOpen(false);
     try {
       const loaded = await api.chat(id);
@@ -92,19 +105,37 @@ function Shell({ loadError }: { loadError: string | null }) {
     } catch (err) {
       setErrors((e) => ({ ...e, [id]: (err as Error).message }));
     }
-  }, [show, requestReply]);
+  }, [show, showInUrl, requestReply]);
 
   useEffect(() => {
     api.chats().then((list) => {
       setChats(list);
-      if (list[0]) select(list[0].id);
+      const linked = list.find((c) => `#${c.id}` === location.hash);
+      if (linked ?? list[0]) select((linked ?? list[0]).id, true);
     }).catch(() => {});
   }, [select]);
+
+  // Back and Forward between chats.
+  useEffect(() => {
+    const onPop = () => {
+      const id = location.hash.slice(1);
+      if (id && id !== activeId.current) select(id, true);
+      else if (!id && activeId.current) {
+        activeId.current = null;
+        setChat(null);
+      }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [select]);
+
+  useBackToClose(navOpen, () => setNavOpen(false));
 
   const startChat = async (topic: string, politeness: Politeness) => {
     setDialog(null);
     const created = await api.createChat(topic, politeness);
     activeId.current = created.id;
+    showInUrl(created.id);
     setChat(created);
     setNavOpen(false);
     refreshList();
@@ -158,6 +189,7 @@ function Shell({ loadError }: { loadError: string | null }) {
     if (activeId.current === id) {
       activeId.current = null;
       setChat(null);
+      showInUrl(null, true);
     }
     refreshList();
   };

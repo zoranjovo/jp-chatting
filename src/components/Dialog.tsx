@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useBackToClose } from '../back.ts';
 
 /** Matches the dialog-out animation in styles.css. */
 const CLOSE_MS = 140;
@@ -46,6 +47,7 @@ export function Dialog({
     setClosing(true);
     timer.current = setTimeout(then, CLOSE_MS);
   };
+  useBackToClose(true, () => close());
 
   return (
     <dialog
