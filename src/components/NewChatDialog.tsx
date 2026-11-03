@@ -1,15 +1,27 @@
 import { useState, type FormEvent } from 'react';
 import type { Politeness } from '../../shared/types.ts';
 import { useT } from '../i18n.tsx';
+import { needsModel, useSettings } from '../settings.tsx';
 import { type CloseDialog, Dialog } from './Dialog.tsx';
+import { SetupNotice } from './SetupNotice.tsx';
 
-export function NewChatDialog({ onStart, onClose }: { onStart: (topic: string, politeness: Politeness) => void; onClose: () => void }) {
+export function NewChatDialog({
+  onStart,
+  onClose,
+  onOpenSettings,
+}: {
+  onStart: (topic: string, politeness: Politeness) => void;
+  onClose: () => void;
+  onOpenSettings: () => void;
+}) {
   const t = useT();
+  const blocked = needsModel(useSettings().settings);
   const [topic, setTopic] = useState('');
   const [politeness, setPoliteness] = useState<Politeness>('polite');
 
   const submit = (e: FormEvent, close: CloseDialog) => {
     e.preventDefault();
+    if (blocked) return;
     close(() => onStart(topic.trim(), politeness));
   };
 
@@ -17,6 +29,7 @@ export function NewChatDialog({ onStart, onClose }: { onStart: (topic: string, p
     <Dialog title={t.newChatTitle} onClose={onClose}>
       {(close) => (
         <form onSubmit={(e) => submit(e, close)} className="form">
+          <SetupNotice onOpenSettings={() => close(onOpenSettings)} />
           <label className="field">
             <span>{t.topicLabel}</span>
             <input autoFocus value={topic} onChange={(e) => setTopic(e.target.value)} placeholder={t.topicPlaceholder} />
@@ -38,7 +51,7 @@ export function NewChatDialog({ onStart, onClose }: { onStart: (topic: string, p
             <button type="button" className="secondary" onClick={() => close()}>
               {t.cancel}
             </button>
-            <button type="submit" className="primary">
+            <button type="submit" className="primary" disabled={blocked}>
               {t.start}
             </button>
           </div>

@@ -245,6 +245,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               </small>
             )}
             {models && !models.error && !loading && options.length === 0 && <small className="muted">{t.noModels}</small>}
+            {draft.provider === 'endpoint' && !draft.endpoint.model && !loading && <small className="warn-text">{t.noModelWarning}</small>}
           </div>
 
           <div className="field model-test">

@@ -222,3 +222,24 @@ test('the endpoint\'s thinking setting is saved and sent to the model', async ({
   await startChat(app);
   expect((await mockCalls(request)).at(-1)?.reasoning).toBe('none');
 });
+
+test('with no model chosen, a chat cannot be started and Settings is one click away', async ({ app, request }) => {
+  await request.put('/api/settings', { data: { provider: 'endpoint', endpoint: { model: '' } } });
+  await app.reload();
+  await expect(app.locator('.empty .setup-notice')).toContainText('Choose a model first');
+
+  await app.locator('.empty').getByRole('button', { name: '+ New chat' }).click();
+  const dialog = app.getByRole('dialog');
+  await expect(dialog.getByRole('button', { name: 'Start' })).toBeDisabled();
+  await dialog.getByRole('button', { name: 'Open Settings' }).click();
+  await expect(app.getByRole('dialog').getByRole('heading', { name: 'Settings' })).toBeVisible();
+  const settings = app.getByRole('dialog');
+  await expect(settings.locator('.warn-text')).toContainText('Without a model your partner can’t reply');
+
+  await settings.getByLabel('Model', { exact: true }).selectOption('mock-small');
+  await expect(settings.locator('.warn-text')).toHaveCount(0);
+  await settings.getByRole('button', { name: 'Save' }).click();
+  await expect(app.locator('.setup-notice')).toHaveCount(0);
+  await startChat(app);
+  expect((await saved(request)).endpoint.model).toBe('mock-small');
+});

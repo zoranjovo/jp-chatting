@@ -11,3 +11,8 @@ export const SettingsContext = createContext<SettingsState>({ settings: DEFAULT_
 export function useSettings(): SettingsState {
   return useContext(SettingsContext);
 }
+
+/** An endpoint with no model chosen can't answer at all -- the state a fresh install starts in. */
+export function needsModel(settings: Settings): boolean {
+  return settings.provider === 'endpoint' && !settings.endpoint.model;
+}
