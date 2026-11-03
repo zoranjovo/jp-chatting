@@ -3,9 +3,11 @@ import type { Settings } from '../../shared/types.ts';
 import { expect, mockCalls, mockControl, startChat, test, theirs } from './fixtures.ts';
 
 test('Refresh list and Test model keep the keyboard on themselves while they work', async ({ app, request }) => {
-  await mockControl(request, { delayMs: 400 });
   const dialog = await openSettings(app);
   const refresh = dialog.getByRole('button', { name: /Refresh list/ });
+  // Let the list the dialog fetches on opening arrive first, so the press below starts a refresh of its own.
+  await expect(refresh).toHaveAttribute('aria-disabled', 'false');
+  await mockControl(request, { delayMs: 1500 });
   await refresh.focus();
   await app.keyboard.press('Enter');
   await expect(refresh).toHaveAttribute('aria-disabled', 'true');
