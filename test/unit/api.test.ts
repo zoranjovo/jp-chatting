@@ -206,6 +206,36 @@ describe('conversation', () => {
     assert.equal(calls[0].request.turns[2].content, 'げんきです！');
   });
 
+  test('a reply asked for again while one is being written waits for it, and reads show it is coming', async () => {
+    const chat = await newChat();
+    let finish!: (text: string) => void;
+    answers.chat = () => new Promise<string>((r) => (finish = r));
+    const first = reply(chat.id);
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal((await api<Chat>('GET', `/api/chats/${chat.id}`)).body.replying, true);
+    const second = reply(chat.id);
+    await new Promise((r) => setTimeout(r, 20));
+    finish('はい、どうぞ。');
+    const [a, b] = await Promise.all([first, second]);
+    assert.equal(calls.filter((c) => c.kind === 'chat').length, 1, 'one model call');
+    assert.deepEqual(a.body, b.body);
+    assert.equal(a.body.messages.length, 1);
+    const after = (await api<Chat>('GET', `/api/chats/${chat.id}`)).body;
+    assert.equal(after.replying, undefined);
+    assert.equal(after.messages.length, 1);
+  });
+
+  test('a failed reply is not left marked as coming', async () => {
+    const chat = await newChat();
+    answers.chat = () => {
+      throw new AiError('down');
+    };
+    assert.equal((await reply(chat.id)).status, 502);
+    assert.equal((await api<Chat>('GET', `/api/chats/${chat.id}`)).body.replying, undefined);
+    answers.chat = DEFAULT_ANSWERS.chat;
+    assert.equal((await reply(chat.id)).body.messages.length, 1);
+  });
+
   test('an empty message is refused', async () => {
     const chat = await newChat();
     const res = await send(chat.id, '   ');

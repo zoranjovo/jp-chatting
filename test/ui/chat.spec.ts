@@ -123,6 +123,36 @@ test('a failed reply keeps the learner\'s message', async ({ app, request }) => 
   await expect(theirs(app)).toHaveCount(2);
 });
 
+test('a reply still being written when the page reloads shows up without another reload', async ({ app, request }) => {
+  await startChat(app);
+  await mockControl(request, { delayMs: 2500 });
+  await composer(app).fill('きこえますか');
+  await composer(app).press('Enter');
+  await expect(app.locator('.typing')).toBeVisible();
+  await app.reload();
+  await expect(mine(app)).toHaveCount(1);
+  await expect(app.locator('.typing')).toBeVisible();
+  await expect(composer(app).locator('xpath=..').getByRole('button', { name: 'Send' })).toBeDisabled();
+  await expect(theirs(app)).toHaveCount(2);
+  await expect(app.locator('.typing')).toHaveCount(0);
+  expect((await mockCalls(request)).filter((c) => c.kind === 'chat')).toHaveLength(2);
+});
+
+test('after a failed reply and a reload, the reply can still be asked for', async ({ app, request }) => {
+  await startChat(app);
+  await mockControl(request, { fail: true });
+  await composer(app).fill('きこえますか');
+  await composer(app).press('Enter');
+  await expect(app.locator('.error')).toBeVisible();
+  await app.reload();
+  await expect(mine(app)).toHaveCount(1);
+  const retry = app.getByRole('button', { name: 'Get a reply' });
+  await expect(retry).toBeVisible();
+  await mockControl(request, { fail: false });
+  await retry.click();
+  await expect(theirs(app)).toHaveCount(2);
+});
+
 const chatSettingsButton = (app: Page) => app.locator('.topbar').getByRole('button', { name: 'Chat settings' });
 
 async function openChatSettings(app: Page) {

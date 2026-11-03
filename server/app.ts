@@ -129,7 +129,16 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
     }),
   );
 
-  app.get('/api/chats/:id', route(async (req, res) => res.json(await loadChat(String(req.params.id)))));
+  /** Replies being written, by chat id. A second request for the same chat waits for this one instead of starting another. */
+  const replies = new Map<string, Promise<Chat>>();
+
+  app.get(
+    '/api/chats/:id',
+    route(async (req, res) => {
+      const chat = await loadChat(String(req.params.id));
+      res.json(replies.has(chat.id) ? { ...chat, replying: true } : chat);
+    }),
+  );
 
   /** The chat's own settings: title, topic and speech style, each only when sent. They apply from the next message on. */
   app.patch(
@@ -173,24 +182,34 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
     }),
   );
 
-  /** The partner's next message -- the opener when the chat is empty. */
+  async function writeReply(id: string): Promise<Chat> {
+    const settings = await store.getSettings();
+    const chat = await loadChat(id);
+    const answering = chat.messages.at(-1)?.id;
+    const content = await generateReply(deps.callAi, settings, chat);
+    const message: Message = { id: store.newId(), role: 'assistant', content, createdAt: store.now(), context: contextOf(settings, chat.politeness) };
+    return updateChat(id, (chat) => {
+      // Rewound while the reply was being written: it answers a history that is gone.
+      if (chat.messages.at(-1)?.id !== answering) return;
+      chat.messages.push(message);
+      if (!chat.title) chat.title = titleFrom(content);
+    });
+  }
+
+  /**
+   * The partner's next message -- the opener when the chat is empty. If one is already being written
+   * (the page was reloaded while waiting), this waits for it and answers with the same result.
+   */
   app.post(
     '/api/chats/:id/reply',
     route(async (req, res) => {
       const id = String(req.params.id);
-      const settings = await store.getSettings();
-      const chat = await loadChat(id);
-      const answering = chat.messages.at(-1)?.id;
-      const content = await generateReply(deps.callAi, settings, chat);
-      const message: Message = { id: store.newId(), role: 'assistant', content, createdAt: store.now(), context: contextOf(settings, chat.politeness) };
-      res.json(
-        await updateChat(id, (chat) => {
-          // Rewound while the reply was being written: it answers a history that is gone.
-          if (chat.messages.at(-1)?.id !== answering) return;
-          chat.messages.push(message);
-          if (!chat.title) chat.title = titleFrom(content);
-        }),
-      );
+      let reply = replies.get(id);
+      if (!reply) {
+        reply = writeReply(id).finally(() => replies.delete(id));
+        replies.set(id, reply);
+      }
+      res.json(await reply);
     }),
   );
 

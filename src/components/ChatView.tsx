@@ -64,7 +64,7 @@ export function ChatView({
             {t.errorPrefix} {error}
           </div>
         )}
-        {needsReply && (error || chat.messages.length === 0) && (
+        {needsReply && (
           <button type="button" className="secondary retry" onClick={onRetry}>
             {t.retryReply}
           </button>

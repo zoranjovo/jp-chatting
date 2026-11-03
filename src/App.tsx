@@ -43,6 +43,8 @@ function Shell({ loadError }: { loadError: string | null }) {
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [chat, setChat] = useState<Chat | null>(null);
   const [waiting, setWaiting] = useState<Set<string>>(new Set());
+  const waitingRef = useRef(waiting);
+  waitingRef.current = waiting;
   const [errors, setErrors] = useState<Record<string, string | null>>({});
   const [dialog, setDialog] = useState<'new' | 'settings' | 'chat' | null>(null);
   const [navOpen, setNavOpen] = useState(false);
@@ -54,23 +56,6 @@ function Shell({ loadError }: { loadError: string | null }) {
   const show = useCallback((next: Chat) => {
     if (activeId.current === next.id) setChat(next);
   }, []);
-
-  const select = useCallback(async (id: string) => {
-    activeId.current = id;
-    setNavOpen(false);
-    try {
-      show(await api.chat(id));
-    } catch (err) {
-      setErrors((e) => ({ ...e, [id]: (err as Error).message }));
-    }
-  }, [show]);
-
-  useEffect(() => {
-    api.chats().then((list) => {
-      setChats(list);
-      if (list[0]) select(list[0].id);
-    }).catch(() => {});
-  }, [select]);
 
   const setBusy = useCallback(
     (id: string, busy: boolean) =>
@@ -95,6 +80,26 @@ function Shell({ loadError }: { loadError: string | null }) {
       refreshList();
     }
   }, [show, refreshList, setBusy]);
+
+  const select = useCallback(async (id: string) => {
+    activeId.current = id;
+    setNavOpen(false);
+    try {
+      const loaded = await api.chat(id);
+      show(loaded);
+      // A reply this page didn't ask for (it was reloaded while waiting): wait for it like any other.
+      if (loaded.replying && !waitingRef.current.has(id)) requestReply(id);
+    } catch (err) {
+      setErrors((e) => ({ ...e, [id]: (err as Error).message }));
+    }
+  }, [show, requestReply]);
+
+  useEffect(() => {
+    api.chats().then((list) => {
+      setChats(list);
+      if (list[0]) select(list[0].id);
+    }).catch(() => {});
+  }, [select]);
 
   const startChat = async (topic: string, politeness: Politeness) => {
     setDialog(null);

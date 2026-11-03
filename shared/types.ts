@@ -118,6 +118,8 @@ export interface Chat {
   createdAt: string;
   updatedAt: string;
   messages: Message[];
+  /** Only on reads from the API, never stored: the partner's reply is being written right now. */
+  replying?: boolean;
 }
 
 export type ChatSummary = Pick<Chat, 'id' | 'title' | 'topic' | 'createdAt' | 'updatedAt'>;
