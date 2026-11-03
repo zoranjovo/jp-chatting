@@ -335,14 +335,14 @@ describe('message info', () => {
 
   test('the partner\'s stamped messages get a closed ⓘ button', () => {
     const html = bubble(message);
-    assert.match(html, /<button type="button" class="info-button " aria-expanded="false" aria-label="How this message was written"/);
+    assert.match(html, /<button type="button" class="icon-button " aria-label="How this message was written" aria-expanded="false"/);
     assert.ok(!html.includes('message-info-pop'), 'closed until clicked');
   });
 
   test('not on the learner\'s messages, nor on messages from before stamping', () => {
-    assert.ok(!bubble({ ...message, role: 'user' }).includes('info-button'));
+    assert.ok(!bubble({ ...message, role: 'user' }).includes('message-info'));
     const { context: _, ...old } = message;
-    assert.ok(!bubble(old).includes('info-button'));
+    assert.ok(!bubble(old).includes('message-info'));
   });
 
   test('lists the model, provider, effort, style, levels and when it was written, labelled', () => {

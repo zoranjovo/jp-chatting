@@ -191,7 +191,7 @@ test('each chat keeps its own speech style', async ({ app }) => {
 async function messageInfo(app: Page, index: number) {
   const message = theirs(app).nth(index);
   await message.getByRole('button', { name: 'How this message was written' }).click();
-  const pop = message.locator('.message-info-pop');
+  const pop = app.locator('.message-info-pop');
   await expect(pop).toBeVisible();
   const rows = await pop.locator('.message-info-list > div').evaluateAll((divs) =>
     divs.map((d) => `${d.querySelector('dt')?.textContent}: ${d.querySelector('dd')?.textContent}`),
@@ -243,6 +243,36 @@ test('the info closes on a click elsewhere', async ({ app }) => {
   await expect(app.locator('.message-info-pop')).toContainText('Its breakdown uses these settings too');
   await app.locator('.topbar h1').click();
   await expect(app.locator('.message-info-pop')).toHaveCount(0);
+});
+
+test('the info pops up on hover, stays while the pointer moves into it, and goes when it leaves', async ({ app }) => {
+  await startChat(app);
+  await theirs(app).first().getByRole('button', { name: 'How this message was written' }).hover();
+  const pop = app.locator('.message-info-pop');
+  await expect(pop).toContainText('Model');
+  await pop.hover();
+  await expect(pop).toBeVisible();
+  await app.locator('.topbar h1').hover();
+  await expect(pop).toHaveCount(0);
+});
+
+test('the message actions are icons that name themselves on hover', async ({ app }) => {
+  await startChat(app);
+  await sendAndWait(app, 'はい');
+  const tooltip = app.locator('.tooltip');
+  for (const [message, name] of [
+    [theirs(app).first(), 'Breakdown'],
+    [mine(app).first(), 'Check'],
+    [mine(app).first(), 'Rewind'],
+  ] as const) {
+    await message.getByRole('button', { name }).hover();
+    await expect(tooltip).toHaveCount(1);
+    await expect(tooltip.locator('strong')).toHaveText(name);
+  }
+  await expect(tooltip).toContainText('Delete this message and everything after it');
+
+  await theirs(app).first().getByRole('button', { name: 'Breakdown' }).click();
+  await expect(tooltip.locator('strong')).toHaveText('Hide');
 });
 
 test('the next message after a change is stamped with the new settings', async ({ app, request }) => {

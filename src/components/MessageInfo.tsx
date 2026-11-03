@@ -1,9 +1,24 @@
-import { useEffect, useRef, useState } from 'react';
+import {
+  FloatingPortal,
+  autoUpdate,
+  flip,
+  offset,
+  safePolygon,
+  shift,
+  useClick,
+  useDismiss,
+  useFloating,
+  useHover,
+  useInteractions,
+  useRole,
+} from '@floating-ui/react';
+import { useState } from 'react';
 import { modelLabel } from '../../shared/context.ts';
 import { genkiBook } from '../../shared/genki.ts';
 import type { MessageContext } from '../../shared/types.ts';
 import { useT } from '../i18n.tsx';
 import { useSettings } from '../settings.tsx';
+import { InfoIcon } from './Icons.tsx';
 
 /** The settings a message was written with, one labelled row each. */
 export function ContextDetails({ context, createdAt }: { context: MessageContext; createdAt: string }) {
@@ -32,47 +47,52 @@ export function ContextDetails({ context, createdAt }: { context: MessageContext
   );
 }
 
-/** A small ⓘ on the partner's messages that pops up how the message was written. */
+/**
+ * A small ⓘ on the partner's messages that pops up how the message was written: on hover (and stays
+ * while the pointer moves into it), or on a click or tap, which keeps it open until a click elsewhere or Escape.
+ */
 export function MessageInfo({ context, createdAt }: { context: MessageContext; createdAt: string }) {
   const t = useT();
   const [open, setOpen] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
-
-  // Closes on a click anywhere else, or Escape.
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: PointerEvent) => {
-      if (!box.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const escape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('pointerdown', away);
-    document.addEventListener('keydown', escape);
-    return () => {
-      document.removeEventListener('pointerdown', away);
-      document.removeEventListener('keydown', escape);
-    };
-  }, [open]);
+  const { refs, floatingStyles, context: floating } = useFloating({
+    open,
+    onOpenChange: setOpen,
+    placement: 'bottom-start',
+    middleware: [offset(6), flip(), shift({ padding: 8 })],
+    whileElementsMounted: autoUpdate,
+  });
+  const { getReferenceProps, getFloatingProps } = useInteractions([
+    useHover(floating, { mouseOnly: true, delay: { open: 120 }, handleClose: safePolygon() }),
+    useClick(floating),
+    useDismiss(floating),
+    useRole(floating, { role: 'dialog' }),
+  ]);
 
   return (
-    <div className="message-info" ref={box}>
+    <div className="message-info">
       <button
         type="button"
-        className={`info-button ${open ? 'active' : ''}`}
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
+        ref={refs.setReference}
+        className={`icon-button ${open ? 'active' : ''}`}
         aria-label={t.messageInfo}
-        title={t.messageInfo}
+        {...getReferenceProps()}
       >
-        i
+        <InfoIcon />
       </button>
       {open && (
-        <div className="message-info-pop" role="group" aria-label={t.messageInfo}>
-          <strong>{t.messageInfo}</strong>
-          <ContextDetails context={context} createdAt={createdAt} />
-          <p>{t.messageInfoNote}</p>
-        </div>
+        <FloatingPortal>
+          <div
+            className="message-info-pop"
+            ref={refs.setFloating}
+            style={floatingStyles}
+            aria-label={t.messageInfo}
+            {...getFloatingProps()}
+          >
+            <strong>{t.messageInfo}</strong>
+            <ContextDetails context={context} createdAt={createdAt} />
+            <p>{t.messageInfoNote}</p>
+          </div>
+        </FloatingPortal>
       )}
     </div>
   );

@@ -155,19 +155,6 @@ button:disabled {
   color: var(--muted);
 }
 
-/* Both labels share one grid cell, so the chip is as wide as the longer one whichever is showing. */
-.chip-labels {
-  display: inline-grid;
-}
-
-.chip-labels > span {
-  grid-area: 1 / 1;
-}
-
-.chip-labels > .chip-off {
-  visibility: hidden;
-}
-
 .chip:hover:not(:disabled),
 .chip.active {
   border-color: var(--accent);
@@ -422,19 +409,66 @@ button:disabled {
 .bubble-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 6px;
-  margin-top: 2px;
+  gap: 2px;
+  margin: 2px -6px -4px;
 }
 
-.mine .chip {
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+}
+
+.icon-button:hover:not(:disabled),
+.icon-button.active {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.icon-button:disabled {
+  opacity: 0.4;
+}
+
+.mine .icon-button {
   color: color-mix(in srgb, var(--mine-ink) 75%, transparent);
-  border-color: color-mix(in srgb, var(--mine-ink) 30%, transparent);
 }
 
-.mine .chip:hover:not(:disabled),
-.mine .chip.active {
+.mine .icon-button:hover:not(:disabled),
+.mine .icon-button.active {
   color: var(--mine-ink);
-  border-color: var(--mine-ink);
+  background: color-mix(in srgb, var(--mine-ink) 18%, transparent);
+}
+
+.tooltip-anchor {
+  display: inline-flex;
+}
+
+.tooltip {
+  z-index: 20;
+  max-width: min(260px, calc(100vw - 16px));
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 12.5px;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+.tooltip strong {
+  font-weight: 600;
+}
+
+.tooltip-hint {
+  display: block;
+  margin-top: 2px;
+  opacity: 0.8;
 }
 
 ruby rt {
@@ -1175,28 +1209,8 @@ ruby rt {
   margin-right: auto;
 }
 
-.info-button {
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  background: transparent;
-  color: var(--muted);
-  font: italic 600 12px/1 Georgia, serif;
-}
-
-.info-button:hover,
-.info-button.active {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
 .message-info-pop {
-  position: absolute;
-  left: 8px;
-  top: calc(100% + 6px);
-  z-index: 5;
+  z-index: 20;
   width: max-content;
   max-width: min(320px, calc(100vw - 48px));
   padding: 10px 14px;
