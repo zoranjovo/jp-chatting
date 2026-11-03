@@ -80,3 +80,32 @@ test('kanji the learner has not learnt are not flagged in their own messages', a
   await expect(mine(app).first().locator('.kanji')).toHaveCount(1);
   await expect(mine(app).first().locator('.over-level')).toHaveCount(0);
 });
+
+test('each chat keeps its own unsent draft', async ({ app }) => {
+  await startChat(app, 'First');
+  await composer(app).pressSequentially('toukyou made');
+  await expect(composer(app)).toHaveValue('とうきょう まで');
+
+  await startChat(app, 'Second');
+  await expect(composer(app)).toHaveValue('');
+  await composer(app).pressSequentially('oosaka');
+
+  await app.locator('.chat-item', { hasText: 'First' }).locator('.chat-item-main').click();
+  await expect(app.locator('h1')).toHaveText('First');
+  await expect(composer(app)).toHaveValue('とうきょう まで');
+
+  await app.locator('.chat-item', { hasText: 'Second' }).locator('.chat-item-main').click();
+  await expect(composer(app)).toHaveValue('おおさか');
+});
+
+test("a rewound message stays in its own chat's composer", async ({ app }) => {
+  await startChat(app, 'First');
+  await composer(app).fill('コーヒーをください。');
+  await composer(app).press('Enter');
+  await expect(theirs(app)).toHaveCount(2);
+  await mine(app).first().getByRole('button', { name: 'Rewind' }).click();
+  await expect(composer(app)).toHaveValue('コーヒーをください。');
+
+  await startChat(app, 'Second');
+  await expect(composer(app)).toHaveValue('');
+});

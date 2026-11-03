@@ -71,7 +71,7 @@ export function ChatView({
         )}
         <div ref={end} />
       </div>
-      <Composer disabled={waiting} onSend={onSend} handle={composer} />
+      <Composer chatId={chat.id} disabled={waiting} onSend={onSend} handle={composer} />
     </div>
   );
 }

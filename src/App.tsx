@@ -195,6 +195,8 @@ function Shell({ loadError }: { loadError: string | null }) {
         )}
         {chat ? (
           <ChatView
+            // A fresh view per chat, so nothing typed or opened in one chat carries over to another.
+            key={chat.id}
             chat={chat}
             waiting={waiting.has(chat.id)}
             error={errors[chat.id] ?? null}

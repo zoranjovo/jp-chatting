@@ -1,4 +1,4 @@
-import { useImperativeHandle, useLayoutEffect, useRef, useState, type ChangeEvent, type KeyboardEvent, type Ref } from 'react';
+import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ChangeEvent, type KeyboardEvent, type Ref } from 'react';
 import { useT } from '../i18n.tsx';
 import { romajiToKana } from '../romaji.ts';
 import { useSettings } from '../settings.tsx';
@@ -8,10 +8,23 @@ export interface ComposerHandle {
   prepend: (message: string) => void;
 }
 
-export function Composer({ disabled, onSend, handle }: { disabled: boolean; onSend: (text: string) => void; handle?: Ref<ComposerHandle> }) {
+/** Unsent text per chat, so a draft stays with its own chat when the learner switches to another. */
+const drafts = new Map<string, string>();
+
+export function Composer({
+  chatId,
+  disabled,
+  onSend,
+  handle,
+}: {
+  chatId: string;
+  disabled: boolean;
+  onSend: (text: string) => void;
+  handle?: Ref<ComposerHandle>;
+}) {
   const t = useT();
   const { settings, update } = useSettings();
-  const [text, setText] = useState('');
+  const [text, setText] = useState(() => drafts.get(chatId) ?? '');
   const ref = useRef<HTMLTextAreaElement>(null);
   const caret = useRef<number | null>(null);
   const romaji = settings.romajiInput;
@@ -23,6 +36,11 @@ export function Composer({ disabled, onSend, handle }: { disabled: boolean; onSe
       ref.current?.focus();
     },
   }), []);
+
+  useEffect(() => {
+    if (text) drafts.set(chatId, text);
+    else drafts.delete(chatId);
+  }, [chatId, text]);
 
   // Keep the caret where the user was typing after a conversion changes the text's length.
   useLayoutEffect(() => {
