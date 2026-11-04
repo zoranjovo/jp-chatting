@@ -157,12 +157,17 @@ test('screen readers hear that the partner is typing, then what it said, and err
   await startChat(app);
   const status = app.locator('.chat > [role="status"]');
   await expect(status).toHaveText(/^Your partner: いらっしゃいませ/);
+  // The Japanese is marked as such, so a screen reader reads it with a Japanese voice.
+  await expect(status.locator('span[lang="ja"]')).toHaveText(/^いらっしゃいませ/);
   await mockControl(request, { delayMs: 800 });
   await composer(app).fill('コーヒーをください');
   await composer(app).press('Enter');
   await expect(status).toHaveText('Typing…');
+  await expect(app.locator('.typing')).toHaveCount(0);
   await expect(theirs(app)).toHaveCount(2);
   await expect(status).toHaveText(/^Your partner: はい、大きいサイズと小さいサイズ/);
+  // Said once, then cleared, so it isn't left as a hidden copy of the message.
+  await expect(status).toHaveText('', { timeout: 8000 });
 
   await mockControl(request, { delayMs: 0, fail: true });
   await composer(app).fill('もしもし');
@@ -175,17 +180,28 @@ test('a chat opened from the list does not read out its old messages', async ({ 
   await startChat(app, 'Two');
   await app.locator('.chat-item', { hasText: 'One' }).locator('.chat-item-main').click();
   await expect(app.locator('h1')).toHaveText('One');
+  await expect(theirs(app)).toHaveCount(1);
+  // Long enough for an announcement made after the chat appeared to show up.
+  await app.waitForTimeout(300);
   await expect(app.locator('.chat > [role="status"]')).toHaveText('');
 });
 
-const focused = (app: Page) => app.evaluate(() => {
-  const el = document.activeElement;
-  return el ? `${el.tagName.toLowerCase()}${el.className ? `.${String(el.className).trim().split(/\s+/).join('.')}` : ''}:${el.textContent?.trim() ?? ''}` : '';
+test('a rewind does not read out the partner message it leaves last', async ({ app }) => {
+  await startChat(app);
+  await composer(app).fill('コーヒーをください');
+  await composer(app).press('Enter');
+  await expect(theirs(app)).toHaveCount(2);
+  const status = app.locator('.chat > [role="status"]');
+  await expect(status).toHaveText('', { timeout: 8000 });
+  await mine(app).first().getByRole('button', { name: 'Rewind' }).click();
+  await expect(theirs(app)).toHaveCount(1);
+  await app.waitForTimeout(300);
+  await expect(status).toHaveText('');
 });
 
 test('starting a chat puts the keyboard in its composer', async ({ app }) => {
   await startChat(app);
-  expect(await focused(app)).toMatch(/^textarea/);
+  await expect(composer(app)).toBeFocused();
 });
 
 test('switching to another chat afterwards leaves focus where the learner put it', async ({ app }) => {
@@ -208,7 +224,28 @@ test('"Get a reply" leaves the keyboard in the composer, not on the page', async
   await app.getByRole('button', { name: 'Get a reply' }).focus();
   await app.keyboard.press('Enter');
   await expect(theirs(app)).toHaveCount(2);
-  expect(await focused(app)).toMatch(/^textarea/);
+  await expect(composer(app)).toBeFocused();
+});
+
+test('a tap on "Get a reply" does not move focus into the composer, which would pop up a phone keyboard', async ({ app, request }) => {
+  await startChat(app);
+  await mockControl(request, { fail: true });
+  await composer(app).fill('きこえますか');
+  await composer(app).press('Enter');
+  await expect(app.locator('.error')).toBeVisible();
+  await mockControl(request, { fail: false });
+  await app.getByRole('button', { name: 'Get a reply' }).click();
+  await expect(theirs(app)).toHaveCount(2);
+  await expect(composer(app)).not.toBeFocused();
+});
+
+test('sending with the Send button from the keyboard leaves focus in the composer', async ({ app }) => {
+  await startChat(app);
+  await composer(app).fill('コーヒーをください');
+  await app.getByRole('button', { name: 'Send', exact: true }).focus();
+  await app.keyboard.press('Enter');
+  await expect(mine(app)).toHaveCount(1);
+  await expect(composer(app)).toBeFocused();
 });
 
 const chatSettingsButton = (app: Page) => app.locator('.topbar').getByRole('button', { name: 'Chat settings' });

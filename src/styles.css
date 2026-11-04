@@ -118,7 +118,7 @@ button[aria-disabled='true'] {
   color: var(--accent-ink);
 }
 
-.primary:hover:not(:disabled) {
+.primary:hover:not(:disabled, [aria-disabled='true']) {
   filter: brightness(1.06);
 }
 
@@ -127,7 +127,7 @@ button[aria-disabled='true'] {
   border-color: var(--line);
 }
 
-.secondary:hover:not(:disabled) {
+.secondary:hover:not(:disabled, [aria-disabled='true']) {
   background: var(--surface);
 }
 
@@ -555,9 +555,11 @@ ruby rt {
   color: var(--warn);
 }
 
-/* Read by screen readers, not shown. */
+/* Read by screen readers, not shown. Pinned to a corner, so it never sits far down a long page and stretches it. */
 .sr-only {
   position: absolute;
+  top: 0;
+  left: 0;
   width: 1px;
   height: 1px;
   margin: -1px;
@@ -1080,7 +1082,7 @@ ruby rt {
   font-size: 22px;
 }
 
-.empty p {
+.empty > p {
   max-width: 460px;
   color: var(--muted);
   margin: 4px 0 16px;

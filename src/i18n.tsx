@@ -59,7 +59,8 @@ const en = {
   yourLine: 'You wrote',
   betterLine: 'Better',
   lineOk: 'Good',
-  overLevel: 'Above your WaniKani level',
+  overLevel: (level: number) => `Above your WaniKani level (${level})`,
+  overWrittenLevel: (level: number) => `Above WaniKani level ${level}, the level this was written at`,
   notInWk: 'Not taught on WaniKani',
   wkLevel: 'WaniKani level',
 
@@ -193,7 +194,8 @@ const ja: Strings = {
   yourLine: 'あなたの文',
   betterLine: 'より自然な文',
   lineOk: 'よくできました',
-  overLevel: 'WaniKaniのレベル外',
+  overLevel: (level: number) => `WaniKaniのレベル外（レベル${level}）`,
+  overWrittenLevel: (level: number) => `WaniKaniのレベル外（書かれた時のレベル${level}）`,
   notInWk: 'WaniKaniにない漢字',
   wkLevel: 'WaniKaniレベル',
 
