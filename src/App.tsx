@@ -10,21 +10,8 @@ import { setDraft } from './drafts.ts';
 import { Sidebar } from './components/Sidebar.tsx';
 import { LanguageProvider, useT } from './i18n.tsx';
 import { onHistory, useBackToClose, whenSettled } from './back.ts';
+import { NARROW, useMediaQuery } from './layout.ts';
 import { SettingsContext } from './settings.tsx';
-
-/** Below this width the sidebar is a drawer behind the menu button; matches the breakpoint in styles.css. */
-const NARROW = '(max-width: 760px)';
-
-function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
-  useEffect(() => {
-    const list = window.matchMedia(query);
-    const onChange = () => setMatches(list.matches);
-    list.addEventListener('change', onChange);
-    return () => list.removeEventListener('change', onChange);
-  }, [query]);
-  return matches;
-}
 
 export function App() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
@@ -76,22 +63,30 @@ function Shell({ loadError }: { loadError: string | null }) {
   const narrow = useMediaQuery(NARROW);
   const drawer = narrow && navOpen;
   const menuButton = useRef<HTMLButtonElement>(null);
+  const sidebar = useRef<HTMLElement>(null);
+
+  // Widening the window (say, rotating a tablet) leaves no drawer to be open; it mustn't spring open again when narrowed.
+  useEffect(() => {
+    if (!narrow) setNavOpen(false);
+  }, [narrow]);
 
   // The drawer, as a keyboard sees it: opening it moves focus in, Escape closes it, and closing it
   // brings focus back to the menu button unless something else (a dialog, the composer) has taken it.
   const wasOpen = useRef(false);
   useEffect(() => {
-    if (drawer) document.getElementById('sidebar')?.querySelector<HTMLElement>('button')?.focus();
+    if (drawer) sidebar.current?.querySelector<HTMLElement>('button')?.focus();
     else if (wasOpen.current) {
       const at = document.activeElement;
-      if (!at || at === document.body || document.getElementById('sidebar')?.contains(at)) menuButton.current?.focus();
+      if (!at || at === document.body || sidebar.current?.contains(at)) menuButton.current?.focus();
     }
     wasOpen.current = drawer;
   }, [drawer]);
   useEffect(() => {
     if (!drawer || dialog) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setNavOpen(false);
+      // Not when something else answers this Escape: a dialog (the sidebar's own Rename and Delete too), or an IME.
+      if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing || document.querySelector('dialog[open]')) return;
+      setNavOpen(false);
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
@@ -286,6 +281,7 @@ function Shell({ loadError }: { loadError: string | null }) {
       <Sidebar
         // Off screen behind the menu: out of the tab order and the accessibility tree until opened.
         inert={narrow && !navOpen}
+        asideRef={sidebar}
         chats={chats}
         activeId={chat?.id ?? null}
         onSelect={select}
