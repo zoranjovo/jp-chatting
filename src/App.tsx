@@ -9,6 +9,7 @@ import { SetupNotice } from './components/SetupNotice.tsx';
 import { setDraft } from './drafts.ts';
 import { Sidebar } from './components/Sidebar.tsx';
 import { LanguageProvider, useT } from './i18n.tsx';
+import { onHistory, useBackToClose, whenSettled } from './back.ts';
 import { SettingsContext } from './settings.tsx';
 
 export function App() {
@@ -58,16 +59,33 @@ function Shell({ loadError }: { loadError: string | null }) {
 
   const refreshList = useCallback(() => api.chats().then(setChats).catch(() => {}), []);
 
-  /** Counts the chats shown, so a slow load can tell a newer one (a reply that landed meanwhile) has replaced it. */
-  const shown = useRef(0);
+  /** The newest copy of each chat the server has sent, so a slow load can tell a reply landed meanwhile. */
+  const latest = useRef(new Map<string, Chat>());
+  /** The chat being loaded; a later select overtakes it. */
+  const selecting = useRef<string | null>(null);
   /** Chats whose reply this page is waiting for, updated at once so two callers in one tick can't both ask. */
   const pending = useRef(new Set<string>());
 
+  /**
+   * Each chat has its own history entry (#<id>), so Back goes to the previous chat and a reload stays put.
+   * An open menu or dialog sits on its own entry (back.ts); moving to a chat from there takes that entry over.
+   * Waits for any entry a closing overlay is taking off, so it never writes over the wrong one.
+   */
+  const showInUrl = useCallback(
+    (id: string | null, replace = false) =>
+      whenSettled(() => {
+        const url = id ? `#${id}` : location.pathname + location.search;
+        if (id ? location.hash === url : !location.hash) return;
+        if (replace || history.state?.overlay !== undefined) history.replaceState(null, '', url);
+        else history.pushState(null, '', url);
+      }),
+    [],
+  );
+
   /** Shows a chat the server returned, if it is still the one on screen. */
   const show = useCallback((next: Chat) => {
-    if (activeId.current !== next.id) return;
-    shown.current += 1;
-    setChat(next);
+    latest.current.set(next.id, next);
+    if (activeId.current === next.id) setChat(next);
   }, []);
 
   const setBusy = useCallback(
@@ -97,33 +115,66 @@ function Shell({ loadError }: { loadError: string | null }) {
     }
   }, [show, refreshList, setBusy]);
 
-  const select = useCallback(async (id: string) => {
-    activeId.current = id;
+  /** Moves to a chat once it has loaded; if it can't be (deleted, or a bad link), stays on the chat shown. */
+  const select = useCallback(async (id: string, replace = false) => {
+    selecting.current = id;
     setNavOpen(false);
+    const before = latest.current.get(id);
+    let loaded: Chat;
     try {
-      const before = shown.current;
-      const loaded = await api.chat(id);
-      // A reply landed while this was loading: what is on screen is newer.
-      if (shown.current !== before) return;
-      show(loaded);
-      // A reply this page didn't ask for (it was reloaded while waiting): wait for it like any other.
-      if (loaded.replying) requestReply(id);
+      loaded = await api.chat(id);
     } catch (err) {
-      setErrors((e) => ({ ...e, [id]: (err as Error).message }));
+      if (selecting.current !== id) return;
+      selecting.current = null;
+      const here = activeId.current;
+      showInUrl(here, true);
+      if (here) setErrors((e) => ({ ...e, [here]: (err as Error).message }));
+      return;
     }
-  }, [show, requestReply]);
+    if (selecting.current !== id) return;
+    selecting.current = null;
+    activeId.current = id;
+    showInUrl(id, replace);
+    // A reply landed while this was loading: it is newer than what was read.
+    const newer = latest.current.get(id);
+    if (newer && newer !== before) return show(newer);
+    show(loaded);
+    // A reply this page didn't ask for (it was reloaded while waiting): wait for it like any other.
+    if (loaded.replying) requestReply(id);
+  }, [show, showInUrl, requestReply]);
 
   useEffect(() => {
     api.chats().then((list) => {
       setChats(list);
-      if (list[0]) select(list[0].id);
+      const first = list.find((c) => `#${c.id}` === location.hash) ?? list[0];
+      if (first) select(first.id, true);
     }).catch(() => {});
   }, [select]);
+
+  // Back and Forward between chats.
+  useEffect(
+    () =>
+      onHistory((closedOverlay) => {
+        // Back only closed a menu or dialog: stay put, and make the entry it landed on name this chat (it may name one since deleted).
+        if (closedOverlay) return showInUrl(activeId.current, true);
+        const id = location.hash.slice(1);
+        if (id && id !== activeId.current) select(id, true);
+        else if (!id && activeId.current) {
+          activeId.current = null;
+          setChat(null);
+        }
+      }),
+    [select, showInUrl],
+  );
+
+  useBackToClose(navOpen, () => setNavOpen(false));
 
   const startChat = async (topic: string, politeness: Politeness) => {
     setDialog(null);
     const created = await api.createChat(topic, politeness);
+    selecting.current = null;
     activeId.current = created.id;
+    showInUrl(created.id);
     setChat(created);
     setNavOpen(false);
     refreshList();
@@ -178,9 +229,11 @@ function Shell({ loadError }: { loadError: string | null }) {
   const remove = async (id: string) => {
     await api.deleteChat(id);
     setDraft(id, '');
+    latest.current.delete(id);
     if (activeId.current === id) {
       activeId.current = null;
       setChat(null);
+      showInUrl(null, true);
     }
     refreshList();
   };

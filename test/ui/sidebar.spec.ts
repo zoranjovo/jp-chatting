@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { chatsOnDisk, expect, startChat, test } from './fixtures.ts';
+import { chatsOnDisk, composer, expect, mine, startChat, test, theirs } from './fixtures.ts';
 
 const dialog = (app: Page) => app.locator('dialog[open]');
 
@@ -7,6 +7,59 @@ const dialog = (app: Page) => app.locator('dialog[open]');
 async function clickBackdrop(app: Page) {
   await app.mouse.click(5, 5);
 }
+
+test('each chat has its own URL: Back and Forward move between chats, and a reload stays in the chat', async ({ app }) => {
+  await startChat(app, 'First');
+  await startChat(app, 'Second');
+  const first = app.locator('.chat-item', { hasText: 'First' }).locator('.chat-item-main');
+  await first.click();
+  await expect(app.locator('h1')).toHaveText('First');
+  const firstUrl = app.url();
+  expect(firstUrl).toMatch(/#[0-9a-f-]{36}$/);
+
+  await app.reload();
+  await expect(app.locator('h1')).toHaveText('First');
+  expect(app.url()).toBe(firstUrl);
+
+  await app.goBack();
+  await expect(app.locator('h1')).toHaveText('Second');
+  await app.goForward();
+  await expect(app.locator('h1')).toHaveText('First');
+});
+
+test('Back closes an open dialog and stays in the app', async ({ app }) => {
+  await startChat(app, 'First');
+  await startChat(app, 'Second');
+  await app.locator('.topbar').getByRole('button', { name: 'Chat settings' }).click();
+  await expect(app.getByRole('dialog')).toBeVisible();
+  await app.goBack();
+  await expect(app.getByRole('dialog')).toHaveCount(0);
+  await expect(app.locator('h1')).toHaveText('Second');
+
+  // Closed with Cancel instead, the dialog leaves no extra step behind: Back goes to the previous chat.
+  await app.locator('.topbar').getByRole('button', { name: 'Chat settings' }).click();
+  await app.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
+  await expect(app.getByRole('dialog')).toHaveCount(0);
+  await app.goBack();
+  await expect(app.locator('h1')).toHaveText('First');
+});
+
+test('Back closes the rename dialog too, keeping the old name', async ({ app }) => {
+  await startChat(app, 'Keep me');
+  await app.locator('.chat-item.active').getByRole('button', { name: 'Rename chat' }).click();
+  await app.getByRole('dialog').getByRole('textbox').fill('Changed');
+  await app.goBack();
+  await expect(app.getByRole('dialog')).toHaveCount(0);
+  await expect(app.locator('.chat-item.active .chat-title')).toHaveText('Keep me');
+});
+
+test('deleting the open chat takes its id out of the URL', async ({ app }) => {
+  await startChat(app, 'Doomed');
+  await app.locator('.chat-item.active').getByRole('button', { name: 'Delete chat' }).click();
+  await app.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+  await expect(app.locator('.chat-item')).toHaveCount(0);
+  expect(new URL(app.url()).hash).toBe('');
+});
 
 test('a chat can be renamed', async ({ app, request }) => {
   await startChat(app, 'Old name');
@@ -81,4 +134,46 @@ test('deleting a chat that is not open leaves the open one alone', async ({ app 
   await dialog(app).getByRole('button', { name: 'Delete' }).click();
   await expect(app.locator('.chat-item')).toHaveCount(1);
   await expect(app.locator('.topbar h1')).toHaveText('Foreground');
+});
+
+test('Back to a chat that was deleted stays on the chat shown, which keeps working', async ({ app }) => {
+  await startChat(app, 'Gone');
+  await startChat(app, 'Here');
+  const here = app.url();
+  const gone = app.locator('.chat-item', { hasText: 'Gone' });
+  await gone.hover();
+  await gone.getByRole('button', { name: 'Delete chat' }).click();
+  await app.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+  await expect(app.locator('.chat-item')).toHaveCount(1);
+  await app.goBack();
+  await expect(app.locator('h1')).toHaveText('Here');
+  await expect.poll(() => app.url()).toBe(here);
+  await composer(app).fill('まだ いますか');
+  await composer(app).press('Enter');
+  await expect(mine(app)).toHaveCount(1);
+  await expect(theirs(app)).toHaveCount(2);
+});
+
+test('a chat started from the dialog gets its own entry, after the dialog\'s is gone', async ({ app }) => {
+  await startChat(app, 'First');
+  const first = app.url();
+  await startChat(app, 'Second');
+  await expect.poll(() => app.url()).not.toBe(first);
+  await app.goBack();
+  await expect(app.locator('h1')).toHaveText('First');
+  expect(app.url()).toBe(first);
+});
+
+test('Forward onto a closed dialog\'s entry opens nothing, and Back still goes to the chat before', async ({ app }) => {
+  await startChat(app, 'First');
+  await startChat(app, 'Second');
+  await app.locator('.topbar').getByRole('button', { name: 'Chat settings' }).click();
+  await expect(app.getByRole('dialog')).toBeVisible();
+  await app.goBack();
+  await expect(app.getByRole('dialog')).toHaveCount(0);
+  await app.goForward();
+  await expect(app.getByRole('dialog')).toHaveCount(0);
+  await expect(app.locator('h1')).toHaveText('Second');
+  await app.goBack();
+  await expect(app.locator('h1')).toHaveText('First');
 });

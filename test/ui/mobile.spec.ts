@@ -28,6 +28,26 @@ test('tapping outside closes the menu', async ({ app }) => {
   await expect(app.locator('.sidebar')).not.toBeInViewport();
 });
 
+test('Back closes the menu instead of leaving the app', async ({ app }) => {
+  await startChat(app, 'Phone chat');
+  await app.getByRole('button', { name: 'Menu' }).click();
+  await expect(app.locator('.sidebar')).toBeInViewport();
+  await app.goBack();
+  await expect(app.locator('.sidebar')).not.toBeInViewport();
+  await expect(app.locator('h1')).toHaveText('Phone chat');
+});
+
+test('picking a chat from the menu, then Back, returns to the chat before', async ({ app }) => {
+  await startChat(app, 'One');
+  await startChat(app, 'Two');
+  await app.getByRole('button', { name: 'Menu' }).click();
+  await app.locator('.chat-item', { hasText: 'One' }).locator('.chat-item-main').click();
+  await expect(app.locator('h1')).toHaveText('One');
+  await app.goBack();
+  await expect(app.locator('h1')).toHaveText('Two');
+  await expect(app.locator('.sidebar')).not.toBeInViewport();
+});
+
 test('the page never scrolls sideways and the composer fits', async ({ app }) => {
   await startChat(app);
   await composer(app).fill('ながいメッセージ'.repeat(20));
