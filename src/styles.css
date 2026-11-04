@@ -397,6 +397,8 @@ button:disabled {
   background: var(--mine);
   color: var(--mine-ink);
   border-top-right-radius: 4px;
+  /* Muted text on the dark bubble. Redefined here, not per element, so it can't leak into the panel below. */
+  --muted: color-mix(in srgb, var(--mine-ink) 70%, transparent);
 }
 
 .bubble-text {
@@ -476,10 +478,6 @@ ruby rt {
   font-size: max(0.6em, 10px);
   color: var(--muted);
   font-weight: 400;
-}
-
-.mine ruby rt {
-  color: color-mix(in srgb, var(--mine-ink) 70%, transparent);
 }
 
 .kanji {
