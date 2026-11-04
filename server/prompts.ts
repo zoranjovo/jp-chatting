@@ -14,11 +14,19 @@ const OPENER_CUE = '(The learner has just opened a new chat. Start the conversat
 
 const FURIGANA_RULE = `Furigana: give the reading of every word that contains kanji in this exact markup: {kanji|reading}. The reading is always hiragana -- never romaji, never katakana. Wrap only the kanji part; okurigana stays outside the braces. Examples: {日本語|にほんご}を{話|はな}します。 {今日|きょう}は{暑|あつ}いですね。 Words written only in kana (コーヒー, カフェ, ありがとう) never get markup.`;
 
-function kanjiRule(level: number): string {
-  if (level <= 0) return 'Kanji: the learner knows hiragana and katakana but no kanji yet. Do not use any kanji at all -- write everything in hiragana, and katakana for loanwords.';
+/**
+ * `scope`, for an answer that is mostly English: which Japanese the rule covers and what it leaves alone,
+ * stated in the rule itself so it never reads as covering everything.
+ */
+function kanjiRule(level: number, scope?: { appliesTo: string; exempt: string }): string {
+  const where = scope ? ` in ${scope.appliesTo}` : ' at all';
+  const exempt = scope ? ` ${scope.exempt}` : '';
+  if (level <= 0) {
+    return `Kanji: the learner knows hiragana and katakana but no kanji yet. Do not use any kanji${where} -- write ${scope ? 'it' : 'everything'} in hiragana, and katakana for loanwords.${exempt}`;
+  }
   return `Kanji: the learner knows all hiragana and katakana, but only these kanji (WaniKani levels 1-${level}):
 ${allowedKanji(level).join('')}
-Use no other kanji at all. Any word that needs a kanji outside that list must be written in hiragana instead (katakana for loanwords). Check every kanji you write against the list; if you are unsure about one, write that word in hiragana.`;
+Use no other kanji${where}. Any word that needs a kanji outside that list must be written in hiragana instead (katakana for loanwords). Check every kanji you write against the list; if you are unsure about one, write that word in hiragana.${exempt}`;
 }
 
 function styleRule(politeness: Politeness): string {
@@ -141,22 +149,26 @@ export function breakdownRequest(
   levels: Pick<Settings, 'genkiLesson' | 'jlptLevel' | 'wkLevel'>,
   earlier: Message[] = [],
 ): { system: string; turns: ChatTurn[] } {
-  const { genkiLesson, jlptLevel } = levels;
+  const { genkiLesson, jlptLevel, wkLevel } = levels;
   const context = earlier.slice(-BREAKDOWN_CONTEXT);
-  const transcript = context.map((m) => `${m.role === 'user' ? 'Learner' : 'Partner'}: ${stripFurigana(m.content)}`).join('\n');
+  // Continuation lines indented, so a message with line breaks can't read as more turns.
+  const transcript = context.map((m) => `${m.role === 'user' ? 'Learner' : 'Partner'}: ${stripFurigana(m.content).replace(/\n/g, '\n  ')}`).join('\n');
   return {
-    system: `You are a patient Japanese teacher. ${jlptLevel > 0 ? `An English-speaking learner at about JLPT N${jlptLevel}` : 'An English-speaking beginner'} wants to understand a Japanese message from their chat partner, line by line.
+    system: `You are a patient Japanese teacher. ${jlptLevel !== 0 ? `An English-speaking learner at about JLPT N${jlptLevel} (at that level a learner ${JLPT_DESCRIPTION[jlptLevel]})` : 'An English-speaking beginner'} wants to understand a Japanese message from their chat partner, line by line.
 
 Split the message into lines -- usually one sentence each, but join short sentences or split long ones wherever that makes the translation and explanation clearer. Cover the whole message, in order, without skipping anything. For each line give:
 - japanese: the Japanese text of the line, copied exactly as in the message -- never turn kana into kanji or change any wording.
 - translation: a natural English translation.
-- explanation: a brief explanation in English of how the line is built -- the grammar, particles, conjugations and set phrases that matter, in one to three sentences. ${jlptLevel > 0 ? `Pitch it at about JLPT N${jlptLevel}: spend it on what a learner at that level may not know yet${jlptLevel <= 3 ? ', and skip the basics (は as the topic, を, です, ます) unless they do something unusual here' : ''}.` : 'Keep it beginner-friendly.'}${genkiLesson > 0 ? ' The learner studies with Genki: when a grammar point is taught in a Genki lesson, name it, e.g. "te-form (Genki L6)" -- take the lesson from the list below.' : ''}
+- explanation: a brief explanation in English of how the line is built -- the grammar, particles, conjugations and set phrases that matter, in one to three sentences. ${jlptLevel > 0 ? `Pitch it at about JLPT N${jlptLevel}: spend it on what a learner at that level may not know yet${jlptLevel <= 3 ? ', and skip the basics (は as the topic, を, です, ます) unless they do something unusual here' : ''}.` : 'Keep it beginner-friendly.'}${genkiLesson > 0 ? ' The learner studies with Genki: when a grammar point is taught in a Genki lesson, name it, e.g. "te-form (Genki L6)" -- take the lesson from the Genki grammar list below.' : ''}
 - words: each word or particle in the line, in order: text (as written in the message), reading (in hiragana -- never romaji; a katakana word keeps its katakana), meaning (a short English gloss or the particle's role).
 ${context.length > 0 ? `
 The conversation before the message is given for context. Use it to explain what the message refers to -- names, things mentioned earlier, the question it answers -- but break down only the message itself.
 ` : ''}
 ${FURIGANA_RULE.replace('Furigana: give', 'In japanese and words.text, give')}
-${kanjiRule(levels.wkLevel)} This applies to any Japanese you add in the English parts (another form of a word, an example); japanese and words.text copy the message exactly, whatever it uses.
+${kanjiRule(wkLevel, {
+  appliesTo: 'any Japanese you add in the English parts (another form of a word, an example)',
+  exempt: `japanese and words.text copy the message exactly, whatever it uses, and the English may name a word from the message${context.length > 0 ? ' or the conversation' : ''} as it is written there.`,
+})}
 ${genkiLesson > 0 ? `
 ${genkiSyllabus()}
 ` : ''}

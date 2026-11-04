@@ -258,9 +258,9 @@ function scoreBreakdown(c: BreakdownCase, b: Breakdown): Pick<Result, 'problems'
   const joined = normalise(b.lines.map((l) => l.japanese).join(''));
   const message = normalise(c.message);
   const texts = b.lines.flatMap((l) => [l.japanese, ...l.words.map((w) => w.text)]);
-  // Kanji the breakdown adds in its English beyond what the message itself uses, above the learner's level.
-  const own = new Set(stripFurigana(c.message));
-  const added = b.lines.flatMap((l) => [l.translation, l.explanation, ...l.words.map((w) => w.meaning)]).flatMap((t) => kanjiAboveLevel(stripFurigana(t), c.level));
+  // Kanji above the learner's level in the English, other than in words named from the message or the conversation, as the prompt allows.
+  const quoted = new Set(stripFurigana([c.message, ...(c.earlier ?? []).map((m) => m.content)].join('')));
+  const added = b.lines.flatMap((l) => [l.translation, l.explanation, ...l.words.map((w) => w.meaning)]).flatMap((t) => kanjiAboveLevel(t, c.level));
   return {
     problems: sumProblems(texts.map((t) => ({ ...replyProblems(t, 60), foreign: [] }))),
     checks: {
@@ -271,7 +271,7 @@ function scoreBreakdown(c: BreakdownCase, b: Breakdown): Pick<Result, 'problems'
       words: b.lines.every((l) => l.words.length > 0),
       readingsKana: b.lines.every((l) => l.words.every((w) => !/[A-Za-z]/.test(w.reading))),
       noBrackets: b.lines.every((l) => !/[「」]/.test(l.translation + l.explanation)),
-      noNewKanji: added.every((k) => own.has(k)),
+      noNewKanji: added.every((k) => quoted.has(k)),
     },
   };
 }
