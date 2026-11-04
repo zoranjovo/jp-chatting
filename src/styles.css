@@ -118,7 +118,7 @@ button[aria-disabled='true'] {
   color: var(--accent-ink);
 }
 
-.primary:hover:not(:disabled) {
+.primary:hover:not(:disabled, [aria-disabled='true']) {
   filter: brightness(1.06);
 }
 
@@ -127,7 +127,7 @@ button[aria-disabled='true'] {
   border-color: var(--line);
 }
 
-.secondary:hover:not(:disabled) {
+.secondary:hover:not(:disabled, [aria-disabled='true']) {
   background: var(--surface);
 }
 

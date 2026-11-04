@@ -238,7 +238,7 @@ function Shell({ loadError }: { loadError: string | null }) {
       setChat(null);
       showInUrl(null, true);
     }
-    refreshList();
+    await refreshList();
   };
 
   const messageUpdated = (m: Message) =>

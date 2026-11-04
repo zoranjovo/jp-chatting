@@ -199,14 +199,9 @@ test('a rewind does not read out the partner message it leaves last', async ({ a
   await expect(status).toHaveText('');
 });
 
-const focused = (app: Page) => app.evaluate(() => {
-  const el = document.activeElement;
-  return el ? `${el.tagName.toLowerCase()}${el.className ? `.${String(el.className).trim().split(/\s+/).join('.')}` : ''}:${el.textContent?.trim() ?? ''}` : '';
-});
-
 test('starting a chat puts the keyboard in its composer', async ({ app }) => {
   await startChat(app);
-  expect(await focused(app)).toMatch(/^textarea/);
+  await expect(composer(app)).toBeFocused();
 });
 
 test('switching to another chat afterwards leaves focus where the learner put it', async ({ app }) => {
@@ -229,7 +224,28 @@ test('"Get a reply" leaves the keyboard in the composer, not on the page', async
   await app.getByRole('button', { name: 'Get a reply' }).focus();
   await app.keyboard.press('Enter');
   await expect(theirs(app)).toHaveCount(2);
-  expect(await focused(app)).toMatch(/^textarea/);
+  await expect(composer(app)).toBeFocused();
+});
+
+test('a tap on "Get a reply" does not move focus into the composer, which would pop up a phone keyboard', async ({ app, request }) => {
+  await startChat(app);
+  await mockControl(request, { fail: true });
+  await composer(app).fill('きこえますか');
+  await composer(app).press('Enter');
+  await expect(app.locator('.error')).toBeVisible();
+  await mockControl(request, { fail: false });
+  await app.getByRole('button', { name: 'Get a reply' }).click();
+  await expect(theirs(app)).toHaveCount(2);
+  await expect(composer(app)).not.toBeFocused();
+});
+
+test('sending with the Send button from the keyboard leaves focus in the composer', async ({ app }) => {
+  await startChat(app);
+  await composer(app).fill('コーヒーをください');
+  await app.getByRole('button', { name: 'Send', exact: true }).focus();
+  await app.keyboard.press('Enter');
+  await expect(mine(app)).toHaveCount(1);
+  await expect(composer(app)).toBeFocused();
 });
 
 const chatSettingsButton = (app: Page) => app.locator('.topbar').getByRole('button', { name: 'Chat settings' });

@@ -157,3 +157,19 @@ test('on a wide screen each explanation sits right of its sentence, all on one c
   }
   expect(lefts[0]).toBe(lefts[1]);
 });
+
+test('Redo from the keyboard keeps focus on it while the new analysis is written', async ({ app, request }) => {
+  await startChat(app);
+  const message = theirs(app).first();
+  await message.getByRole('button', { name: 'Breakdown' }).click();
+  await expect(message.locator('.analysis-line')).toHaveCount(2);
+  await mockControl(request, { delayMs: 800 });
+  const redo = message.getByRole('button', { name: 'Redo' });
+  await redo.focus();
+  await app.keyboard.press('Enter');
+  await expect(message.locator('.analysis-busy')).toBeVisible();
+  await expect(redo).toBeFocused();
+  await expect(redo).toHaveAttribute('aria-disabled', 'true');
+  await expect(message.locator('.analysis-line')).toHaveCount(2);
+  await expect(redo).toBeFocused();
+});

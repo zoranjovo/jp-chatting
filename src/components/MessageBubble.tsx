@@ -131,8 +131,9 @@ export function MessageBubble({
               )}
               {!busy && message.breakdown && !mine && <BreakdownView breakdown={message.breakdown} />}
               {!busy && message.feedback && mine && <FeedbackView feedback={message.feedback} />}
-              {!busy && (analysis || error) && (
-                <button type="button" className="link-button" onClick={() => analyze(true)}>
+              {/* Kept while busy (aria-disabled, not disabled), so the keyboard focus on it isn't dropped to the page. */}
+              {(analysis || error) && (
+                <button type="button" className="link-button" aria-disabled={busy} onClick={() => !busy && analyze(true)}>
                   {t.redo}
                 </button>
               )}

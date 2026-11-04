@@ -101,7 +101,16 @@ export function Composer({
         autoComplete="off"
         spellCheck={false}
       />
-      <button type="button" className="send" onClick={send} disabled={disabled || !text.trim()}>
+      <button
+        type="button"
+        className="send"
+        onClick={(e) => {
+          send();
+          // Sending empties the box, which disables this button and would drop keyboard focus to the page.
+          if (e.detail === 0) ref.current?.focus();
+        }}
+        disabled={disabled || !text.trim()}
+      >
         {t.send}
       </button>
     </div>
