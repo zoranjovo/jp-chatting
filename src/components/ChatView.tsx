@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { stripFurigana } from '../../shared/kanji.ts';
 import type { Chat, Message } from '../../shared/types.ts';
+import { prependDraft } from '../drafts.ts';
 import { useT } from '../i18n.tsx';
 import { Composer, type ComposerHandle } from './Composer.tsx';
 import { MessageBubble } from './MessageBubble.tsx';
+import { SetupNotice } from './SetupNotice.tsx';
 
 export function ChatView({
   chat,
@@ -13,22 +15,27 @@ export function ChatView({
   onRetry,
   onMessageUpdated,
   onRewind,
+  onOpenSettings,
 }: {
   chat: Chat;
   waiting: boolean;
   error: string | null;
-  onSend: (text: string) => void;
+  onSend: (text: string) => Promise<boolean>;
   onRetry: () => void;
   onMessageUpdated: (m: Message) => void;
   /** Resolves true once the message and everything after it are gone. */
   onRewind: (m: Message) => Promise<boolean>;
+  onOpenSettings: () => void;
 }) {
   const t = useT();
   const end = useRef<HTMLDivElement>(null);
   const composer = useRef<ComposerHandle>(null);
 
   const rewind = async (m: Message) => {
-    if (await onRewind(m)) composer.current?.prepend(m.content);
+    if (!(await onRewind(m))) return;
+    // The learner may have switched chats meanwhile; the text still goes to this chat's draft.
+    if (composer.current) composer.current.prepend(m.content);
+    else prependDraft(chat.id, m.content);
   };
   const last = chat.messages.at(-1);
   const needsReply = !waiting && (!last || last.role === 'user');
@@ -42,8 +49,11 @@ export function ChatView({
     seen.current = { chat: chat.id, message: last?.id };
   }, [chat.id, last, t.partnerSays]);
 
+  // Straight to the end when the chat opens; smoothly for each new message.
+  const opened = useRef(false);
   useEffect(() => {
-    end.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    end.current?.scrollIntoView({ behavior: opened.current ? 'smooth' : 'auto', block: 'end' });
+    opened.current = true;
   }, [chat.messages.length, waiting]);
 
   return (
@@ -74,6 +84,7 @@ export function ChatView({
             {t.errorPrefix} {error}
           </div>
         )}
+        {needsReply && <SetupNotice onOpenSettings={onOpenSettings} />}
         {needsReply && (
           <button type="button" className="secondary retry" onClick={onRetry}>
             {t.retryReply}

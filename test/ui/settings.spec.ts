@@ -1,6 +1,6 @@
 import type { APIRequestContext, Page } from '@playwright/test';
 import type { Settings } from '../../shared/types.ts';
-import { expect, mockCalls, mockControl, startChat, test, theirs } from './fixtures.ts';
+import { composer, expect, mockCalls, mockControl, startChat, test, theirs } from './fixtures.ts';
 
 async function openSettings(page: Page) {
   await page.locator('.sidebar').getByRole('button', { name: /Settings|設定/ }).click();
@@ -242,4 +242,26 @@ test('with no model chosen, a chat cannot be started and Settings is one click a
   await expect(app.locator('.setup-notice')).toHaveCount(0);
   await startChat(app);
   expect((await saved(request)).endpoint.model).toBe('mock-small');
+});
+
+test('the model notice waits for the saved settings, and stays away if they never come', async ({ app }) => {
+  // The defaults have no model, so a notice drawn before the settings arrive would be wrong for nearly everyone.
+  await app.route('**/api/settings', (route) => (route.request().method() === 'GET' ? route.abort() : route.continue()));
+  await app.reload();
+  await expect(app.locator('.error')).toBeVisible();
+  await expect(app.locator('.setup-notice')).toHaveCount(0);
+  await app.locator('.empty').getByRole('button', { name: '+ New chat' }).click();
+  await expect(app.getByRole('dialog').getByRole('button', { name: 'Start' })).toBeEnabled();
+});
+
+test('a chat that can\'t get a reply for want of a model offers Settings too', async ({ app, request }) => {
+  await startChat(app);
+  await request.put('/api/settings', { data: { provider: 'endpoint', endpoint: { model: '' } } });
+  await app.reload();
+  await composer(app).fill('こんにちは');
+  await composer(app).press('Enter');
+  const chat = app.locator('.chat');
+  await expect(chat.locator('.error')).toContainText('no model chosen');
+  await chat.locator('.setup-notice').getByRole('button', { name: 'Open Settings' }).click();
+  await expect(app.getByRole('dialog').getByRole('heading', { name: 'Settings' })).toBeVisible();
 });
