@@ -249,6 +249,7 @@ function Shell({ loadError }: { loadError: string | null }) {
     try {
       show(await api.rewind(id, m.id));
       setErrors((e) => ({ ...e, [id]: null }));
+      refreshList();
       return true;
     } catch (err) {
       setErrors((e) => ({ ...e, [id]: (err as Error).message }));
