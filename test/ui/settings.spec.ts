@@ -2,6 +2,29 @@ import type { APIRequestContext, Page } from '@playwright/test';
 import type { Settings } from '../../shared/types.ts';
 import { composer, expect, mockCalls, mockControl, startChat, test, theirs } from './fixtures.ts';
 
+test('Refresh list and Test model keep the keyboard on themselves while they work', async ({ app, request }) => {
+  const dialog = await openSettings(app);
+  const refresh = dialog.getByRole('button', { name: /Refresh list/ });
+  // Let the list the dialog fetches on opening arrive first, so the press below starts a refresh of its own.
+  // (Not done until the models are in: the button reads not-busy for a moment before that fetch starts.)
+  await expect(dialog.getByLabel('Model', { exact: true }).locator('option', { hasText: 'mock-large' })).toHaveCount(1);
+  await expect(refresh).toHaveAttribute('aria-disabled', 'false');
+  await mockControl(request, { delayMs: 1500 });
+  await refresh.focus();
+  await app.keyboard.press('Enter');
+  await expect(refresh).toHaveAttribute('aria-disabled', 'true');
+  await expect(refresh).toBeFocused();
+  await expect(refresh).toHaveAttribute('aria-disabled', 'false');
+  await expect(refresh).toBeFocused();
+
+  const testButton = dialog.getByRole('button', { name: 'Test model' });
+  await testButton.focus();
+  await app.keyboard.press('Enter');
+  await expect(dialog.getByRole('button', { name: /Testing/ })).toBeFocused();
+  await expect(dialog.locator('.model-test-result')).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Test model' })).toBeFocused();
+});
+
 async function openSettings(page: Page) {
   await page.locator('.sidebar').getByRole('button', { name: /Settings|設定/ }).click();
   const dialog = page.getByRole('dialog');

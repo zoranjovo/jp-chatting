@@ -59,6 +59,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   }, [testTarget]);
 
   const runTest = async () => {
+    if (test.state === 'testing') return;
     const run = ++testRun.current;
     setTest({ state: 'testing' });
     try {
@@ -235,7 +236,13 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
                   </option>
                 ))}
               </select>
-              <button type="button" className="secondary" onClick={() => loadModels(draft.provider, draft.endpoint)} disabled={loading}>
+              {/* aria-disabled rather than disabled while busy: a disabled button drops keyboard focus to the page. */}
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => !loading && loadModels(draft.provider, draft.endpoint)}
+                aria-disabled={loading}
+              >
                 ↻ {t.refreshModels}
               </button>
             </div>
@@ -251,7 +258,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
 
           <div className="field model-test">
             <div>
-              <button type="button" className="secondary" onClick={runTest} disabled={!current || test.state === 'testing'}>
+              <button type="button" className="secondary" onClick={runTest} disabled={!current} aria-disabled={test.state === 'testing'}>
                 {test.state === 'testing' ? t.testingModel : t.testModel}
               </button>
             </div>

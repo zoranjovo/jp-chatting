@@ -55,6 +55,9 @@ function Shell({ loadError }: { loadError: string | null }) {
   const [errors, setErrors] = useState<Record<string, string | null>>({});
   const [dialog, setDialog] = useState<'new' | 'settings' | 'chat' | null>(null);
   const [navOpen, setNavOpen] = useState(false);
+  /** The chat just started, whose composer should take focus once it shows; cleared once it has. */
+  const [focusChat, setFocusChat] = useState<string | null>(null);
+  const composerFocused = useCallback(() => setFocusChat(null), []);
   const activeId = useRef<string | null>(null);
 
   const refreshList = useCallback(() => api.chats().then(setChats).catch(() => {}), []);
@@ -176,6 +179,7 @@ function Shell({ loadError }: { loadError: string | null }) {
     activeId.current = created.id;
     showInUrl(created.id);
     setChat(created);
+    setFocusChat(created.id);
     setNavOpen(false);
     refreshList();
     requestReply(created.id);
@@ -235,7 +239,7 @@ function Shell({ loadError }: { loadError: string | null }) {
       setChat(null);
       showInUrl(null, true);
     }
-    refreshList();
+    await refreshList();
   };
 
   const messageUpdated = (m: Message) =>
@@ -286,6 +290,8 @@ function Shell({ loadError }: { loadError: string | null }) {
             onMessageUpdated={messageUpdated}
             onRewind={rewind}
             onOpenSettings={() => setDialog('settings')}
+            focusComposer={focusChat === chat.id}
+            onComposerFocused={composerFocused}
           />
         ) : (
           <div className="empty">

@@ -61,6 +61,36 @@ test('deleting the open chat takes its id out of the URL', async ({ app }) => {
   expect(new URL(app.url()).hash).toBe('');
 });
 
+test('after deleting a chat, focus moves to the chat that took its place, or to New chat', async ({ app }) => {
+  await startChat(app, 'Keep');
+  await startChat(app, 'Delete me');
+  await app.locator('.chat-item', { hasText: 'Delete me' }).getByRole('button', { name: 'Delete chat' }).click();
+  await app.getByRole('dialog').getByRole('button', { name: 'Delete' }).press('Enter');
+  await expect(app.locator('.chat-item')).toHaveCount(1);
+  await expect(app.locator('.chat-item', { hasText: 'Keep' }).locator('.chat-item-main')).toBeFocused();
+
+  await app.locator('.chat-item', { hasText: 'Keep' }).getByRole('button', { name: 'Delete chat' }).click();
+  await app.getByRole('dialog').getByRole('button', { name: 'Delete' }).press('Enter');
+  await expect(app.locator('.chat-item')).toHaveCount(0);
+  await expect(app.locator('.sidebar .new-chat')).toBeFocused();
+});
+
+test('a failed delete leaves no focus move pending to fire later', async ({ app }) => {
+  await startChat(app, 'Stays');
+  await app.route('**/api/chats/*', (route) => (route.request().method() === 'DELETE' ? route.abort() : route.continue()));
+  await app.locator('.chat-item.active').getByRole('button', { name: 'Delete chat' }).click();
+  const failed = app.waitForEvent('requestfailed', (r) => r.method() === 'DELETE');
+  await app.getByRole('dialog').getByRole('button', { name: 'Delete' }).press('Enter');
+  await failed;
+  await app.unroute('**/api/chats/*');
+  await expect(app.locator('.chat-item')).toHaveCount(1);
+  await composer(app).click();
+  await composer(app).fill('もしもし');
+  await composer(app).press('Enter');
+  await expect(theirs(app)).toHaveCount(2);
+  await expect(composer(app)).toBeFocused();
+});
+
 test('a chat can be renamed', async ({ app, request }) => {
   await startChat(app, 'Old name');
   await app.locator('.chat-item.active').getByRole('button', { name: 'Rename chat' }).click();

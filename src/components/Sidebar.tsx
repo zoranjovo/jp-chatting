@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
 import type { ChatSummary, UiLanguage } from '../../shared/types.ts';
 import { useT } from '../i18n.tsx';
 import { useSettings } from '../settings.tsx';
@@ -18,7 +18,8 @@ export function Sidebar({
   onSelect: (id: string) => void;
   onNew: () => void;
   onRename: (id: string, title: string) => void;
-  onDelete: (id: string) => void;
+  /** Resolves once the chat is deleted and the list refreshed; rejects if the delete failed. */
+  onDelete: (id: string) => Promise<void>;
   onSettings: () => void;
 }) {
   const t = useT();
@@ -27,10 +28,26 @@ export function Sidebar({
   const [renaming, setRenaming] = useState<ChatSummary | null>(null);
   const [deleting, setDeleting] = useState<ChatSummary | null>(null);
 
+  // Once a deleted chat has left the list, focus its neighbour (or New chat) rather than leave focus on the page.
+  const aside = useRef<HTMLElement>(null);
+  /** Set only once the delete has succeeded: the deleted chat, and the neighbour (from the list as it was) to focus. */
+  const [refocus, setRefocus] = useState<{ gone: string; next: string | null } | null>(null);
+  useEffect(() => {
+    if (!refocus || chats.some((c) => c.id === refocus.gone)) return;
+    setRefocus(null);
+    // Only if focus went with the dialog -- not if the learner has since moved on, say into the composer.
+    const active = document.activeElement;
+    if (active && active !== document.body && !aside.current?.contains(active)) return;
+    const index = chats.findIndex((c) => c.id === refocus.next);
+    const items = aside.current?.querySelectorAll<HTMLButtonElement>('.chat-item-main');
+    const next = (index >= 0 ? items?.[index] : undefined) ?? aside.current?.querySelector<HTMLButtonElement>('.new-chat');
+    next?.focus();
+  }, [refocus, chats]);
+
   const setLanguage = (uiLanguage: UiLanguage) => update({ uiLanguage });
 
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" ref={aside}>
       <div className="brand">
         <span className="brand-mark" aria-hidden>
           話
@@ -89,8 +106,14 @@ export function Sidebar({
           confirmLabel={t.delete}
           cancelLabel={t.cancel}
           onConfirm={() => {
-            onDelete(deleting.id);
+            const gone = deleting.id;
+            const i = chats.findIndex((c) => c.id === gone);
+            const next = (chats[i + 1] ?? chats[i - 1])?.id ?? null;
             setDeleting(null);
+            onDelete(gone).then(
+              () => setRefocus({ gone, next }),
+              () => {},
+            );
           }}
           onCancel={() => setDeleting(null)}
         />

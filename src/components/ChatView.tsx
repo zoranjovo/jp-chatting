@@ -20,6 +20,8 @@ export function ChatView({
   onMessageUpdated,
   onRewind,
   onOpenSettings,
+  focusComposer,
+  onComposerFocused,
 }: {
   chat: Chat;
   waiting: boolean;
@@ -30,6 +32,9 @@ export function ChatView({
   /** Resolves true once the message and everything after it are gone. */
   onRewind: (m: Message) => Promise<boolean>;
   onOpenSettings: () => void;
+  /** Moves focus to the composer once (then calls onComposerFocused), e.g. for a chat just started. */
+  focusComposer?: boolean;
+  onComposerFocused?: () => void;
 }) {
   const t = useT();
   const end = useRef<HTMLDivElement>(null);
@@ -75,6 +80,12 @@ export function ChatView({
     opened.current = true;
   }, [chat.messages.length, waiting]);
 
+  useEffect(() => {
+    if (!focusComposer) return;
+    composer.current?.focus();
+    onComposerFocused?.();
+  }, [focusComposer, onComposerFocused]);
+
   return (
     <AnnounceContext.Provider value={announce}>
       <div className="chat">
@@ -106,7 +117,16 @@ export function ChatView({
           )}
           {needsReply && <SetupNotice onOpenSettings={onOpenSettings} />}
           {needsReply && (
-            <button type="button" className="secondary retry" onClick={onRetry}>
+            <button
+              type="button"
+              className="secondary retry"
+              onClick={(e) => {
+                // The button goes away once the reply is asked for: keep the keyboard in the chat. Only from the
+                // keyboard (detail 0) -- a tap would pop up the phone's on-screen keyboard over the reply.
+                if (e.detail === 0) composer.current?.focus();
+                onRetry();
+              }}
+            >
               {t.retryReply}
             </button>
           )}
