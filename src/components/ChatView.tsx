@@ -3,6 +3,7 @@ import type { Chat, Message } from '../../shared/types.ts';
 import { useT } from '../i18n.tsx';
 import { Composer, type ComposerHandle } from './Composer.tsx';
 import { MessageBubble } from './MessageBubble.tsx';
+import { SetupNotice } from './SetupNotice.tsx';
 
 export function ChatView({
   chat,
@@ -12,6 +13,7 @@ export function ChatView({
   onRetry,
   onMessageUpdated,
   onRewind,
+  onOpenSettings,
 }: {
   chat: Chat;
   waiting: boolean;
@@ -21,6 +23,7 @@ export function ChatView({
   onMessageUpdated: (m: Message) => void;
   /** Resolves true once the message and everything after it are gone. */
   onRewind: (m: Message) => Promise<boolean>;
+  onOpenSettings: () => void;
 }) {
   const t = useT();
   const end = useRef<HTMLDivElement>(null);
@@ -64,6 +67,7 @@ export function ChatView({
             {t.errorPrefix} {error}
           </div>
         )}
+        {needsReply && <SetupNotice onOpenSettings={onOpenSettings} />}
         {needsReply && (error || chat.messages.length === 0) && (
           <button type="button" className="secondary retry" onClick={onRetry}>
             {t.retryReply}
