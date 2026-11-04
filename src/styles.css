@@ -1065,7 +1065,7 @@ ruby rt {
   font-size: 22px;
 }
 
-.empty p {
+.empty > p {
   max-width: 460px;
   color: var(--muted);
   margin: 4px 0 16px;

@@ -39,6 +39,11 @@ export interface Settings {
   };
 }
 
+/** An endpoint with no model chosen can't answer at all -- the state a fresh install starts in. Checked by the UI and the server alike. */
+export function needsModel(settings: Pick<Settings, 'provider' | 'endpoint'>): boolean {
+  return settings.provider === 'endpoint' && !settings.endpoint.model;
+}
+
 export const DEFAULT_SETTINGS: Settings = {
   uiLanguage: 'en',
   wkLevel: 5,
