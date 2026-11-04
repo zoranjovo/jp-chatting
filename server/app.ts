@@ -129,8 +129,12 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
     }),
   );
 
-  /** Replies being written, by chat id. A second request for the same chat waits for this one instead of starting another. */
-  const replies = new Map<string, Promise<Chat>>();
+  /**
+   * Replies being written, by chat id, with the message each answers and the settings it was started under.
+   * Another request to answer the same message under the same settings waits for it instead of starting another;
+   * one under new settings (say, after switching away from a model that hangs) starts afresh.
+   */
+  const replies = new Map<string, { answering: string | undefined; settings: string; reply: Promise<Chat> }>();
 
   app.get(
     '/api/chats/:id',
@@ -182,14 +186,12 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
     }),
   );
 
-  async function writeReply(id: string): Promise<Chat> {
-    const settings = await store.getSettings();
-    const chat = await loadChat(id);
+  async function writeReply(chat: Chat, settings: Settings): Promise<Chat> {
     const answering = chat.messages.at(-1)?.id;
     const content = await generateReply(deps.callAi, settings, chat);
     const message: Message = { id: store.newId(), role: 'assistant', content, createdAt: store.now(), context: contextOf(settings, chat.politeness) };
-    return updateChat(id, (chat) => {
-      // Rewound while the reply was being written: it answers a history that is gone.
+    return updateChat(chat.id, (chat) => {
+      // Rewound, or answered by another reply, while this one was being written: it answers a history that is gone.
       if (chat.messages.at(-1)?.id !== answering) return;
       chat.messages.push(message);
       if (!chat.title) chat.title = titleFrom(content);
@@ -204,12 +206,21 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
     '/api/chats/:id/reply',
     route(async (req, res) => {
       const id = String(req.params.id);
-      let reply = replies.get(id);
-      if (!reply) {
-        reply = writeReply(id).finally(() => replies.delete(id));
-        replies.set(id, reply);
+      const settings = await store.getSettings();
+      const chat = await loadChat(id);
+      const answering = chat.messages.at(-1)?.id;
+      // The partner never answers itself: a page that was waiting for a reply that has since landed gets the chat as it is.
+      if (chat.messages.at(-1)?.role === 'assistant') return res.json(chat);
+      const key = JSON.stringify(settings);
+      let pending = replies.get(id);
+      if (!pending || pending.answering !== answering || pending.settings !== key) {
+        const reply: Promise<Chat> = writeReply(chat, settings).finally(() => {
+          if (replies.get(id)?.reply === reply) replies.delete(id);
+        });
+        pending = { answering, settings: key, reply };
+        replies.set(id, pending);
       }
-      res.json(await reply);
+      res.json(await pending.reply);
     }),
   );
 

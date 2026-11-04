@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { DEFAULT_SETTINGS, type Breakdown, type Chat, type Feedback, type Message, type MessageContext, type Settings } from '../../shared/types.ts';
+import { DEFAULT_SETTINGS, needsModel, type Breakdown, type Chat, type Feedback, type Message, type MessageContext, type Settings } from '../../shared/types.ts';
 import { BreakdownView, FeedbackView, glossSegments } from '../../src/components/Analysis.tsx';
 import { ChatSettingsDialog } from '../../src/components/ChatSettingsDialog.tsx';
 import { ContextLine } from '../../src/components/ContextLine.tsx';
@@ -14,14 +14,14 @@ import { ContextDetails } from '../../src/components/MessageInfo.tsx';
 import { JpText } from '../../src/components/JpText.tsx';
 import { parseInline } from '../../src/components/RichText.tsx';
 import { LanguageProvider } from '../../src/i18n.tsx';
-import { needsModel, SettingsContext } from '../../src/settings.tsx';
+import { SettingsContext } from '../../src/settings.tsx';
 import { SetupNotice } from '../../src/components/SetupNotice.tsx';
 import { SettingsDialog } from '../../src/components/SettingsDialog.tsx';
 
 function render(node: ReactNode, patch: Partial<Settings> = {}): string {
   const settings = { ...DEFAULT_SETTINGS, ...patch };
   return renderToStaticMarkup(
-    <SettingsContext.Provider value={{ settings, update: async () => {} }}>
+    <SettingsContext.Provider value={{ settings, loaded: true, update: async () => {} }}>
       <LanguageProvider language={settings.uiLanguage}>{node}</LanguageProvider>
     </SettingsContext.Provider>,
   );
@@ -340,13 +340,18 @@ describe('kanji marks follow the level a message was written at', () => {
     assert.equal(count(bubble(message, 3), 'over-level'), 0);
   });
 
-  test('a message is still marked for kanji above the level it was written at', () => {
-    assert.ok(count(bubble({ ...message, context: { ...stamp, wkLevel: 3 } }, 60), 'over-level') > 0);
+  test('a message is still marked for kanji above the level it was written at, and only those, naming that level', () => {
+    // 何 is level 5, 飲 level 10: at a stamp of 7 only 飲 is above it.
+    const html = bubble({ ...message, context: { ...stamp, wkLevel: 7 } }, 60);
+    assert.equal(count(html, 'over-level'), 1);
+    assert.match(html, /class="kanji over-level" title="Above WaniKani level 7, the level this was written at\n飲/);
   });
 
-  test('a message from before stamping uses the current level', () => {
+  test('a message from before stamping uses the current level, and says so', () => {
     const { context: _, ...old } = message;
-    assert.ok(count(bubble(old, 3), 'over-level') > 0);
+    const html = bubble(old, 7);
+    assert.equal(count(html, 'over-level'), 1);
+    assert.match(html, /title="Above your WaniKani level \(7\)\n飲/);
     assert.equal(count(bubble(old, 20), 'over-level'), 0);
   });
 });
