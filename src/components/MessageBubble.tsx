@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { Message } from '../../shared/types.ts';
+import { useAnnounce } from '../announce.ts';
 import { api } from '../api.ts';
 import { useT } from '../i18n.tsx';
 import { BreakdownView, FeedbackView } from './Analysis.tsx';
@@ -26,6 +27,7 @@ export function MessageBubble({
   rewindDisabled?: boolean;
 }) {
   const t = useT();
+  const announce = useAnnounce();
   const [open, setOpen] = useState(false);
   // The panel stays mounted once opened, so closing can animate; `shown` is set
   // just after `open` so the opening transition starts from collapsed.
@@ -33,8 +35,6 @@ export function MessageBubble({
   const [shown, setShown] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** Said to screen readers once a requested analysis has arrived. */
-  const [ready, setReady] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const mine = message.role === 'user';
@@ -62,10 +62,10 @@ export function MessageBubble({
     if (analysis && !refresh) return;
     setBusy(true);
     setError(null);
-    setReady(false);
+    announce(t.analyzing);
     try {
       onUpdated(await api.analyze(chatId, message.id, refresh));
-      setReady(true);
+      announce(mine ? t.feedbackReady : t.breakdownReady);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -119,9 +119,6 @@ export function MessageBubble({
           </Tooltip>
         </div>
       </div>
-      <span className="sr-only" role="status">
-        {busy ? t.analyzing : ready && open ? (mine ? t.feedbackReady : t.breakdownReady) : ''}
-      </span>
       {mounted && (
         <div ref={wrap} className={`analysis-wrap ${shown ? 'open' : ''}`} inert={!open}>
           <div className="analysis-clip">

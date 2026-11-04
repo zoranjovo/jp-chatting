@@ -23,9 +23,18 @@ test('screen readers hear when a breakdown is being written and when it is ready
   await mockControl(request, { delayMs: 800 });
   const message = theirs(app).first();
   await message.getByRole('button', { name: 'Breakdown' }).click();
-  const status = message.locator(':scope > [role="status"]');
+  const status = app.locator('.chat > [role="status"]');
   await expect(status).toHaveText('Thinking…');
   await expect(status).toHaveText('Breakdown ready.');
+  // Hidden and shown again from the cache: nothing new to say.
+  await message.getByRole('button', { name: 'Hide' }).click();
+  await expect(status).toHaveText('', { timeout: 8000 });
+  await message.getByRole('button', { name: 'Breakdown' }).click();
+  await expect(message.locator('.analysis-line')).toHaveCount(2);
+  await app.waitForTimeout(300);
+  await expect(status).toHaveText('');
+  // The only status region is the chat's: none per message.
+  await expect(app.getByRole('status')).toHaveCount(1);
 });
 
 test('Breakdown is fetched once, then hidden and shown from the cache', async ({ app, request }) => {
