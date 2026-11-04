@@ -70,7 +70,10 @@ http
         return send(200, {});
       }
       if (url === '/__calls') return send(200, calls);
-      if (url.endsWith('/models')) return send(200, { data: [{ id: 'mock-small' }, { id: 'mock-large' }] });
+      if (url.endsWith('/models')) {
+        if (control.delayMs) await new Promise((r) => setTimeout(r, control.delayMs));
+        return send(200, { data: [{ id: 'mock-small' }, { id: 'mock-large' }] });
+      }
       if (!url.endsWith('/chat/completions')) return send(404, { error: 'not found' });
 
       const body = JSON.parse(raw || '{}');
