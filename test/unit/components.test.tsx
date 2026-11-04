@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { DEFAULT_SETTINGS, type Breakdown, type Chat, type Feedback, type Message, type MessageContext, type Settings } from '../../shared/types.ts';
+import { DEFAULT_SETTINGS, needsModel, type Breakdown, type Chat, type Feedback, type Message, type MessageContext, type Settings } from '../../shared/types.ts';
 import { BreakdownView, FeedbackView, glossSegments } from '../../src/components/Analysis.tsx';
 import { ChatSettingsDialog } from '../../src/components/ChatSettingsDialog.tsx';
 import { ContextLine } from '../../src/components/ContextLine.tsx';
@@ -15,11 +15,12 @@ import { JpText } from '../../src/components/JpText.tsx';
 import { parseInline } from '../../src/components/RichText.tsx';
 import { LanguageProvider } from '../../src/i18n.tsx';
 import { SettingsContext } from '../../src/settings.tsx';
+import { SetupNotice } from '../../src/components/SetupNotice.tsx';
 
 function render(node: ReactNode, patch: Partial<Settings> = {}): string {
   const settings = { ...DEFAULT_SETTINGS, ...patch };
   return renderToStaticMarkup(
-    <SettingsContext.Provider value={{ settings, update: async () => {} }}>
+    <SettingsContext.Provider value={{ settings, loaded: true, update: async () => {} }}>
       <LanguageProvider language={settings.uiLanguage}>{node}</LanguageProvider>
     </SettingsContext.Provider>,
   );
@@ -397,5 +398,20 @@ describe('ChatSettingsDialog', () => {
     assert.match(html, /value="Ordering"/);
     assert.ok(html.includes('<label class="active"><input type="radio" checked=""/>Casual (plain form)'));
     assert.match(html, /class="context-line chat-uses"[^>]*>Haiku 5\.5 · Casual · WK 8</);
+  });
+});
+
+describe('SetupNotice', () => {
+  const endpoint = (model: string) => ({ ...DEFAULT_SETTINGS.endpoint, model });
+
+  test('only an endpoint with no model needs one', () => {
+    assert.equal(needsModel({ ...DEFAULT_SETTINGS, provider: 'endpoint', endpoint: endpoint('') }), true);
+    assert.equal(needsModel({ ...DEFAULT_SETTINGS, provider: 'endpoint', endpoint: endpoint('qwen') }), false);
+    assert.equal(needsModel({ ...DEFAULT_SETTINGS, provider: 'claude', endpoint: endpoint('') }), false);
+  });
+
+  test('shows while no model is chosen, and not once one is', () => {
+    assert.match(render(<SetupNotice onOpenSettings={() => {}} />, { provider: 'endpoint', endpoint: endpoint('') }), /Choose a model first.*Open Settings/);
+    assert.equal(render(<SetupNotice onOpenSettings={() => {}} />, { provider: 'endpoint', endpoint: endpoint('qwen') }), '');
   });
 });

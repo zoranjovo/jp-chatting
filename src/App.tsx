@@ -5,16 +5,24 @@ import { ChatView } from './components/ChatView.tsx';
 import { ChatSettingsDialog, type ChatPatch } from './components/ChatSettingsDialog.tsx';
 import { NewChatDialog } from './components/NewChatDialog.tsx';
 import { SettingsDialog } from './components/SettingsDialog.tsx';
+import { SetupNotice } from './components/SetupNotice.tsx';
 import { Sidebar } from './components/Sidebar.tsx';
 import { LanguageProvider, useT } from './i18n.tsx';
 import { SettingsContext } from './settings.tsx';
 
 export function App() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.settings().then(setSettings, (err: Error) => setLoadError(err.message));
+    api.settings().then(
+      (s) => {
+        setSettings(s);
+        setLoaded(true);
+      },
+      (err: Error) => setLoadError(err.message),
+    );
   }, []);
 
   const update = useCallback(async (patch: Partial<Settings>) => {
@@ -26,7 +34,7 @@ export function App() {
     document.documentElement.lang = settings.uiLanguage;
   }, [settings.uiLanguage]);
 
-  const state = useMemo(() => ({ settings, update }), [settings, update]);
+  const state = useMemo(() => ({ settings, loaded, update }), [settings, loaded, update]);
 
   return (
     <SettingsContext.Provider value={state}>
@@ -202,6 +210,7 @@ function Shell({ loadError }: { loadError: string | null }) {
             onRetry={() => requestReply(chat.id)}
             onMessageUpdated={messageUpdated}
             onRewind={rewind}
+            onOpenSettings={() => setDialog('settings')}
           />
         ) : (
           <div className="empty">
@@ -210,13 +219,14 @@ function Shell({ loadError }: { loadError: string | null }) {
             </div>
             <h2>{t.emptyTitle}</h2>
             <p>{t.emptyBody}</p>
+            <SetupNotice onOpenSettings={() => setDialog('settings')} />
             <button type="button" className="primary" onClick={() => setDialog('new')}>
               + {t.newChat}
             </button>
           </div>
         )}
       </main>
-      {dialog === 'new' && <NewChatDialog onStart={startChat} onClose={() => setDialog(null)} />}
+      {dialog === 'new' && <NewChatDialog onStart={startChat} onClose={() => setDialog(null)} onOpenSettings={() => setDialog('settings')} />}
       {dialog === 'settings' && <SettingsDialog onClose={() => setDialog(null)} />}
       {dialog === 'chat' && chat && <ChatSettingsDialog chat={chat} onSave={saveChatSettings} onClose={() => setDialog(null)} />}
     </div>
