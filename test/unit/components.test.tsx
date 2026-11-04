@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { DEFAULT_SETTINGS, type Breakdown, type Chat, type ChatSummary, type Feedback, type Message, type MessageContext, type Settings } from '../../shared/types.ts';
+import { DEFAULT_SETTINGS, needsModel, type Breakdown, type Chat, type ChatSummary, type Feedback, type Message, type MessageContext, type Settings } from '../../shared/types.ts';
 import { BreakdownView, FeedbackView, glossSegments } from '../../src/components/Analysis.tsx';
 import { ChatSettingsDialog } from '../../src/components/ChatSettingsDialog.tsx';
 import { Composer } from '../../src/components/Composer.tsx';
@@ -16,7 +16,7 @@ import { ContextDetails } from '../../src/components/MessageInfo.tsx';
 import { JpText } from '../../src/components/JpText.tsx';
 import { parseInline } from '../../src/components/RichText.tsx';
 import { LanguageProvider } from '../../src/i18n.tsx';
-import { needsModel, SettingsContext } from '../../src/settings.tsx';
+import { SettingsContext } from '../../src/settings.tsx';
 import { SettingsDialog } from '../../src/components/SettingsDialog.tsx';
 import { SetupNotice } from '../../src/components/SetupNotice.tsx';
 import { Sidebar } from '../../src/components/Sidebar.tsx';
@@ -24,7 +24,7 @@ import { Sidebar } from '../../src/components/Sidebar.tsx';
 function render(node: ReactNode, patch: Partial<Settings> = {}): string {
   const settings = { ...DEFAULT_SETTINGS, ...patch };
   return renderToStaticMarkup(
-    <SettingsContext.Provider value={{ settings, update: async () => {} }}>
+    <SettingsContext.Provider value={{ settings, loaded: true, update: async () => {} }}>
       <LanguageProvider language={settings.uiLanguage}>{node}</LanguageProvider>
     </SettingsContext.Provider>,
   );
@@ -343,13 +343,18 @@ describe('kanji marks follow the level a message was written at', () => {
     assert.equal(count(bubble(message, 3), 'over-level'), 0);
   });
 
-  test('a message is still marked for kanji above the level it was written at', () => {
-    assert.ok(count(bubble({ ...message, context: { ...stamp, wkLevel: 3 } }, 60), 'over-level') > 0);
+  test('a message is still marked for kanji above the level it was written at, and only those, naming that level', () => {
+    // 何 is level 5, 飲 level 10: at a stamp of 7 only 飲 is above it.
+    const html = bubble({ ...message, context: { ...stamp, wkLevel: 7 } }, 60);
+    assert.equal(count(html, 'over-level'), 1);
+    assert.match(html, /class="kanji over-level" title="Above WaniKani level 7, the level this was written at\n飲/);
   });
 
-  test('a message from before stamping uses the current level', () => {
+  test('a message from before stamping uses the current level, and says so', () => {
     const { context: _, ...old } = message;
-    assert.ok(count(bubble(old, 3), 'over-level') > 0);
+    const html = bubble(old, 7);
+    assert.equal(count(html, 'over-level'), 1);
+    assert.match(html, /title="Above your WaniKani level \(7\)\n飲/);
     assert.equal(count(bubble(old, 20), 'over-level'), 0);
   });
 });
@@ -441,15 +446,6 @@ describe('SetupNotice', () => {
   });
 });
 
-describe('SettingsDialog', () => {
-  test('the WaniKani label, slider and number box all show the saved level', () => {
-    const html = render(<SettingsDialog onClose={() => {}} />, { wkLevel: 17 });
-    assert.match(html, /WaniKani level: <strong>17<\/strong>/);
-    assert.match(html, /<input type="range"[^>]*value="17"/);
-    assert.match(html, /<input type="number"[^>]*value="17"/);
-  });
-});
-
 describe('accessible names and states', () => {
   const attr = (html: string, tag: string, name: string) => html.match(new RegExp(`<${tag}[^>]*\\s${name}="([^"]*)"`))?.[1];
 
@@ -468,33 +464,54 @@ describe('accessible names and states', () => {
     assert.ok(html.includes(`id="${id}">Delete it?</p>`));
   });
 
-  test('the composer and the romaji toggle have names of their own', () => {
-    const html = render(<Composer chatId="c" disabled={false} onSend={() => {}} />);
+  test('the composer has a name, and the romaji toggle\'s name starts with the glyph it shows', () => {
+    const composer = (patch: Partial<Settings> = {}) => render(<Composer chatId="c" disabled={false} onSend={async () => true} />, patch);
+    const html = composer();
     assert.equal(attr(html, 'textarea', 'aria-label'), 'Message');
-    assert.match(html, /<button[^>]*aria-label="Convert romaji to kana" aria-pressed="true"[^>]*>あ</);
-    assert.equal(attr(render(<Composer chatId="c" disabled={false} onSend={() => {}} />, { uiLanguage: 'ja' }), 'textarea', 'aria-label'), 'メッセージ');
+    // No aria-label replacing what is on screen, and the state only in aria-pressed, not in the title too.
+    assert.match(html, /<button[^>]*aria-pressed="true">あ<span class="sr-only"> Convert romaji to kana while typing<\/span><\/button>/);
+    assert.doesNotMatch(html, /romaji-toggle[^>]*title=/);
+    assert.match(composer({ romajiInput: false }), /aria-pressed="false">A<span class="sr-only">/);
+    assert.equal(attr(composer({ uiLanguage: 'ja' }), 'textarea', 'aria-label'), 'メッセージ');
   });
 
-  test('the sidebar marks the open chat and the chosen language', () => {
+  test('the sidebar marks the open chat, and the language is one choice of two', () => {
     const chats: ChatSummary[] = ['a', 'b'].map((id) => ({ id, title: id.toUpperCase(), topic: '', createdAt: '', updatedAt: '2026-01-01T00:00:00Z' }));
-    const props = { chats, onSelect: () => {}, onNew: () => {}, onRename: () => {}, onDelete: () => {}, onSettings: () => {} };
+    const props = { chats, asideRef: { current: null }, onSelect: () => {}, onNew: () => {}, onRename: () => {}, onDelete: async () => {}, onSettings: () => {} };
     const html = render(<Sidebar {...props} activeId="b" />);
     assert.equal(count(html, 'aria-current'), 1);
     assert.match(html, /aria-current="page"><span class="chat-title jp">B</);
-    assert.match(html, /aria-pressed="true"[^>]*>EN</);
-    assert.match(html, /aria-pressed="false"[^>]*>日本語</);
-    assert.match(render(<Sidebar {...props} activeId={null} />, { uiLanguage: 'ja' }), /aria-pressed="true"[^>]*>日本語</);
+    assert.match(html, /role="radiogroup" aria-label="Interface language"/);
+    assert.match(html, /<label class="active"><input type="radio" name="ui-language" checked=""\/>EN<\/label>/);
+    assert.match(html, /<label class=""><input type="radio" name="ui-language"\/>日本語<\/label>/);
+    assert.match(render(<Sidebar {...props} activeId={null} />, { uiLanguage: 'ja' }), /<label class="active"><input type="radio" name="ui-language" checked=""\/>日本語/);
   });
 
-  test('the WaniKani slider and number box are each named, with the hint as their description', () => {
+  test('the WaniKani level is a group, its slider and number box named apart, with the hint as their description', () => {
     const html = render(<SettingsDialog onClose={() => {}} />, { wkLevel: 5 });
-    const inputs = [...html.matchAll(/<input type="(range|number)"[^>]*>/g)].map((m) => m[0]);
-    assert.equal(inputs.length, 2);
+    const group = html.match(/<div class="field" role="group" aria-labelledby="([^"]+)"><label class="field-label" id="([^"]+)" for="([^"]+)">/);
+    assert.ok(group);
+    assert.equal(group[1], group[2]);
+    const [slider, box] = [...html.matchAll(/<input[^>]*type="(range|number)"[^>]*>/g)].map((m) => m[0]);
+    assert.ok(slider.includes(`id="${group[3]}"`), 'the heading is the slider\'s label');
+    assert.match(slider, /aria-label="WaniKani level"/);
+    assert.match(box, /aria-label="Type a WaniKani level"/);
     const hint = html.match(/<small class="muted" id="([^"]+)">Your partner may use the \d+ kanji from levels 1–5/)?.[1];
     assert.ok(hint);
-    for (const input of inputs) {
-      assert.match(input, /aria-label="WaniKani level"/);
-      assert.ok(input.includes(`aria-describedby="${hint}"`));
+    for (const input of [slider, box]) assert.ok(input.includes(`aria-describedby="${hint}"`));
+  });
+
+  test('every other field\'s hint describes its control rather than running into its name', () => {
+    for (const patch of [{ provider: 'endpoint' as const }, { provider: 'claude' as const }]) {
+      const html = render(<SettingsDialog onClose={() => {}} />, patch);
+      // No <label> wraps a control any more, so no hint (or chosen option) can become part of a name.
+      assert.equal(count(html, '<label class="field">'), 0);
+      for (const [, id, hintId] of html.matchAll(/<(?:select|input) [^>]*id="([^"]+)"[^>]*aria-describedby="([^"]+)"/g)) {
+        assert.match(html, new RegExp(`<label class="field-label"[^>]* for="${id}">`), `control ${id} has its own label`);
+        assert.ok(html.includes(`<small class="muted" id="${hintId}">`), `control ${id} is described by a hint`);
+      }
     }
+    const genki = render(<SettingsDialog onClose={() => {}} />);
+    assert.match(genki, /<label class="field-label" for="([^"]+)">Genki lesson<\/label><select id="\1" aria-describedby="[^"]+"/);
   });
 });

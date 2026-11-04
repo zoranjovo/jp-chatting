@@ -1,4 +1,5 @@
-import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ChangeEvent, type KeyboardEvent, type Ref } from 'react';
+import { useImperativeHandle, useLayoutEffect, useRef, type ChangeEvent, type KeyboardEvent, type Ref } from 'react';
+import { prependDraft, useDraft } from '../drafts.ts';
 import { useT } from '../i18n.tsx';
 import { romajiToKana } from '../romaji.ts';
 import { useSettings } from '../settings.tsx';
@@ -9,9 +10,6 @@ export interface ComposerHandle {
   focus: () => void;
 }
 
-/** Unsent text per chat, so a draft stays with its own chat when the learner switches to another. */
-const drafts = new Map<string, string>();
-
 export function Composer({
   chatId,
   disabled,
@@ -20,31 +18,28 @@ export function Composer({
 }: {
   chatId: string;
   disabled: boolean;
-  onSend: (text: string) => void;
+  /** Resolves false if the message wasn't stored; its text then goes back in the box. */
+  onSend: (text: string) => Promise<boolean>;
   handle?: Ref<ComposerHandle>;
 }) {
   const t = useT();
   const { settings, update } = useSettings();
-  const [text, setText] = useState(() => drafts.get(chatId) ?? '');
+  // The chat's own draft, read by id, so the text can never belong to another chat.
+  const [text, setText] = useDraft(chatId);
   const ref = useRef<HTMLTextAreaElement>(null);
   const caret = useRef<number | null>(null);
   const romaji = settings.romajiInput;
 
   useImperativeHandle(handle, () => ({
     prepend(message) {
-      setText((current) => (current.trim() ? `${message}\n\n${current}` : message));
+      prependDraft(chatId, message);
       caret.current = message.length;
       ref.current?.focus();
     },
     focus() {
       ref.current?.focus();
     },
-  }), []);
-
-  useEffect(() => {
-    if (text) drafts.set(chatId, text);
-    else drafts.delete(chatId);
-  }, [chatId, text]);
+  }), [chatId]);
 
   // Keep the caret where the user was typing after a conversion changes the text's length.
   useLayoutEffect(() => {
@@ -68,11 +63,11 @@ export function Composer({
     setText(before + value.slice(at));
   };
 
-  const send = () => {
+  const send = async () => {
     const out = (romaji ? romajiToKana(text, true) : text).trim();
     if (!out || disabled) return;
-    onSend(out);
     setText('');
+    if (!(await onSend(out))) prependDraft(chatId, out);
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -88,11 +83,12 @@ export function Composer({
         type="button"
         className={`romaji-toggle ${romaji ? 'on' : ''}`}
         onClick={() => update({ romajiInput: !romaji })}
-        title={romaji ? t.romajiOn : t.romajiOff}
-        aria-label={t.romajiToggle}
+        // Named by the glyph it shows then what it does, so a voice command for what is on screen works;
+        // aria-pressed carries the state. No title: it would only say the name again as a description.
         aria-pressed={romaji}
       >
         {romaji ? 'あ' : 'A'}
+        <span className="sr-only"> {t.romajiInput}</span>
       </button>
       <textarea
         ref={ref}
@@ -108,7 +104,16 @@ export function Composer({
         autoComplete="off"
         spellCheck={false}
       />
-      <button type="button" className="send" onClick={send} disabled={disabled || !text.trim()}>
+      <button
+        type="button"
+        className="send"
+        onClick={(e) => {
+          send();
+          // Sending empties the box, which disables this button and would drop keyboard focus to the page.
+          if (e.detail === 0) ref.current?.focus();
+        }}
+        disabled={disabled || !text.trim()}
+      >
         {t.send}
       </button>
     </div>

@@ -1,7 +1,7 @@
 // An OpenAI-compatible chat completions endpoint: LM Studio, Ollama, llama.cpp,
 // vLLM, OpenRouter, OpenAI itself...
 
-import type { Settings } from '../../shared/types.ts';
+import { needsModel, type Settings } from '../../shared/types.ts';
 import { AiError, parseJsonReply, stripThinking, type AiRequest } from './types.ts';
 
 type EndpointConfig = Settings['endpoint'];
@@ -44,7 +44,7 @@ async function post(config: EndpointConfig, body: Record<string, unknown>): Prom
 }
 
 export async function callEndpoint(request: AiRequest, config: EndpointConfig): Promise<unknown> {
-  if (!config.model) throw new AiError('no model chosen for the endpoint -- pick one in Settings');
+  if (needsModel({ provider: 'endpoint', endpoint: config })) throw new AiError('no model chosen for the endpoint -- pick one in Settings');
   const body: Record<string, unknown> = {
     model: config.model,
     messages: [{ role: 'system', content: request.system }, ...request.turns],

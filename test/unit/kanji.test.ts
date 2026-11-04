@@ -113,6 +113,9 @@ describe('parseWkLevel', () => {
     assert.equal(parseWkLevel('0'), 0);
     assert.equal(parseWkLevel('-3'), 0);
     assert.equal(parseWkLevel('75'), MAX_WK_LEVEL);
+    // Too big for a number is still above the top level, not "no level".
+    assert.equal(parseWkLevel('1e400'), MAX_WK_LEVEL);
+    assert.equal(parseWkLevel('-1e400'), 0);
   });
 
   test('text that is not a number yet is no level, not 0', () => {

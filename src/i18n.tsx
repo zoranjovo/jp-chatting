@@ -37,9 +37,6 @@ const en = {
   composerPlaceholder: 'Write in Japanese… (Enter to send, Shift+Enter for a new line)',
   composerPlaceholderRomaji: 'Type romaji — it turns into kana (CAPS for katakana)…',
   send: 'Send',
-  romajiToggle: 'Convert romaji to kana',
-  romajiOn: 'Romaji → kana is on',
-  romajiOff: 'Romaji → kana is off',
   retryReply: 'Get a reply',
   errorPrefix: 'Something went wrong:',
 
@@ -61,7 +58,8 @@ const en = {
   yourLine: 'You wrote',
   betterLine: 'Better',
   lineOk: 'Good',
-  overLevel: 'Above your WaniKani level',
+  overLevel: (level: number) => `Above your WaniKani level (${level})`,
+  overWrittenLevel: (level: number) => `Above WaniKani level ${level}, the level this was written at`,
   notInWk: 'Not taught on WaniKani',
   wkLevel: 'WaniKani level',
 
@@ -70,6 +68,7 @@ const en = {
   sectionAi: 'AI',
   uiLanguage: 'Interface language',
   wkLevelLabel: 'WaniKani level',
+  wkLevelNumber: 'Type a WaniKani level',
   wkLevelHint: (level: number, count: number) =>
     level === 0 ? 'Kana only — no kanji.' : `Your partner may use the ${count} kanji from levels 1–${level}. Others are written in kana.`,
   furigana: 'Show furigana (readings over kanji)',
@@ -173,9 +172,6 @@ const ja: Strings = {
   composerPlaceholder: '日本語で書いてください…（Enterで送信、Shift+Enterで改行）',
   composerPlaceholderRomaji: 'ローマ字で入力するとかなになります（大文字はカタカナ）…',
   send: '送信',
-  romajiToggle: 'ローマ字をかなに変換',
-  romajiOn: 'ローマ字→かな：オン',
-  romajiOff: 'ローマ字→かな：オフ',
   retryReply: '返信をもらう',
   errorPrefix: 'エラーが発生しました：',
 
@@ -197,7 +193,8 @@ const ja: Strings = {
   yourLine: 'あなたの文',
   betterLine: 'より自然な文',
   lineOk: 'よくできました',
-  overLevel: 'WaniKaniのレベル外',
+  overLevel: (level: number) => `WaniKaniのレベル外（レベル${level}）`,
+  overWrittenLevel: (level: number) => `WaniKaniのレベル外（書かれた時のレベル${level}）`,
   notInWk: 'WaniKaniにない漢字',
   wkLevel: 'WaniKaniレベル',
 
@@ -206,6 +203,7 @@ const ja: Strings = {
   sectionAi: 'AI',
   uiLanguage: '表示言語',
   wkLevelLabel: 'WaniKaniレベル',
+  wkLevelNumber: 'WaniKaniレベルを入力',
   wkLevelHint: (level: number, count: number) =>
     level === 0 ? 'かなのみ（漢字なし）。' : `相手はレベル1〜${level}の漢字${count}字を使えます。それ以外はかなで書きます。`,
   furigana: 'ふりがなを表示する',

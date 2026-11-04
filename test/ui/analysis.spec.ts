@@ -23,9 +23,18 @@ test('screen readers hear when a breakdown is being written and when it is ready
   await mockControl(request, { delayMs: 800 });
   const message = theirs(app).first();
   await message.getByRole('button', { name: 'Breakdown' }).click();
-  const status = message.locator(':scope > [role="status"]');
+  const status = app.locator('.chat > [role="status"]');
   await expect(status).toHaveText('Thinking…');
   await expect(status).toHaveText('Breakdown ready.');
+  // Hidden and shown again from the cache: nothing new to say.
+  await message.getByRole('button', { name: 'Hide' }).click();
+  await expect(status).toHaveText('', { timeout: 8000 });
+  await message.getByRole('button', { name: 'Breakdown' }).click();
+  await expect(message.locator('.analysis-line')).toHaveCount(2);
+  await app.waitForTimeout(300);
+  await expect(status).toHaveText('');
+  // The only status region is the chat's: none per message.
+  await expect(app.getByRole('status')).toHaveCount(1);
 });
 
 test('Breakdown is fetched once, then hidden and shown from the cache', async ({ app, request }) => {
@@ -147,4 +156,20 @@ test('on a wide screen each explanation sits right of its sentence, all on one c
     lefts.push(Math.round(explain.x));
   }
   expect(lefts[0]).toBe(lefts[1]);
+});
+
+test('Redo from the keyboard keeps focus on it while the new analysis is written', async ({ app, request }) => {
+  await startChat(app);
+  const message = theirs(app).first();
+  await message.getByRole('button', { name: 'Breakdown' }).click();
+  await expect(message.locator('.analysis-line')).toHaveCount(2);
+  await mockControl(request, { delayMs: 800 });
+  const redo = message.getByRole('button', { name: 'Redo' });
+  await redo.focus();
+  await app.keyboard.press('Enter');
+  await expect(message.locator('.analysis-busy')).toBeVisible();
+  await expect(redo).toBeFocused();
+  await expect(redo).toHaveAttribute('aria-disabled', 'true');
+  await expect(message.locator('.analysis-line')).toHaveCount(2);
+  await expect(redo).toBeFocused();
 });

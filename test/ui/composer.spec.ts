@@ -36,7 +36,7 @@ test('with romaji input off, text is left as typed, and the choice is remembered
   await expect(toggle).toHaveAttribute('aria-pressed', 'true');
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-pressed', 'false');
-  await expect(toggle).toHaveText('A');
+  await expect(toggle).toHaveText(/^A/);
   await composer(app).pressSequentially('hello');
   await expect(composer(app)).toHaveValue('hello');
 
@@ -47,10 +47,15 @@ test('with romaji input off, text is left as typed, and the choice is remembered
 test('the message box and the romaji switch have names of their own, and the switch says whether it is on', async ({ app }) => {
   await startChat(app);
   await expect(app.getByRole('textbox', { name: 'Message', exact: true })).toBeVisible();
-  const toggle = app.getByRole('button', { name: 'Convert romaji to kana', exact: true });
+  const toggle = app.getByRole('button', { name: /Convert romaji to kana while typing$/ });
+  // The name starts with what the button shows, so "click あ" works for voice control.
+  await expect(toggle).toHaveAccessibleName('あ Convert romaji to kana while typing');
   await expect(toggle).toHaveAttribute('aria-pressed', 'true');
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  await expect(toggle).toHaveAccessibleName('A Convert romaji to kana while typing');
+  // The state is in aria-pressed alone, not said again as a description.
+  await expect(toggle).toHaveAccessibleDescription('');
 });
 
 test('Shift+Enter makes a new line instead of sending', async ({ app }) => {
@@ -117,4 +122,40 @@ test("a rewound message stays in its own chat's composer", async ({ app }) => {
 
   await startChat(app, 'Second');
   await expect(composer(app)).toHaveValue('');
+});
+
+test('a message that fails to send goes back in the composer', async ({ app }) => {
+  await startChat(app);
+  await app.route('**/api/chats/*/messages', (route) => (route.request().method() === 'POST' ? route.abort() : route.continue()));
+  await composer(app).fill('コーヒーをください。');
+  await composer(app).press('Enter');
+  await expect(app.locator('.chat .error')).toBeVisible();
+  await expect(composer(app)).toHaveValue('コーヒーをください。');
+  await expect(mine(app)).toHaveCount(0);
+});
+
+test('a rewind that finishes after switching chats puts the text in its own chat\'s draft', async ({ app }) => {
+  await startChat(app, 'First');
+  await composer(app).fill('コーヒーをください。');
+  await composer(app).press('Enter');
+  await expect(theirs(app)).toHaveCount(2);
+  await startChat(app, 'Second');
+
+  await app.locator('.chat-item', { hasText: 'First' }).locator('.chat-item-main').click();
+  await expect(app.locator('h1')).toHaveText('First');
+  let release!: () => void;
+  const held = new Promise<void>((r) => (release = r));
+  await app.route('**/rewind', async (route) => {
+    await held;
+    await route.continue();
+  });
+  await mine(app).first().getByRole('button', { name: 'Rewind' }).click();
+  await app.locator('.chat-item', { hasText: 'Second' }).locator('.chat-item-main').click();
+  await expect(app.locator('h1')).toHaveText('Second');
+  release();
+  await expect(composer(app)).toHaveValue('');
+
+  await app.locator('.chat-item', { hasText: 'First' }).locator('.chat-item-main').click();
+  await expect(app.locator('h1')).toHaveText('First');
+  await expect(composer(app)).toHaveValue('コーヒーをください。');
 });

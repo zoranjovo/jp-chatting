@@ -1,11 +1,16 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import type { APIRequestContext, Page } from '@playwright/test';
-import type { Settings } from '../../shared/types.ts';
-import { expect, mockCalls, mockControl, startChat, test, theirs } from './fixtures.ts';
+import { DATA_DIR } from '../../playwright.config.ts';
+import type { Chat, Settings } from '../../shared/types.ts';
+import { composer, expect, mockCalls, mockControl, startChat, test, theirs } from './fixtures.ts';
 
 test('Refresh list and Test model keep the keyboard on themselves while they work', async ({ app, request }) => {
   const dialog = await openSettings(app);
   const refresh = dialog.getByRole('button', { name: /Refresh list/ });
   // Let the list the dialog fetches on opening arrive first, so the press below starts a refresh of its own.
+  // (Not done until the models are in: the button reads not-busy for a moment before that fetch starts.)
+  await expect(dialog.getByLabel('Model', { exact: true }).locator('option', { hasText: 'mock-large' })).toHaveCount(1);
   await expect(refresh).toHaveAttribute('aria-disabled', 'false');
   await mockControl(request, { delayMs: 1500 });
   await refresh.focus();
@@ -34,7 +39,7 @@ const saved = async (request: APIRequestContext) => (await (await request.get('/
 
 async function setLevel(page: Page, level: number) {
   const dialog = await openSettings(page);
-  await dialog.getByRole('spinbutton', { name: 'WaniKani level' }).fill(String(level));
+  await dialog.getByRole('spinbutton', { name: 'Type a WaniKani level' }).fill(String(level));
   await dialog.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 }
@@ -65,32 +70,49 @@ test('a new reply at a low level spells those kanji out in kana', async ({ app }
   await expect(theirs(app).first().locator('.over-level')).toHaveCount(0);
 });
 
-test('raising the level in settings is saved, and leaves earlier messages unmarked', async ({ app, request }) => {
+/** Rewrites the level a stored message was stamped with: the reply pipeline never lets a new one break its level. */
+function stampLevel(chatId: string, index: number, wkLevel: number) {
+  const file = path.join(DATA_DIR, 'chats', `${chatId}.json`);
+  const chat = JSON.parse(fs.readFileSync(file, 'utf8')) as Chat;
+  chat.messages[index].context!.wkLevel = wkLevel;
+  fs.writeFileSync(file, JSON.stringify(chat));
+}
+
+test('kanji above the level a message was written at are marked, naming that level, whatever the level is now', async ({ app, request }) => {
   await startChat(app);
-  await setLevel(app, 3);
-  await expect(theirs(app).first().locator('.over-level')).toHaveCount(0);
+  const [chat] = (await (await request.get('/api/chats')).json()) as Chat[];
+  // 何 is level 5 and 飲 level 10: written at 7, only 飲 is above it.
+  stampLevel(chat.id, 0, 7);
+  await app.reload();
+  const over = theirs(app).first().locator('.over-level');
+  await expect(over).toHaveCount(1);
+  await expect(over).toHaveText('飲');
+  await expect(over).toHaveAttribute('title', /^Above WaniKani level 7, the level this was written at\n飲 — Drink · WaniKani level 10/);
+
+  // Raising the level now is saved, and doesn't change how the message is judged.
   const dialog = await openSettings(app);
-  await dialog.getByRole('spinbutton', { name: 'WaniKani level' }).fill('60');
+  await dialog.getByRole('spinbutton', { name: 'Type a WaniKani level' }).fill('60');
   await expect(dialog).toContainText('levels 1–60');
   await dialog.getByRole('button', { name: 'Save' }).click();
   await expect(app.getByRole('dialog')).toHaveCount(0);
-  await expect(theirs(app).first().locator('.over-level')).toHaveCount(0);
   expect((await saved(request)).wkLevel).toBe(60);
+  await expect(over).toHaveCount(1);
 });
 
 test('level 0 means kana only', async ({ app }) => {
   const dialog = await openSettings(app);
-  await dialog.getByRole('spinbutton', { name: 'WaniKani level' }).fill('0');
+  await dialog.getByRole('spinbutton', { name: 'Type a WaniKani level' }).fill('0');
   await expect(dialog).toContainText('Kana only');
 });
 
 async function clearLevelBox(page: Page) {
   const dialog = await openSettings(page);
-  const box = dialog.locator('input[type="number"]');
+  const box = dialog.getByRole('spinbutton', { name: 'Type a WaniKani level' });
   await box.click();
   await page.keyboard.press('ControlOrMeta+a');
   await page.keyboard.press('Backspace');
-  return { dialog, box, slider: dialog.locator('input[type="range"]'), label: dialog.locator('.field', { hasText: 'WaniKani level' }).locator('strong') };
+  const slider = dialog.getByRole('slider', { name: 'WaniKani level', exact: true });
+  return { dialog, box, slider, label: dialog.getByRole('group', { name: /^WaniKani level/ }).locator('strong') };
 }
 
 test('the level box can be emptied and retyped without a 0 creeping in', async ({ app, request }) => {
@@ -126,6 +148,25 @@ test('a negative level becomes 0, and Enter in the box saves it', async ({ app, 
   expect((await saved(request)).wkLevel).toBe(0);
 });
 
+for (const [typed, level] of [['2.5', 3], ['75', 60]] as const) {
+  test(`Enter in the level box saves ${typed} as ${level}`, async ({ app, request }) => {
+    const { box, label } = await clearLevelBox(app);
+    await box.pressSequentially(typed);
+    await expect(label).toHaveText(String(level));
+    await box.press('Enter');
+    await expect(app.getByRole('dialog')).toHaveCount(0);
+    expect((await saved(request)).wkLevel).toBe(level);
+  });
+}
+
+test('the Save button saves a level still typed as a fraction', async ({ app, request }) => {
+  const { dialog, box } = await clearLevelBox(app);
+  await box.pressSequentially('7.4');
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect(app.getByRole('dialog')).toHaveCount(0);
+  expect((await saved(request)).wkLevel).toBe(7);
+});
+
 test('leaving the level box empty keeps the level it had', async ({ app }) => {
   const { dialog, box, slider, label } = await clearLevelBox(app);
   await expect(label).toHaveText('10');
@@ -135,16 +176,29 @@ test('leaving the level box empty keeps the level it had', async ({ app }) => {
   await expect(dialog).toContainText('levels 1–10');
 });
 
-test('the WaniKani slider and number box are named on their own, with the hint as their description', async ({ app }) => {
+test('the WaniKani slider and number box are named apart, in a group, with the hint as their description', async ({ app }) => {
   const dialog = await openSettings(app);
+  await expect(dialog.getByRole('group', { name: 'WaniKani level: 10' })).toBeVisible();
   const slider = dialog.getByRole('slider', { name: 'WaniKani level', exact: true });
-  const box = dialog.getByRole('spinbutton', { name: 'WaniKani level', exact: true });
+  const box = dialog.getByRole('spinbutton', { name: 'Type a WaniKani level', exact: true });
   await expect(slider).toHaveValue('10');
   await expect(box).toHaveValue('10');
   await expect(slider).toHaveAccessibleDescription(/kanji from levels 1–10\./);
   await box.fill('4');
   await expect(slider).toHaveValue('4');
   await expect(box).toHaveAccessibleDescription(/kanji from levels 1–4\./);
+  // Clicking the heading focuses the slider, as a label should.
+  await dialog.locator('.field-label', { hasText: 'WaniKani level' }).click();
+  await expect(slider).toBeFocused();
+});
+
+test('a select is named by its label alone, with its hint as the description', async ({ app }) => {
+  const dialog = await openSettings(app);
+  const genki = dialog.getByRole('combobox', { name: 'Genki lesson', exact: true });
+  await expect(genki).toHaveAccessibleName('Genki lesson');
+  await expect(genki).not.toHaveAccessibleDescription('');
+  await expect(dialog.getByRole('combobox', { name: 'JLPT level', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('textbox', { name: 'Endpoint URL', exact: true })).toBeVisible();
 });
 
 test('furigana can be turned off', async ({ app }) => {
@@ -219,7 +273,7 @@ test('the Claude CLI option lists its models and its own settings', async ({ app
 
 test('the interface switches to Japanese and stays that way', async ({ app }) => {
   await startChat(app);
-  await app.getByRole('button', { name: '日本語' }).click();
+  await app.locator('.lang-switch label', { hasText: '日本語' }).click();
   await expect(app.getByRole('button', { name: '+ 新しいチャット' })).toBeVisible();
   await expect(theirs(app).first().getByRole('button', { name: '解説' })).toBeVisible();
   await expect(app.locator('html')).toHaveAttribute('lang', 'ja');
@@ -232,9 +286,9 @@ test('the interface switches to Japanese and stays that way', async ({ app }) =>
 });
 
 test('switching back to English', async ({ app }) => {
-  await app.getByRole('button', { name: '日本語' }).click();
+  await app.locator('.lang-switch label', { hasText: '日本語' }).click();
   await expect(app.getByRole('heading', { name: 'チャットで日本語を練習しよう' })).toBeVisible();
-  await app.getByRole('button', { name: 'EN', exact: true }).click();
+  await app.locator('.lang-switch label', { hasText: 'EN' }).click();
   await expect(app.getByRole('heading', { name: 'Practise Japanese by chatting' })).toBeVisible();
 });
 
@@ -254,7 +308,7 @@ test('choosing the Claude CLI shows the personal-use notice, with links to the t
 });
 
 test('the personal-use notice is translated', async ({ app }) => {
-  await app.getByRole('button', { name: '日本語' }).click();
+  await app.locator('.lang-switch label', { hasText: '日本語' }).click();
   const dialog = await openSettings(app);
   await dialog.getByText('Claude Code CLI', { exact: true }).click();
   await expect(dialog.getByRole('note')).toContainText('自分だけの個人利用に限ります');
@@ -330,4 +384,26 @@ test('with no model chosen, a chat cannot be started and Settings is one click a
   await expect(app.locator('.setup-notice')).toHaveCount(0);
   await startChat(app);
   expect((await saved(request)).endpoint.model).toBe('mock-small');
+});
+
+test('the model notice waits for the saved settings, and stays away if they never come', async ({ app }) => {
+  // The defaults have no model, so a notice drawn before the settings arrive would be wrong for nearly everyone.
+  await app.route('**/api/settings', (route) => (route.request().method() === 'GET' ? route.abort() : route.continue()));
+  await app.reload();
+  await expect(app.locator('.error')).toBeVisible();
+  await expect(app.locator('.setup-notice')).toHaveCount(0);
+  await app.locator('.empty').getByRole('button', { name: '+ New chat' }).click();
+  await expect(app.getByRole('dialog').getByRole('button', { name: 'Start' })).toBeEnabled();
+});
+
+test('a chat that can\'t get a reply for want of a model offers Settings too', async ({ app, request }) => {
+  await startChat(app);
+  await request.put('/api/settings', { data: { provider: 'endpoint', endpoint: { model: '' } } });
+  await app.reload();
+  await composer(app).fill('こんにちは');
+  await composer(app).press('Enter');
+  const chat = app.locator('.chat');
+  await expect(chat.locator('.error')).toContainText('no model chosen');
+  await chat.locator('.setup-notice').getByRole('button', { name: 'Open Settings' }).click();
+  await expect(app.getByRole('dialog').getByRole('heading', { name: 'Settings' })).toBeVisible();
 });

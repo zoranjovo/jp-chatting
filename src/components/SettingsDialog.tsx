@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react';
-import { flushSync } from 'react-dom';
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { genkiBook, MAX_GENKI_LESSON } from '../../shared/genki.ts';
 import { asJlptLevel, JLPT_LEVELS } from '../../shared/jlpt.ts';
 import { allowedKanji, MAX_WK_LEVEL, parseWkLevel } from '../../shared/kanji.ts';
-import { ENDPOINT_REASONING, type ClaudeEffort, type EndpointReasoning, type ModelList, type Settings } from '../../shared/types.ts';
+import { ENDPOINT_REASONING, needsModel, type ClaudeEffort, type EndpointReasoning, type ModelList, type Settings } from '../../shared/types.ts';
 import { api } from '../api.ts';
 import { useT } from '../i18n.tsx';
 import { useSettings } from '../settings.tsx';
@@ -33,14 +32,9 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const setEndpoint = (patch: Partial<Settings['endpoint']>) => setDraft((d) => ({ ...d, endpoint: { ...d.endpoint, ...patch } }));
   const setClaude = (patch: Partial<Settings['claude']>) => setDraft((d) => ({ ...d, claude: { ...d.claude, ...patch } }));
 
-  // The number box keeps its own text so it can be emptied and retyped; the level follows whenever the text is a number,
-  // and the box shows the level again (clamped, whole) when it loses focus.
-  const [wkText, setWkText] = useState(String(settings.wkLevel));
-  const setWkLevel = (level: number) => {
-    set('wkLevel', level);
-    setWkText(String(level));
-  };
-  const showWkLevel = () => setWkText(String(draft.wkLevel));
+  // While the number box is being typed in it shows the text as typed, so it can be emptied and retyped; the level
+  // follows whenever the text is a number. Otherwise it shows the level itself, so nothing can leave the two apart.
+  const [wkTyped, setWkTyped] = useState<string | null>(null);
 
   const loadModels = useCallback(async (provider: Settings['provider'], endpoint: Settings['endpoint']) => {
     setLoading(true);
@@ -89,85 +83,84 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const current = draft.provider === 'claude' ? draft.claude.model : draft.endpoint.model;
   const options = models?.models ?? [];
   const kanjiCount = allowedKanji(draft.wkLevel).length;
-  const wkHintId = useId();
+  const wkIds = { label: useId(), slider: useId(), hint: useId() };
 
   return (
     <Dialog title={t.settingsTitle} onClose={onClose}>
       {(close) => (
-        <form onSubmit={(e) => submit(e, close)} className="form">
+        // noValidate: the level box may hold "2.5" or "-3" mid-edit; the level it stands for is already clamped.
+        <form onSubmit={(e) => submit(e, close)} className="form" noValidate>
           <h3>{t.sectionLearning}</h3>
-          <label className="field">
-            <span>{t.uiLanguage}</span>
-            <select value={draft.uiLanguage} onChange={(e) => set('uiLanguage', e.target.value as Settings['uiLanguage'])}>
-              <option value="en">English</option>
-              <option value="ja">日本語</option>
-            </select>
-          </label>
+          <Field label={t.uiLanguage}>
+            {(a11y) => (
+              <select {...a11y} value={draft.uiLanguage} onChange={(e) => set('uiLanguage', e.target.value as Settings['uiLanguage'])}>
+                <option value="en">English</option>
+                <option value="ja">日本語</option>
+              </select>
+            )}
+          </Field>
 
-          {/* Not a <label>: one around both inputs names only the slider, with the number and the hint run into it. */}
-          <div className="field">
-            <span>
+          {/* Two controls for one level: a group named by the heading, each control with a name of its own. */}
+          <div className="field" role="group" aria-labelledby={wkIds.label}>
+            <label className="field-label" id={wkIds.label} htmlFor={wkIds.slider}>
               {t.wkLevelLabel}: <strong>{draft.wkLevel}</strong>
-            </span>
+            </label>
             <div className="level-row">
               <input
+                id={wkIds.slider}
                 type="range"
                 min={0}
                 max={MAX_WK_LEVEL}
                 value={draft.wkLevel}
-                onChange={(e) => setWkLevel(Number(e.target.value))}
+                onChange={(e) => set('wkLevel', Number(e.target.value))}
                 aria-label={t.wkLevelLabel}
-                aria-describedby={wkHintId}
+                aria-describedby={wkIds.hint}
               />
               <input
                 type="number"
                 min={0}
                 max={MAX_WK_LEVEL}
-                value={wkText}
+                value={wkTyped ?? String(draft.wkLevel)}
                 onChange={(e) => {
-                  setWkText(e.target.value);
+                  setWkTyped(e.target.value);
                   const level = parseWkLevel(e.target.value);
                   if (level !== null) set('wkLevel', level);
                 }}
-                onBlur={showWkLevel}
-                onKeyDown={(e) => {
-                  // Enter submits straight from the box, so the box must show the clamped level before native validation runs.
-                  if (e.key === 'Enter') flushSync(showWkLevel);
-                }}
-                aria-label={t.wkLevelLabel}
-                aria-describedby={wkHintId}
+                onBlur={() => setWkTyped(null)}
+                aria-label={t.wkLevelNumber}
+                aria-describedby={wkIds.hint}
               />
             </div>
-            <small className="muted" id={wkHintId}>
+            <small className="muted" id={wkIds.hint}>
               {t.wkLevelHint(draft.wkLevel, kanjiCount)}
             </small>
           </div>
 
-          <label className="field">
-            <span>{t.genkiLabel}</span>
-            <select value={draft.genkiLesson} onChange={(e) => set('genkiLesson', Number(e.target.value))}>
-              <option value={0}>{t.genkiNone}</option>
-              {Array.from({ length: MAX_GENKI_LESSON }, (_, i) => i + 1).map((lesson) => (
-                <option key={lesson} value={lesson}>
-                  {t.genkiLesson(genkiBook(lesson), lesson)}
-                </option>
-              ))}
-            </select>
-            <small className="muted">{draft.genkiLesson > 0 ? t.genkiHint(draft.genkiLesson) : t.genkiNoneHint}</small>
-          </label>
+          <Field label={t.genkiLabel} hint={draft.genkiLesson > 0 ? t.genkiHint(draft.genkiLesson) : t.genkiNoneHint}>
+            {(a11y) => (
+              <select {...a11y} value={draft.genkiLesson} onChange={(e) => set('genkiLesson', Number(e.target.value))}>
+                <option value={0}>{t.genkiNone}</option>
+                {Array.from({ length: MAX_GENKI_LESSON }, (_, i) => i + 1).map((lesson) => (
+                  <option key={lesson} value={lesson}>
+                    {t.genkiLesson(genkiBook(lesson), lesson)}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
 
-          <label className="field">
-            <span>{t.jlptLabel}</span>
-            <select value={draft.jlptLevel} onChange={(e) => set('jlptLevel', asJlptLevel(e.target.value))}>
-              <option value={0}>{t.jlptNone}</option>
-              {JLPT_LEVELS.map((level) => (
-                <option key={level} value={level}>
-                  {t.jlptOption(level)}
-                </option>
-              ))}
-            </select>
-            <small className="muted">{t.jlptHint}</small>
-          </label>
+          <Field label={t.jlptLabel} hint={t.jlptHint}>
+            {(a11y) => (
+              <select {...a11y} value={draft.jlptLevel} onChange={(e) => set('jlptLevel', asJlptLevel(e.target.value))}>
+                <option value={0}>{t.jlptNone}</option>
+                {JLPT_LEVELS.map((level) => (
+                  <option key={level} value={level}>
+                    {t.jlptOption(level)}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
 
           <label className="check">
             <input type="checkbox" checked={draft.furigana} onChange={(e) => set('furigana', e.target.checked)} />
@@ -212,44 +205,61 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
 
           {draft.provider === 'endpoint' ? (
             <>
-              <label className="field">
-                <span>{t.baseUrl}</span>
-                <input value={draft.endpoint.baseUrl} onChange={(e) => setEndpoint({ baseUrl: e.target.value })} placeholder="http://localhost:1234/v1" />
-                <small className="muted">{t.baseUrlHint}</small>
-              </label>
-              <label className="field">
-                <span>{t.apiKey}</span>
-                <input type="password" value={draft.endpoint.apiKey} onChange={(e) => setEndpoint({ apiKey: e.target.value })} autoComplete="off" />
-              </label>
-              <label className="field">
-                <span>{t.thinking}</span>
-                <select value={draft.endpoint.reasoning} onChange={(e) => setEndpoint({ reasoning: e.target.value as EndpointReasoning })}>
-                  {ENDPOINT_REASONING.map((r) => (
-                    <option key={r} value={r}>
-                      {t.thinkingOption(r)}
-                    </option>
-                  ))}
-                </select>
-                <small className="muted">{t.thinkingHint}</small>
-              </label>
+              <Field label={t.baseUrl} hint={t.baseUrlHint}>
+                {(a11y) => (
+                  <input
+                    {...a11y}
+                    value={draft.endpoint.baseUrl}
+                    onChange={(e) => setEndpoint({ baseUrl: e.target.value })}
+                    placeholder="http://localhost:1234/v1"
+                  />
+                )}
+              </Field>
+              <Field label={t.apiKey}>
+                {(a11y) => (
+                  <input
+                    {...a11y}
+                    type="password"
+                    value={draft.endpoint.apiKey}
+                    onChange={(e) => setEndpoint({ apiKey: e.target.value })}
+                    autoComplete="off"
+                  />
+                )}
+              </Field>
+              <Field label={t.thinking} hint={t.thinkingHint}>
+                {(a11y) => (
+                  <select
+                    {...a11y}
+                    value={draft.endpoint.reasoning}
+                    onChange={(e) => setEndpoint({ reasoning: e.target.value as EndpointReasoning })}
+                  >
+                    {ENDPOINT_REASONING.map((r) => (
+                      <option key={r} value={r}>
+                        {t.thinkingOption(r)}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </Field>
             </>
           ) : (
             <>
-              <label className="field">
-                <span>{t.claudeCommand}</span>
-                <input value={draft.claude.command} onChange={(e) => setClaude({ command: e.target.value })} placeholder="claude" />
-                <small className="muted">{t.claudeHint}</small>
-              </label>
-              <label className="field">
-                <span>{t.effort}</span>
-                <select value={draft.claude.effort} onChange={(e) => setClaude({ effort: e.target.value as ClaudeEffort })}>
-                  {EFFORTS.map((e) => (
-                    <option key={e} value={e}>
-                      {e || t.effortDefault}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <Field label={t.claudeCommand} hint={t.claudeHint}>
+                {(a11y) => (
+                  <input {...a11y} value={draft.claude.command} onChange={(e) => setClaude({ command: e.target.value })} placeholder="claude" />
+                )}
+              </Field>
+              <Field label={t.effort}>
+                {(a11y) => (
+                  <select {...a11y} value={draft.claude.effort} onChange={(e) => setClaude({ effort: e.target.value as ClaudeEffort })}>
+                    {EFFORTS.map((e) => (
+                      <option key={e} value={e}>
+                        {e || t.effortDefault}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </Field>
             </>
           )}
 
@@ -285,7 +295,8 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               </small>
             )}
             {models && !models.error && !loading && options.length === 0 && <small className="muted">{t.noModels}</small>}
-            {draft.provider === 'endpoint' && !draft.endpoint.model && !loading && <small className="warn-text">{t.noModelWarning}</small>}
+            {/* Only when nothing above already explains the empty picker. */}
+            {needsModel(draft) && !loading && !models?.error && options.length > 0 && <small className="warn-text">{t.noModelWarning}</small>}
           </div>
 
           <div className="field model-test">
@@ -323,5 +334,35 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
         </form>
       )}
     </Dialog>
+  );
+}
+
+/**
+ * A labelled control. The label names the control alone and the hint describes it: a <label> wrapped round
+ * both would run the hint (and a select's chosen option) into the control's name.
+ */
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: ReactNode;
+  hint?: ReactNode;
+  children: (a11y: { id: string; 'aria-describedby'?: string }) => ReactNode;
+}) {
+  const id = useId();
+  const hintId = useId();
+  return (
+    <div className="field">
+      <label className="field-label" htmlFor={id}>
+        {label}
+      </label>
+      {children({ id, 'aria-describedby': hint ? hintId : undefined })}
+      {hint && (
+        <small className="muted" id={hintId}>
+          {hint}
+        </small>
+      )}
+    </div>
   );
 }
