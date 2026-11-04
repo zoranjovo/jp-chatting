@@ -2,6 +2,7 @@ import {
   FloatingPortal,
   autoUpdate,
   flip,
+  hide,
   offset,
   shift,
   useDismiss,
@@ -12,19 +13,29 @@ import {
   useRole,
 } from '@floating-ui/react';
 import { type ReactNode, useState } from 'react';
+import { anchoredStyle, listBoundary } from './floating.ts';
 
 /**
  * A short label that pops up while the pointer is over its child (or keyboard focus is on it).
  * The child keeps its own aria-label; the tooltip is the visible counterpart. The wrapper span
  * takes the hover, so a disabled button still gets its tooltip.
+ *
+ * The message actions sit in a row under the text, with more buttons beside them, so every label
+ * goes below its button, whatever its height -- covering neither the message nor the other actions.
+ * Above is the fallback when there is no room below in the message list.
  */
 export function Tooltip({ label, children }: { label: ReactNode; children: ReactNode }) {
   const [open, setOpen] = useState(false);
-  const { refs, floatingStyles, context } = useFloating({
+  const { refs, floatingStyles, context, middlewareData, isPositioned } = useFloating({
     open,
     onOpenChange: setOpen,
-    placement: 'top',
-    middleware: [offset(6), flip(), shift({ padding: 8 })],
+    placement: 'bottom',
+    middleware: [
+      offset(6),
+      flip((state) => ({ crossAxis: false, fallbackPlacements: ['top'], ...listBoundary(state) })),
+      shift((state) => ({ padding: 8, ...listBoundary(state) })),
+      hide(),
+    ],
     whileElementsMounted: autoUpdate,
   });
   const { getReferenceProps, getFloatingProps } = useInteractions([
@@ -41,7 +52,7 @@ export function Tooltip({ label, children }: { label: ReactNode; children: React
       </span>
       {open && (
         <FloatingPortal>
-          <div className="tooltip" ref={refs.setFloating} style={floatingStyles} {...getFloatingProps()}>
+          <div className="tooltip" ref={refs.setFloating} style={anchoredStyle(floatingStyles, middlewareData, isPositioned)} {...getFloatingProps()}>
             {label}
           </div>
         </FloatingPortal>

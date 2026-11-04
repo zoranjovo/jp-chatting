@@ -1,4 +1,4 @@
-import { test as base, expect, type APIRequestContext, type Page } from '@playwright/test';
+import { test as base, expect, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 import type { Chat, ChatSummary, Settings } from '../../shared/types.ts';
 import { MOCK_PORT } from '../../playwright.config.ts';
 
@@ -54,6 +54,34 @@ export async function startChat(page: Page, topic = '') {
 export const theirs = (page: Page) => page.locator('.message.theirs');
 export const mine = (page: Page) => page.locator('.message.mine');
 export const composer = (page: Page) => page.locator('.composer textarea');
+
+type Box = { x: number; y: number; width: number; height: number };
+const overlap = (a: Box, b: Box, margin = 0) =>
+  a.x < b.x + b.width + margin && b.x < a.x + a.width + margin && a.y < b.y + b.height + margin && b.y < a.y + a.height + margin;
+
+/**
+ * Waits for the one open tooltip to be placed next to `button` (it starts at the page's corner before
+ * floating-ui has positioned it), then checks it leaves `clear` — the message's text — uncovered, and
+ * the other buttons in the action row too.
+ */
+export async function expectTooltipBeside(page: Page, button: Locator, clear: Locator) {
+  const tooltip = page.locator('.tooltip');
+  await expect(tooltip).toHaveCount(1);
+  await expect
+    .poll(async () => {
+      const [tip, anchor] = await Promise.all([tooltip.boundingBox(), button.boundingBox()]);
+      return !!tip && !!anchor && overlap(tip, anchor, 8);
+    })
+    .toBe(true);
+  const [tip, text, own] = await Promise.all([tooltip.boundingBox(), clear.boundingBox(), button.boundingBox()]);
+  expect(overlap(tip!, text!), `tooltip ${JSON.stringify(tip)} covers the text ${JSON.stringify(text)}`).toBe(false);
+  const row = button.locator('xpath=ancestor::div[contains(@class, "bubble-actions")]').getByRole('button');
+  for (const other of await row.all()) {
+    const box = await other.boundingBox();
+    if (!box || (box.x === own!.x && box.y === own!.y)) continue;
+    expect(overlap(tip!, box), `tooltip ${JSON.stringify(tip)} covers another action at ${JSON.stringify(box)}`).toBe(false);
+  }
+}
 
 export async function chatsOnDisk(request: APIRequestContext): Promise<Chat[]> {
   const list = (await (await request.get('/api/chats')).json()) as ChatSummary[];
