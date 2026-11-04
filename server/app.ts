@@ -206,13 +206,15 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
     '/api/chats/:id/reply',
     route(async (req, res) => {
       const id = String(req.params.id);
+      // Taken before anything is awaited: a reply in flight now may land while the chat loads, and is still the one to join.
+      const inFlight = replies.get(id);
       const settings = await store.getSettings();
       const chat = await loadChat(id);
       const answering = chat.messages.at(-1)?.id;
       // The partner never answers itself: a page that was waiting for a reply that has since landed gets the chat as it is.
       if (chat.messages.at(-1)?.role === 'assistant') return res.json(chat);
       const key = JSON.stringify(settings);
-      let pending = replies.get(id);
+      let pending = replies.get(id) ?? inFlight;
       if (!pending || pending.answering !== answering || pending.settings !== key) {
         const reply: Promise<Chat> = writeReply(chat, settings).finally(() => {
           if (replies.get(id)?.reply === reply) replies.delete(id);
