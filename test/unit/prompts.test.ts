@@ -180,12 +180,20 @@ describe('feedbackRequest', () => {
     const earlier = ['一', '二', '三', '四', '五', '六', '七'].map((n) => msg('assistant', n));
     const content = feedbackRequest(settings(), 'polite', msg('user', 'x'), earlier).turns[0].content;
     assert.ok(!content.includes('一'));
-    assert.match(content, /Partner: 二/);
+    assert.match(content, /Partner: 二\nPartner: 三\nPartner: 四\nPartner: 五\nPartner: 六\nPartner: 七\n\nThe learner's message/);
   });
 
-  test('works for a first message with nothing before it', () => {
+  test('labels a multi-line message once, with its further lines indented, and strips the learner\'s markup', () => {
+    const earlier = [msg('user', 'ボストンから きました。\n\nユキさんは？'), msg('assistant', 'とうきょうです。')];
+    const content = feedbackRequest(settings(), 'polite', msg('user', '{東京|とうきょう}ですか'), earlier).turns[0].content;
+    assert.match(content, /Learner: ボストンから きました。\n {2}\n {2}ユキさんは？\nPartner: とうきょうです。\n\nThe learner's message:\n東京ですか$/);
+  });
+
+  test('works for a first message with nothing before it, and says nothing of a conversation', () => {
     const req = feedbackRequest(settings(), 'polite', msg('user', 'hello'));
     assert.ok(!req.turns[0].content.includes('conversation'));
+    assert.ok(!req.system.includes('"Learner" lines'));
+    assert.match(feedbackRequest(settings(), 'polite', msg('user', 'x'), [msg('assistant', 'y')]).system, /"Learner" lines are theirs/);
   });
 
   test('speaks to the learner as you, and keeps the speakers apart', () => {

@@ -225,12 +225,13 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
 
       // Under the settings the message was written with, so changing them since doesn't change the answer.
       const settings = settingsFor(await store.getSettings(), message.context);
+      const earlier = chat.messages.slice(0, index);
       let patch: Partial<Message>;
       if (message.role === 'assistant') {
-        patch = { breakdown: await generateBreakdown(deps.callAi, settings, message, chat.messages.slice(0, index)) };
+        patch = { breakdown: await generateBreakdown(deps.callAi, settings, message, earlier) };
       } else {
         const politeness = message.context?.politeness ?? chat.politeness;
-        patch = { feedback: await generateFeedback(deps.callAi, settings, politeness, message, chat.messages.slice(0, index)) };
+        patch = { feedback: await generateFeedback(deps.callAi, settings, politeness, message, earlier) };
       }
       const saved = await updateChat(id, (c) => {
         const m = c.messages.find((x) => x.id === mid);
