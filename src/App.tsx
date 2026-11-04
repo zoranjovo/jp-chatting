@@ -6,6 +6,7 @@ import { ChatSettingsDialog, type ChatPatch } from './components/ChatSettingsDia
 import { NewChatDialog } from './components/NewChatDialog.tsx';
 import { SettingsDialog } from './components/SettingsDialog.tsx';
 import { SetupNotice } from './components/SetupNotice.tsx';
+import { setDraft } from './drafts.ts';
 import { Sidebar } from './components/Sidebar.tsx';
 import { LanguageProvider, useT } from './i18n.tsx';
 import { SettingsContext } from './settings.tsx';
@@ -114,13 +115,15 @@ function Shell({ loadError }: { loadError: string | null }) {
   };
 
   const send = async (text: string) => {
-    if (!chat) return;
+    if (!chat) return false;
     const id = chat.id;
     try {
       show(await api.send(id, text));
       requestReply(id);
+      return true;
     } catch (err) {
       setErrors((e) => ({ ...e, [id]: (err as Error).message }));
+      return false;
     }
   };
 
@@ -157,6 +160,7 @@ function Shell({ loadError }: { loadError: string | null }) {
 
   const remove = async (id: string) => {
     await api.deleteChat(id);
+    setDraft(id, '');
     if (activeId.current === id) {
       activeId.current = null;
       setChat(null);
