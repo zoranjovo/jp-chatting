@@ -9,6 +9,8 @@ test('Refresh list and Test model keep the keyboard on themselves while they wor
   const dialog = await openSettings(app);
   const refresh = dialog.getByRole('button', { name: /Refresh list/ });
   // Let the list the dialog fetches on opening arrive first, so the press below starts a refresh of its own.
+  // (Not done until the models are in: the button reads not-busy for a moment before that fetch starts.)
+  await expect(dialog.getByLabel('Model', { exact: true }).locator('option', { hasText: 'mock-large' })).toHaveCount(1);
   await expect(refresh).toHaveAttribute('aria-disabled', 'false');
   await mockControl(request, { delayMs: 1500 });
   await refresh.focus();
