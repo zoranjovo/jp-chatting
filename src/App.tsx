@@ -6,6 +6,7 @@ import { ChatSettingsDialog, type ChatPatch } from './components/ChatSettingsDia
 import { NewChatDialog } from './components/NewChatDialog.tsx';
 import { SettingsDialog } from './components/SettingsDialog.tsx';
 import { SetupNotice } from './components/SetupNotice.tsx';
+import { setDraft } from './drafts.ts';
 import { Sidebar } from './components/Sidebar.tsx';
 import { LanguageProvider, useT } from './i18n.tsx';
 import { useBackToClose } from './back.ts';
@@ -13,10 +14,17 @@ import { SettingsContext } from './settings.tsx';
 
 export function App() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.settings().then(setSettings, (err: Error) => setLoadError(err.message));
+    api.settings().then(
+      (s) => {
+        setSettings(s);
+        setLoaded(true);
+      },
+      (err: Error) => setLoadError(err.message),
+    );
   }, []);
 
   const update = useCallback(async (patch: Partial<Settings>) => {
@@ -28,7 +36,7 @@ export function App() {
     document.documentElement.lang = settings.uiLanguage;
   }, [settings.uiLanguage]);
 
-  const state = useMemo(() => ({ settings, update }), [settings, update]);
+  const state = useMemo(() => ({ settings, loaded, update }), [settings, loaded, update]);
 
   return (
     <SettingsContext.Provider value={state}>
@@ -44,14 +52,17 @@ function Shell({ loadError }: { loadError: string | null }) {
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [chat, setChat] = useState<Chat | null>(null);
   const [waiting, setWaiting] = useState<Set<string>>(new Set());
-  const waitingRef = useRef(waiting);
-  waitingRef.current = waiting;
   const [errors, setErrors] = useState<Record<string, string | null>>({});
   const [dialog, setDialog] = useState<'new' | 'settings' | 'chat' | null>(null);
   const [navOpen, setNavOpen] = useState(false);
   const activeId = useRef<string | null>(null);
 
   const refreshList = useCallback(() => api.chats().then(setChats).catch(() => {}), []);
+
+  /** Counts the chats shown, so a slow load can tell a newer one (a reply that landed meanwhile) has replaced it. */
+  const shown = useRef(0);
+  /** Chats whose reply this page is waiting for, updated at once so two callers in one tick can't both ask. */
+  const pending = useRef(new Set<string>());
 
   /**
    * Each chat has its own history entry (#<id>), so Back goes to the previous chat and a reload stays put.
@@ -66,7 +77,9 @@ function Shell({ loadError }: { loadError: string | null }) {
 
   /** Shows a chat the server returned, if it is still the one on screen. */
   const show = useCallback((next: Chat) => {
-    if (activeId.current === next.id) setChat(next);
+    if (activeId.current !== next.id) return;
+    shown.current += 1;
+    setChat(next);
   }, []);
 
   const setBusy = useCallback(
@@ -81,6 +94,8 @@ function Shell({ loadError }: { loadError: string | null }) {
   );
 
   const requestReply = useCallback(async (id: string) => {
+    if (pending.current.has(id)) return;
+    pending.current.add(id);
     setBusy(id, true);
     setErrors((e) => ({ ...e, [id]: null }));
     try {
@@ -88,6 +103,7 @@ function Shell({ loadError }: { loadError: string | null }) {
     } catch (err) {
       setErrors((e) => ({ ...e, [id]: (err as Error).message }));
     } finally {
+      pending.current.delete(id);
       setBusy(id, false);
       refreshList();
     }
@@ -98,10 +114,13 @@ function Shell({ loadError }: { loadError: string | null }) {
     showInUrl(id, replace);
     setNavOpen(false);
     try {
+      const before = shown.current;
       const loaded = await api.chat(id);
+      // A reply landed while this was loading: what is on screen is newer.
+      if (shown.current !== before) return;
       show(loaded);
       // A reply this page didn't ask for (it was reloaded while waiting): wait for it like any other.
-      if (loaded.replying && !waitingRef.current.has(id)) requestReply(id);
+      if (loaded.replying) requestReply(id);
     } catch (err) {
       setErrors((e) => ({ ...e, [id]: (err as Error).message }));
     }
@@ -143,13 +162,15 @@ function Shell({ loadError }: { loadError: string | null }) {
   };
 
   const send = async (text: string) => {
-    if (!chat) return;
+    if (!chat) return false;
     const id = chat.id;
     try {
       show(await api.send(id, text));
       requestReply(id);
+      return true;
     } catch (err) {
       setErrors((e) => ({ ...e, [id]: (err as Error).message }));
+      return false;
     }
   };
 
@@ -186,6 +207,7 @@ function Shell({ loadError }: { loadError: string | null }) {
 
   const remove = async (id: string) => {
     await api.deleteChat(id);
+    setDraft(id, '');
     if (activeId.current === id) {
       activeId.current = null;
       setChat(null);
@@ -241,6 +263,7 @@ function Shell({ loadError }: { loadError: string | null }) {
             onRetry={() => requestReply(chat.id)}
             onMessageUpdated={messageUpdated}
             onRewind={rewind}
+            onOpenSettings={() => setDialog('settings')}
           />
         ) : (
           <div className="empty">
