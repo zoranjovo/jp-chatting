@@ -339,13 +339,18 @@ describe('kanji marks follow the level a message was written at', () => {
     assert.equal(count(bubble(message, 3), 'over-level'), 0);
   });
 
-  test('a message is still marked for kanji above the level it was written at', () => {
-    assert.ok(count(bubble({ ...message, context: { ...stamp, wkLevel: 3 } }, 60), 'over-level') > 0);
+  test('a message is still marked for kanji above the level it was written at, and only those, naming that level', () => {
+    // 何 is level 5, 飲 level 10: at a stamp of 7 only 飲 is above it.
+    const html = bubble({ ...message, context: { ...stamp, wkLevel: 7 } }, 60);
+    assert.equal(count(html, 'over-level'), 1);
+    assert.match(html, /class="kanji over-level" title="Above WaniKani level 7, the level this was written at\n飲/);
   });
 
-  test('a message from before stamping uses the current level', () => {
+  test('a message from before stamping uses the current level, and says so', () => {
     const { context: _, ...old } = message;
-    assert.ok(count(bubble(old, 3), 'over-level') > 0);
+    const html = bubble(old, 7);
+    assert.equal(count(html, 'over-level'), 1);
+    assert.match(html, /title="Above your WaniKani level \(7\)\n飲/);
     assert.equal(count(bubble(old, 20), 'over-level'), 0);
   });
 });

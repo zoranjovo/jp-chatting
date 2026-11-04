@@ -1,5 +1,8 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import type { APIRequestContext, Page } from '@playwright/test';
-import type { Settings } from '../../shared/types.ts';
+import { DATA_DIR } from '../../playwright.config.ts';
+import type { Chat, Settings } from '../../shared/types.ts';
 import { composer, expect, mockCalls, mockControl, startChat, test, theirs } from './fixtures.ts';
 
 test('Refresh list and Test model keep the keyboard on themselves while they work', async ({ app, request }) => {
@@ -65,17 +68,33 @@ test('a new reply at a low level spells those kanji out in kana', async ({ app }
   await expect(theirs(app).first().locator('.over-level')).toHaveCount(0);
 });
 
-test('raising the level in settings is saved, and leaves earlier messages unmarked', async ({ app, request }) => {
+/** Rewrites the level a stored message was stamped with: the reply pipeline never lets a new one break its level. */
+function stampLevel(chatId: string, index: number, wkLevel: number) {
+  const file = path.join(DATA_DIR, 'chats', `${chatId}.json`);
+  const chat = JSON.parse(fs.readFileSync(file, 'utf8')) as Chat;
+  chat.messages[index].context!.wkLevel = wkLevel;
+  fs.writeFileSync(file, JSON.stringify(chat));
+}
+
+test('kanji above the level a message was written at are marked, naming that level, whatever the level is now', async ({ app, request }) => {
   await startChat(app);
-  await setLevel(app, 3);
-  await expect(theirs(app).first().locator('.over-level')).toHaveCount(0);
+  const [chat] = (await (await request.get('/api/chats')).json()) as Chat[];
+  // 何 is level 5 and 飲 level 10: written at 7, only 飲 is above it.
+  stampLevel(chat.id, 0, 7);
+  await app.reload();
+  const over = theirs(app).first().locator('.over-level');
+  await expect(over).toHaveCount(1);
+  await expect(over).toHaveText('飲');
+  await expect(over).toHaveAttribute('title', /^Above WaniKani level 7, the level this was written at\n飲 — Drink · WaniKani level 10/);
+
+  // Raising the level now is saved, and doesn't change how the message is judged.
   const dialog = await openSettings(app);
   await dialog.locator('input[type="number"]').fill('60');
   await expect(dialog).toContainText('levels 1–60');
   await dialog.getByRole('button', { name: 'Save' }).click();
   await expect(app.getByRole('dialog')).toHaveCount(0);
-  await expect(theirs(app).first().locator('.over-level')).toHaveCount(0);
   expect((await saved(request)).wkLevel).toBe(60);
+  await expect(over).toHaveCount(1);
 });
 
 test('level 0 means kana only', async ({ app }) => {
