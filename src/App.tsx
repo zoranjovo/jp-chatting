@@ -10,6 +10,7 @@ import { setDraft } from './drafts.ts';
 import { Sidebar } from './components/Sidebar.tsx';
 import { LanguageProvider, useT } from './i18n.tsx';
 import { onHistory, useBackToClose, whenSettled } from './back.ts';
+import { NARROW, useMediaQuery } from './layout.ts';
 import { SettingsContext } from './settings.tsx';
 
 export function App() {
@@ -59,6 +60,37 @@ function Shell({ loadError }: { loadError: string | null }) {
   const [focusChat, setFocusChat] = useState<string | null>(null);
   const composerFocused = useCallback(() => setFocusChat(null), []);
   const activeId = useRef<string | null>(null);
+  const narrow = useMediaQuery(NARROW);
+  const drawer = narrow && navOpen;
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const sidebar = useRef<HTMLElement>(null);
+
+  // Widening the window (say, rotating a tablet) leaves no drawer to be open; it mustn't spring open again when narrowed.
+  useEffect(() => {
+    if (!narrow) setNavOpen(false);
+  }, [narrow]);
+
+  // The drawer, as a keyboard sees it: opening it moves focus in, Escape closes it, and closing it
+  // brings focus back to the menu button unless something else (a dialog, the composer) has taken it.
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (drawer) sidebar.current?.querySelector<HTMLElement>('button')?.focus();
+    else if (wasOpen.current) {
+      const at = document.activeElement;
+      if (!at || at === document.body || sidebar.current?.contains(at)) menuButton.current?.focus();
+    }
+    wasOpen.current = drawer;
+  }, [drawer]);
+  useEffect(() => {
+    if (!drawer || dialog) return;
+    const onKey = (e: KeyboardEvent) => {
+      // Not when something else answers this Escape: a dialog (the sidebar's own Rename and Delete too), or an IME.
+      if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing || document.querySelector('dialog[open]')) return;
+      setNavOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [drawer, dialog]);
 
   const refreshList = useCallback(() => api.chats().then(setChats).catch(() => {}), []);
 
@@ -248,6 +280,9 @@ function Shell({ loadError }: { loadError: string | null }) {
   return (
     <div className={`app ${navOpen ? 'nav-open' : ''}`}>
       <Sidebar
+        // Off screen behind the menu: out of the tab order and the accessibility tree until opened.
+        inert={narrow && !navOpen}
+        asideRef={sidebar}
         chats={chats}
         activeId={chat?.id ?? null}
         onSelect={select}
@@ -257,9 +292,17 @@ function Shell({ loadError }: { loadError: string | null }) {
         onSettings={() => setDialog('settings')}
       />
       <div className="scrim" onClick={() => setNavOpen(false)} />
-      <main className="main">
+      <main className="main" inert={drawer}>
         <header className="topbar">
-          <button type="button" className="icon-button menu-button" onClick={() => setNavOpen(true)} aria-label={t.menu}>
+          <button
+            ref={menuButton}
+            type="button"
+            className="icon-button menu-button"
+            onClick={() => setNavOpen(true)}
+            aria-label={t.menu}
+            aria-expanded={navOpen}
+            aria-controls="sidebar"
+          >
             ☰
           </button>
           <h1 className="jp">{chat ? chat.title || t.untitled : t.appName}</h1>

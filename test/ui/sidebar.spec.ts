@@ -91,6 +91,12 @@ test('a failed delete leaves no focus move pending to fire later', async ({ app 
   await expect(composer(app)).toBeFocused();
 });
 
+test('on a wide screen the sidebar is always in the tab order', async ({ app }) => {
+  await startChat(app, 'Desk');
+  await expect(app.locator('.sidebar')).not.toHaveAttribute('inert');
+  await expect(app.locator('.main')).not.toHaveAttribute('inert');
+});
+
 test('a chat can be renamed', async ({ app, request }) => {
   await startChat(app, 'Old name');
   await app.locator('.chat-item.active').getByRole('button', { name: 'Rename chat' }).click();
