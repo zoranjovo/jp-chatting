@@ -64,14 +64,16 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
 
   /**
    * One read-modify-write at a time per chat, so a reply and a breakdown finishing together don't overwrite each other.
-   * `touch` moves the chat to the top of the list; only changes to the conversation itself do, not analyses or renames.
+   * The change says what it did: only a change to the `conversation` moves the chat to the top of the list; `meta`
+   * (analyses, renames) saves it in place; `none` saves nothing.
    */
   const locks = new Map<string, Promise<unknown>>();
-  async function updateChat(id: string, change: (chat: Chat) => void, touch = true): Promise<Chat> {
+  async function updateChat(id: string, change: (chat: Chat) => 'conversation' | 'meta' | 'none'): Promise<Chat> {
     const run = (locks.get(id) ?? Promise.resolve()).then(async () => {
       const chat = await loadChat(id);
-      change(chat);
-      if (touch) chat.updatedAt = store.now();
+      const changed = change(chat);
+      if (changed === 'none') return chat;
+      if (changed === 'conversation') chat.updatedAt = store.now();
       return store.saveChat(chat);
     });
     locks.set(id, run.catch(() => undefined));
@@ -146,7 +148,8 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
           if (title) chat.title = title;
           if (topic !== undefined) chat.topic = topic;
           if (politeness) chat.politeness = politeness;
-        }, false),
+          return 'meta';
+        }),
       );
     }),
   );
@@ -171,6 +174,7 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
       res.json(
         await updateChat(String(req.params.id), (chat) => {
           chat.messages.push({ id: store.newId(), role: 'user', content, createdAt: store.now(), context: contextOf(settings, chat.politeness) });
+          return 'conversation';
         }),
       );
     }),
@@ -189,9 +193,10 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
       res.json(
         await updateChat(id, (chat) => {
           // Rewound while the reply was being written: it answers a history that is gone.
-          if (chat.messages.at(-1)?.id !== answering) return;
+          if (chat.messages.at(-1)?.id !== answering) return 'none';
           chat.messages.push(message);
           if (!chat.title) chat.title = titleFrom(content);
+          return 'conversation';
         }),
       );
     }),
@@ -208,6 +213,7 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
           if (index < 0) throw new NotFound('message not found');
           if (chat.messages[index].role !== 'user') throw new BadRequest("only the learner's messages can be rewound to");
           chat.messages.splice(index);
+          return 'conversation';
         }),
       );
     }),
@@ -236,14 +242,12 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
         const politeness = message.context?.politeness ?? chat.politeness;
         patch = { feedback: await generateFeedback(deps.callAi, settings, politeness, message, previous) };
       }
-      const saved = await updateChat(
-        id,
-        (c) => {
-          const m = c.messages.find((x) => x.id === mid);
-          if (m) Object.assign(m, patch);
-        },
-        false,
-      );
+      const saved = await updateChat(id, (c) => {
+        const m = c.messages.find((x) => x.id === mid);
+        if (!m) return 'none';
+        Object.assign(m, patch);
+        return 'meta';
+      });
       const analysed = saved.messages.find((m) => m.id === mid);
       if (!analysed) throw new NotFound('message not found -- rewound while it was being analysed');
       res.json(analysed);

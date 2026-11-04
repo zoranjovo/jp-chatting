@@ -144,6 +144,8 @@ describe('chats API', () => {
   test('lists chats newest first', async () => {
     const a = await newChat('first');
     const b = await newChat('second');
+    // So the timestamps can't tie.
+    await new Promise((r) => setTimeout(r, 5));
     await send(a.id, 'bump');
     const list = (await api<Chat[]>('GET', '/api/chats')).body.map((c) => c.id);
     assert.ok(list.indexOf(a.id) < list.indexOf(b.id));
@@ -154,6 +156,7 @@ describe('chats API', () => {
     const tick = () => new Promise((r) => setTimeout(r, 5));
     const a = await newChat('older');
     await reply(a.id);
+    const learner = (await send(a.id, 'hi')).body.messages[1];
     await tick();
     const b = await newChat('newer');
     const opener = (await api<Chat>('GET', `/api/chats/${a.id}`)).body.messages[0];
@@ -161,6 +164,8 @@ describe('chats API', () => {
     assert.deepEqual(await order(), [b.id, a.id]);
 
     await analyze(a.id, opener.id);
+    await analyze(a.id, learner.id);
+    await analyze(a.id, opener.id, true);
     await api('PATCH', `/api/chats/${a.id}`, { title: 'Renamed', topic: 'Other', politeness: 'casual' });
     assert.deepEqual(await order(), [b.id, a.id]);
 
@@ -684,11 +689,14 @@ describe('rewind', () => {
     answers.chat = () => new Promise((r) => (finish = () => r('おそい')));
     const late = reply(chat.id);
     await new Promise((r) => setTimeout(r, 20));
-    await rewind(chat.id, sent.messages[1].id);
+    const rewound = (await rewind(chat.id, sent.messages[1].id)).body;
+    await new Promise((r) => setTimeout(r, 5));
     finish();
     const res = await late;
     assert.equal(res.status, 200);
     assert.deepEqual(res.body.messages.map((m) => m.content), [sent.messages[0].content]);
+    // Nothing was added, so the chat keeps its place in the list.
+    assert.equal((await api<Chat>('GET', `/api/chats/${chat.id}`)).body.updatedAt, rewound.updatedAt);
   });
 
   test('an analysis that finishes after its message was rewound is a 404 and saves nothing', async () => {
