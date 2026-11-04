@@ -53,7 +53,8 @@ export interface FeedbackCase {
   name: string;
   level: number;
   genki?: number;
-  previous: string;
+  /** The conversation before the message, ending with the partner's message it answers. */
+  earlier: Message[];
   message: string;
   verdicts: Feedback['verdict'][];
   /** The corrected Japanese should contain one of these. */
@@ -104,17 +105,36 @@ export const CASES: Case[] = [
     level: 20,
     message: '{週末|しゅうまつ}は{何|なに}してた？{私|わたし}は{友達|ともだち}と{映画|えいが}を{見|み}に{行|い}ったよ。',
   },
-  { kind: 'feedback', name: 'feedback · correct order', level: 10, previous: CAFE_OPENER, message: 'コーヒーをおねがいします。', verdicts: ['correct'], expect: ['コーヒーを'] },
-  { kind: 'feedback', name: 'feedback · wrong particle', level: 10, previous: CAFE_OPENER, message: 'コーヒーがおねがいします。', verdicts: ['minor', 'incorrect'], expect: ['コーヒーを'] },
-  { kind: 'feedback', name: 'feedback · English input', level: 10, previous: CAFE_OPENER, message: 'Can I have a coffee please?', verdicts: ['english'], expect: ['コーヒー'] },
+  { kind: 'feedback', name: 'feedback · correct order', level: 10, earlier: [msg('assistant', CAFE_OPENER)], message: 'コーヒーをおねがいします。', verdicts: ['correct'], expect: ['コーヒーを'] },
+  { kind: 'feedback', name: 'feedback · wrong particle', level: 10, earlier: [msg('assistant', CAFE_OPENER)], message: 'コーヒーがおねがいします。', verdicts: ['minor', 'incorrect'], expect: ['コーヒーを'] },
+  { kind: 'feedback', name: 'feedback · English input', level: 10, earlier: [msg('assistant', CAFE_OPENER)], message: 'Can I have a coffee please?', verdicts: ['english'], expect: ['コーヒー'] },
   {
     kind: 'feedback',
     name: 'feedback · wrong tense',
     level: 20,
-    previous: '{週末|しゅうまつ}は{何|なに}をしましたか？',
+    earlier: [msg('assistant', '{週末|しゅうまつ}は{何|なに}をしましたか？')],
     message: 'ともだちと えいがを みます。',
     verdicts: ['minor', 'incorrect'],
     expect: ['みました', '{見|み}ました', '見ました'],
+  },
+  // Who said what: the partner introduces itself and asks; the learner answers. The feedback must not swap them.
+  {
+    kind: 'feedback',
+    name: "feedback · answers the partner's question",
+    level: 10,
+    earlier: [msg('assistant', 'はじめまして！ユキです。{大学生|だいがくせい}です。'), msg('user', 'はじめまして。サムです。'), msg('assistant', 'サムさんは アメリカの どこから {来|き}ましたか？')],
+    message: 'ボストンから きました。ユキさんは どこから きましたか？',
+    verdicts: ['correct', 'minor'],
+    expect: ['ボストン'],
+  },
+  {
+    kind: 'feedback',
+    name: 'feedback · English question to the partner',
+    level: 10,
+    earlier: [msg('assistant', 'どんな {音楽|おんがく}が {好|す}きですか？'), msg('assistant', 'ジャズですか？ロックですか？')],
+    message: "I don't understand. What does ongaku mean?",
+    verdicts: ['english'],
+    expect: ['{音楽|おんがく}', '音楽', 'おんがく'],
   },
   // Genki: the same kinds of scenario with the grammar guided to early lessons.
   { kind: 'reply', name: 'genki · opener · café · lesson 3', level: 10, genki: 3, politeness: 'polite', topic: 'Ordering at a café', messages: [] },
@@ -264,6 +284,10 @@ function scoreFeedback(c: FeedbackCase, f: Feedback): Pick<Result, 'problems' | 
       lines: f.lines.length > 0 && f.lines.every((l) => l.translation.trim() && l.explanation.trim()),
       originalTranslated: f.lines.every((l) => l.ok || (l.originalTranslation ?? '').trim().length > 0),
       noBrackets: ![f.meaning, f.summary, ...f.lines.flatMap((l) => [l.translation, l.explanation])].some((t) => /[「」]/.test(t)),
+      // Shown under "You said" and spoken to the learner, so never about them in the third person, and the meaning in their own voice.
+      addressesLearner:
+        ![f.meaning, f.summary, ...f.lines.map((l) => l.explanation)].some((t) => /\bthe (learner|student|user)\b/i.test(t)) &&
+        !/^\s*(they|he|she)\b/i.test(f.meaning),
     },
   };
 }
@@ -301,7 +325,7 @@ async function runCase(model: string, c: Case, sample: number): Promise<Result> 
       const b = await generateBreakdown(recording, settingsFor(model, c.level, c.genki, c.jlpt), msg('assistant', c.message), c.earlier ?? []);
       return { ...base, ms: Date.now() - started, output: b, ...scoreBreakdown(c, b) };
     }
-    const f = await generateFeedback(recording, settingsFor(model, c.level, c.genki), 'polite', msg('user', c.message), msg('assistant', c.previous));
+    const f = await generateFeedback(recording, settingsFor(model, c.level, c.genki), 'polite', msg('user', c.message), c.earlier);
     return { ...base, ms: Date.now() - started, output: f, ...scoreFeedback(c, f) };
   } catch (err) {
     return { ...base, ms: Date.now() - started, error: (err as Error).message, output: null, problems: { kanji: [], furigana: [], foreign: [] }, checks: { ran: false } };
