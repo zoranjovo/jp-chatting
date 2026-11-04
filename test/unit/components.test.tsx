@@ -412,8 +412,8 @@ describe('message info', () => {
 
   test('Claude\'s default effort is named, and the labels follow the UI language', () => {
     const html = render(<ContextDetails context={{ ...ctx, effort: undefined }} createdAt={message.createdAt} />, { uiLanguage: 'ja' });
-    assert.ok(html.includes('<dt>思考レベル</dt><dd>モデルの既定</dd>'));
-    assert.ok(render(<ContextDetails context={{ ...ctx, effort: 'xhigh' }} createdAt="" />, { uiLanguage: 'ja' }).includes('<dt>思考レベル</dt><dd>超高</dd>'));
+    assert.ok(html.includes('<dt>思考レベル</dt><dd>CLIの既定</dd>'));
+    assert.ok(render(<ContextDetails context={{ ...ctx, effort: 'xhigh' }} createdAt="" />, { uiLanguage: 'ja' }).includes('<dt>思考レベル</dt><dd>とても高い</dd>'));
     assert.ok(html.includes('<dd>げんきI・第6課</dd>'));
   });
 });

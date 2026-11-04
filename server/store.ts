@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { MAX_GENKI_LESSON } from '../shared/genki.ts';
 import { asJlptLevel } from '../shared/jlpt.ts';
 import { clampWkLevel } from '../shared/kanji.ts';
-import { DEFAULT_SETTINGS, ENDPOINT_REASONING, type Chat, type ChatSummary, type Politeness, type Settings } from '../shared/types.ts';
+import { asClaudeEffort, asEndpointReasoning, DEFAULT_SETTINGS, type Chat, type ChatSummary, type Politeness, type Settings } from '../shared/types.ts';
 
 const DEFAULT_DATA_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
 
@@ -74,12 +74,14 @@ const CLAUDE_ALIASES: Record<string, string> = { '': 'claude-sonnet-5-5', haiku:
 function withDefaults(saved: (Partial<Settings> & { politeness?: unknown }) | null): Settings {
   const claude = { ...DEFAULT_SETTINGS.claude, ...saved?.claude };
   claude.model = CLAUDE_ALIASES[claude.model] ?? claude.model;
+  // A value an older build (or a hand edit) left behind would be passed to the CLI as it is, and refused.
+  claude.effort = asClaudeEffort(claude.effort);
   // politeness moved to each chat; migrateLegacy() hands it to the chats that predate that.
   const { politeness: _moved, ...rest } = saved ?? {};
   return {
     ...DEFAULT_SETTINGS,
     ...rest,
-    endpoint: { ...DEFAULT_SETTINGS.endpoint, ...saved?.endpoint },
+    endpoint: { ...DEFAULT_SETTINGS.endpoint, ...saved?.endpoint, reasoning: asEndpointReasoning(saved?.endpoint?.reasoning) },
     claude,
   };
 }
@@ -116,7 +118,6 @@ export function saveSettings(patch: Partial<Settings>): Promise<Settings> {
     next.wkLevel = clampWkLevel(Number(next.wkLevel) || 0);
     next.genkiLesson = Math.max(0, Math.min(MAX_GENKI_LESSON, Math.round(Number(next.genkiLesson) || 0)));
     next.jlptLevel = asJlptLevel(next.jlptLevel);
-    if (!ENDPOINT_REASONING.includes(next.endpoint.reasoning)) next.endpoint.reasoning = '';
     await writeJson(settingsFile(), next);
     return next;
   });

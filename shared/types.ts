@@ -5,11 +5,22 @@ import type { JlptLevel } from './jlpt.ts';
 export type UiLanguage = 'en' | 'ja';
 export type Politeness = 'polite' | 'casual';
 export type ProviderKind = 'endpoint' | 'claude';
-export type ClaudeEffort = '' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
-export const CLAUDE_EFFORTS: ClaudeEffort[] = ['', 'low', 'medium', 'high', 'xhigh', 'max'];
+/** Passed to the Claude CLI as --effort; '' passes nothing (the CLI's own default). */
+export const CLAUDE_EFFORTS = ['', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
+export type ClaudeEffort = (typeof CLAUDE_EFFORTS)[number];
 /** Sent to an endpoint as reasoning_effort; '' sends nothing (the model's default), 'none' turns thinking off. */
-export type EndpointReasoning = '' | 'none' | 'low' | 'medium' | 'high';
-export const ENDPOINT_REASONING: EndpointReasoning[] = ['', 'none', 'low', 'medium', 'high'];
+export const ENDPOINT_REASONING = ['', 'none', 'low', 'medium', 'high'] as const;
+export type EndpointReasoning = (typeof ENDPOINT_REASONING)[number];
+
+/** A stored or stamped value as a Claude effort; anything else (an old or hand-edited value) is the default. */
+export function asClaudeEffort(v: unknown): ClaudeEffort {
+  return CLAUDE_EFFORTS.find((e) => e === v) ?? '';
+}
+
+/** A stored or stamped value as an endpoint's reasoning setting; anything else is the default. */
+export function asEndpointReasoning(v: unknown): EndpointReasoning {
+  return ENDPOINT_REASONING.find((r) => r === v) ?? '';
+}
 
 export interface Settings {
   uiLanguage: UiLanguage;

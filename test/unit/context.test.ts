@@ -56,6 +56,13 @@ describe('message context', () => {
     assert.equal(claude.claude.effort, '', '"none" is not a Claude effort');
   });
 
+  test('a stamped effort that is no Claude effort at all is the default, not passed to the CLI', () => {
+    // As a hand-edited chat file (or a newer version) could have it.
+    const stamp = { ...contextOf(claude, 'polite'), effort: 'turbo' as never };
+    assert.equal(settingsFor(DEFAULT_SETTINGS, stamp).claude.effort, '');
+    assert.equal(settingsFor(DEFAULT_SETTINGS, { ...stamp, effort: 'max' }).claude.effort, 'max');
+  });
+
   test('no stamp leaves the settings as they are', () => {
     assert.equal(settingsFor(claude, undefined), claude);
   });

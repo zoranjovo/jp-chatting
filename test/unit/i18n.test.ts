@@ -54,11 +54,22 @@ describe('UI strings', () => {
       for (const r of ENDPOINT_REASONING) assert.notEqual(dict.thinkingOption(r), r, `thinking ${r}`);
       assert.doesNotMatch(dict.thinkingHint, /reasoning_effort/);
     }
-    assert.deepEqual(CLAUDE_EFFORTS.map(en.effortOption), ['Model default', 'Low', 'Medium', 'High', 'Extra high', 'Max']);
-    assert.deepEqual(CLAUDE_EFFORTS.map(ja.effortOption), ['モデルの既定', '低', '中', '高', '超高', '最大']);
+    // Claude's '' sends no --effort: the CLI's default, which may not be the model's.
+    assert.deepEqual(CLAUDE_EFFORTS.map(en.effortOption), ['CLI default', 'Low', 'Medium', 'High', 'Extra high', 'Max']);
+    assert.deepEqual(CLAUDE_EFFORTS.map(ja.effortOption), ['CLIの既定', '低', '中', '高', 'とても高い', '最大']);
+    assert.deepEqual(ENDPOINT_REASONING.map(en.thinkingOption), ['Model default', 'Off', 'Low', 'Medium', 'High']);
     assert.deepEqual(ENDPOINT_REASONING.map(ja.thinkingOption), ['モデルの既定', 'オフ', '低', '中', '高']);
     assert.equal(en.effortMeta('xhigh'), 'Effort: Extra high');
     assert.equal(ja.effortMeta('max'), '思考レベル：最大');
+  });
+
+  test('a value with no label shows as it is, never as something inherited or the other provider\'s label', () => {
+    for (const dict of [en, ja]) {
+      assert.equal(dict.effortMeta('constructor').endsWith('constructor'), true);
+      assert.equal(dict.effortOption('toString'), 'toString');
+      // 'none' is an endpoint value; a Claude effort of 'none' is not "Off".
+      assert.equal(dict.effortOption('none'), 'none');
+    }
   });
 
   test('every feedback verdict has a label in both languages', () => {
