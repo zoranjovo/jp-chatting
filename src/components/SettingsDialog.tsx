@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { genkiBook, MAX_GENKI_LESSON } from '../../shared/genki.ts';
 import { asJlptLevel, JLPT_LEVELS } from '../../shared/jlpt.ts';
-import { allowedKanji, MAX_WK_LEVEL } from '../../shared/kanji.ts';
+import { allowedKanji, MAX_WK_LEVEL, parseWkLevel } from '../../shared/kanji.ts';
 import { ENDPOINT_REASONING, needsModel, type ClaudeEffort, type EndpointReasoning, type ModelList, type Settings } from '../../shared/types.ts';
 import { api } from '../api.ts';
 import { useT } from '../i18n.tsx';
@@ -31,6 +31,10 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const set = <K extends keyof Settings>(key: K, value: Settings[K]) => setDraft((d) => ({ ...d, [key]: value }));
   const setEndpoint = (patch: Partial<Settings['endpoint']>) => setDraft((d) => ({ ...d, endpoint: { ...d.endpoint, ...patch } }));
   const setClaude = (patch: Partial<Settings['claude']>) => setDraft((d) => ({ ...d, claude: { ...d.claude, ...patch } }));
+
+  // While the number box is being typed in it shows the text as typed, so it can be emptied and retyped; the level
+  // follows whenever the text is a number. Otherwise it shows the level itself, so nothing can leave the two apart.
+  const [wkTyped, setWkTyped] = useState<string | null>(null);
 
   const loadModels = useCallback(async (provider: Settings['provider'], endpoint: Settings['endpoint']) => {
     setLoading(true);
@@ -83,7 +87,8 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   return (
     <Dialog title={t.settingsTitle} onClose={onClose}>
       {(close) => (
-        <form onSubmit={(e) => submit(e, close)} className="form">
+        // noValidate: the level box may hold "2.5" or "-3" mid-edit; the level it stands for is already clamped.
+        <form onSubmit={(e) => submit(e, close)} className="form" noValidate>
           <h3>{t.sectionLearning}</h3>
           <label className="field">
             <span>{t.uiLanguage}</span>
@@ -103,8 +108,13 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
                 type="number"
                 min={0}
                 max={MAX_WK_LEVEL}
-                value={draft.wkLevel}
-                onChange={(e) => set('wkLevel', Math.max(0, Math.min(MAX_WK_LEVEL, Number(e.target.value) || 0)))}
+                value={wkTyped ?? String(draft.wkLevel)}
+                onChange={(e) => {
+                  setWkTyped(e.target.value);
+                  const level = parseWkLevel(e.target.value);
+                  if (level !== null) set('wkLevel', level);
+                }}
+                onBlur={() => setWkTyped(null)}
               />
             </div>
             <small className="muted">{t.wkLevelHint(draft.wkLevel, kanjiCount)}</small>
