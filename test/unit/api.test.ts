@@ -222,8 +222,10 @@ describe('conversation', () => {
     answers.chat = () => new Promise<string>((r) => (finish = r));
     const first = reply(chat.id);
     await until(() => chatCalls() === 1);
+    // Any second model call answers at once, so a regression fails the count below instead of hanging the run.
+    answers.chat = DEFAULT_ANSWERS.chat;
     assert.equal((await api<Chat>('GET', `/api/chats/${chat.id}`)).body.replying, true);
-    // Whether it joins the first or arrives after it landed, the second gets the same chat and makes no call.
+    // Whether it joins the first, catches it just as it lands, or arrives after, the second gets the same chat and makes no call.
     const second = reply(chat.id);
     finish('はい、どうぞ。');
     const [a, b] = await Promise.all([first, second]);
