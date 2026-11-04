@@ -46,7 +46,7 @@ export function Sidebar({
     const items = aside.current?.querySelectorAll<HTMLButtonElement>('.chat-item-main');
     const next = (index >= 0 ? items?.[index] : undefined) ?? aside.current?.querySelector<HTMLButtonElement>('.new-chat');
     next?.focus();
-  }, [refocus, chats]);
+  }, [refocus, chats, aside]);
 
   const setLanguage = (uiLanguage: UiLanguage) => update({ uiLanguage });
 
