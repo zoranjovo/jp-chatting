@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { useBackToClose } from '../back.ts';
 
 /** Matches the dialog-out animation in styles.css. */
@@ -16,14 +16,18 @@ export function Dialog({
   title,
   onClose,
   small,
+  describedBy,
   children,
 }: {
   title: string;
   onClose: () => void;
   small?: boolean;
+  /** The id of the element that explains the dialog (a confirmation's question), read out after the title. */
+  describedBy?: string;
   children: ReactNode | ((close: CloseDialog) => ReactNode);
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   const [closing, setClosing] = useState(false);
   // A ref as well as the state: a `close` from an earlier render (one awaited in a submit handler) must still see it.
   const closed = useRef(false);
@@ -53,6 +57,8 @@ export function Dialog({
     <dialog
       ref={ref}
       className={`dialog ${small ? 'small' : ''} ${closing ? 'closing' : ''}`}
+      aria-labelledby={titleId}
+      aria-describedby={describedBy}
       onCancel={(e) => {
         e.preventDefault();
         close();
@@ -62,7 +68,7 @@ export function Dialog({
       }}
     >
       <div className="dialog-body">
-        <h2>{title}</h2>
+        <h2 id={titleId}>{title}</h2>
         {typeof children === 'function' ? children(close) : children}
       </div>
     </dialog>
@@ -85,11 +91,14 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const messageId = useId();
   return (
-    <Dialog title={title} onClose={onCancel} small>
+    <Dialog title={title} onClose={onCancel} small describedBy={messageId}>
       {(close) => (
         <>
-          <p className="dialog-message">{message}</p>
+          <p className="dialog-message" id={messageId}>
+            {message}
+          </p>
           <div className="dialog-actions">
             <button type="button" className="secondary" onClick={() => close()}>
               {cancelLabel}

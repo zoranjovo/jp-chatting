@@ -288,7 +288,9 @@ button[aria-disabled='true'] {
   padding: 3px;
 }
 
-.lang-switch button {
+.lang-switch label {
+  text-align: center;
+  cursor: pointer;
   flex: 1;
   background: none;
   border: none;
@@ -299,7 +301,18 @@ button[aria-disabled='true'] {
   color: var(--muted);
 }
 
-.lang-switch button.active {
+.lang-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.lang-switch label:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.lang-switch label.active {
   background: var(--surface);
   color: var(--ink);
   box-shadow: var(--shadow);
@@ -1196,7 +1209,8 @@ ruby rt {
   gap: 5px;
 }
 
-.field > span {
+.field > span,
+.field > .field-label {
   font-weight: 600;
   font-size: 14px;
 }
