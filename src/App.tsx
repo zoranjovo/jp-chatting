@@ -12,10 +12,17 @@ import { SettingsContext } from './settings.tsx';
 
 export function App() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.settings().then(setSettings, (err: Error) => setLoadError(err.message));
+    api.settings().then(
+      (s) => {
+        setSettings(s);
+        setLoaded(true);
+      },
+      (err: Error) => setLoadError(err.message),
+    );
   }, []);
 
   const update = useCallback(async (patch: Partial<Settings>) => {
@@ -27,7 +34,7 @@ export function App() {
     document.documentElement.lang = settings.uiLanguage;
   }, [settings.uiLanguage]);
 
-  const state = useMemo(() => ({ settings, update }), [settings, update]);
+  const state = useMemo(() => ({ settings, loaded, update }), [settings, loaded, update]);
 
   return (
     <SettingsContext.Provider value={state}>
@@ -202,6 +209,7 @@ function Shell({ loadError }: { loadError: string | null }) {
             onRetry={() => requestReply(chat.id)}
             onMessageUpdated={messageUpdated}
             onRewind={rewind}
+            onOpenSettings={() => setDialog('settings')}
           />
         ) : (
           <div className="empty">
