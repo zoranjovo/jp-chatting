@@ -61,7 +61,8 @@ const overlap = (a: Box, b: Box, margin = 0) =>
 
 /**
  * Waits for the one open tooltip to be placed next to `button` (it starts at the page's corner before
- * floating-ui has positioned it), then checks it leaves `clear` — the message's text — uncovered.
+ * floating-ui has positioned it), then checks it leaves `clear` — the message's text — uncovered, and
+ * the other buttons in the action row too.
  */
 export async function expectTooltipBeside(page: Page, button: Locator, clear: Locator) {
   const tooltip = page.locator('.tooltip');
@@ -72,8 +73,14 @@ export async function expectTooltipBeside(page: Page, button: Locator, clear: Lo
       return !!tip && !!anchor && overlap(tip, anchor, 8);
     })
     .toBe(true);
-  const [tip, text] = await Promise.all([tooltip.boundingBox(), clear.boundingBox()]);
+  const [tip, text, own] = await Promise.all([tooltip.boundingBox(), clear.boundingBox(), button.boundingBox()]);
   expect(overlap(tip!, text!), `tooltip ${JSON.stringify(tip)} covers the text ${JSON.stringify(text)}`).toBe(false);
+  const row = button.locator('xpath=ancestor::div[contains(@class, "bubble-actions")]').getByRole('button');
+  for (const other of await row.all()) {
+    const box = await other.boundingBox();
+    if (!box || (box.x === own!.x && box.y === own!.y)) continue;
+    expect(overlap(tip!, box), `tooltip ${JSON.stringify(tip)} covers another action at ${JSON.stringify(box)}`).toBe(false);
+  }
 }
 
 export async function chatsOnDisk(request: APIRequestContext): Promise<Chat[]> {

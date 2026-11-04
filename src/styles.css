@@ -454,7 +454,8 @@ button[aria-disabled='true'] {
 .tooltip {
   width: max-content;
   z-index: 20;
-  max-width: min(260px, calc(100vw - 16px));
+  /* Wide enough that the longest label (Rewind's) wraps to few lines, covering little of the message below. */
+  max-width: min(340px, calc(100vw - 16px));
   padding: 5px 9px;
   border-radius: 6px;
   background: var(--ink);

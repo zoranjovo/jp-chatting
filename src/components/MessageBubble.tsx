@@ -84,7 +84,6 @@ export function MessageBubble({
             {!mine && message.context && <MessageInfo context={message.context} createdAt={message.createdAt} />}
             {onRewind && (
               <Tooltip
-                tall
                 label={
                   <>
                     <strong>{t.rewind}</strong>

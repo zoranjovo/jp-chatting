@@ -427,7 +427,7 @@ test('the action tooltips leave the message text uncovered, on hover and on keyb
   await expectTooltipBeside(app, message.getByRole('button', { name: 'Rewind' }), message.locator('.bubble-text'));
 });
 
-test('a tooltip goes away once its button scrolls out of view', async ({ app }) => {
+test('a tooltip hides while its button is scrolled out of view, and comes back with it', async ({ app }) => {
   await app.setViewportSize({ width: 1000, height: 420 });
   await startChat(app);
   for (const text of ['コーヒーをください', 'ありがとう', 'はい', 'またね']) await sendAndWait(app, text);
@@ -440,7 +440,27 @@ test('a tooltip goes away once its button scrolls out of view', async ({ app }) 
   await app.locator('.messages').evaluate((list) => list.scrollTo({ top: list.scrollHeight }));
   await expect(message.getByRole('button', { name: 'Check' })).not.toBeInViewport();
   await expect(message.getByRole('button', { name: 'Check' })).toBeFocused();
-  await expect(app.locator('.tooltip')).toHaveCount(0);
+  await expect(app.locator('.tooltip', { hasText: 'Check' })).toBeHidden();
+
+  // Still focused when it scrolls back: the keyboard user gets the label again.
+  await app.locator('.messages').evaluate((list) => list.scrollTo({ top: 0 }));
+  await expect(message.getByRole('button', { name: 'Check' })).toBeInViewport();
+  await expect(app.locator('.tooltip', { hasText: 'Check' })).toBeVisible();
+});
+
+test('the message info popup, opened with a click, survives scrolling away and back', async ({ app }) => {
+  await app.setViewportSize({ width: 1000, height: 420 });
+  await startChat(app);
+  for (const text of ['コーヒーをください', 'ありがとう', 'はい', 'またね']) await sendAndWait(app, text);
+  const info = theirs(app).first().getByRole('button', { name: 'How this message was written' });
+  await info.click();
+  const pop = app.locator('.message-info-pop');
+  await expect(pop).toBeVisible();
+  await app.locator('.messages').evaluate((list) => list.scrollTo({ top: list.scrollHeight }));
+  await expect(info).not.toBeInViewport();
+  await expect(pop).toBeHidden();
+  await app.locator('.messages').evaluate((list) => list.scrollTo({ top: 0 }));
+  await expect(pop).toBeVisible();
 });
 
 test('the next message after a change is stamped with the new settings', async ({ app, request }) => {
