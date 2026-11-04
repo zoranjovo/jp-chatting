@@ -34,11 +34,11 @@ describe('the bundled WaniKani list', () => {
     assert.equal(kanjiInfo('a'), undefined);
   });
 
-  test("kanjiInfo drops the dataset's answer markers, even from a file built before the script did", () => {
+  test("no meaning or reading keeps the dataset's answer markers", () => {
     assert.equal(kanjiInfo('大')!.meaning, 'Big, Large');
     for (const [k] of rows as [string][]) {
       const { meaning, on, kun } = kanjiInfo(k)!;
-      for (const list of [meaning, on, kun]) assert.doesNotMatch(list, /(^|, |、)[\^!]/, `${k}: ${list}`);
+      for (const item of [...meaning.split(','), ...on.split('、'), ...kun.split('、')]) assert.doesNotMatch(item.trim(), /^[\^!]/, `${k}: ${item}`);
     }
   });
 });

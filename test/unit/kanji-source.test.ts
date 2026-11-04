@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { toRow, wkAnswers } from '../../scripts/kanji-source.ts';
+import { hasMarkers, toRow, wkAnswers } from '../../scripts/kanji-source.ts';
 
 describe('wkAnswers', () => {
   test('drops the "^" (not primary) and "!" (not accepted) markers', () => {
@@ -18,6 +18,10 @@ describe('wkAnswers', () => {
     assert.deepEqual(wkAnswers(['^', '!', '']), []);
     assert.deepEqual(wkAnswers(null), []);
   });
+
+  test('trims before reading the marker', () => {
+    assert.deepEqual(wkAnswers([' ^Large', 'Big ']), ['Big', 'Large']);
+  });
 });
 
 describe('toRow', () => {
@@ -31,5 +35,17 @@ describe('toRow', () => {
   test('falls back to the general meanings, and skips kanji WaniKani does not teach', () => {
     assert.deepEqual(toRow('X', { wk_level: 60, meanings: ['One', 'Two', 'Three'] }), ['X', 60, 'One, Two', '', '']);
     assert.equal(toRow('薔', { wk_level: null, meanings: ['Rose'] }), undefined);
+  });
+
+  test('an empty WaniKani meaning list falls back too, and the fallback is cleaned up the same way', () => {
+    assert.deepEqual(toRow('X', { wk_level: 5, wk_meanings: [], meanings: [' One ', '', 'Two'] }), ['X', 5, 'One, Two', '', '']);
+  });
+});
+
+describe('hasMarkers', () => {
+  test('finds a marker on any meaning or reading, so --if-missing rebuilds a file from before markers were dropped', () => {
+    assert.equal(hasMarkers(['大', 1, 'Big, ^Large', 'たい、だい', 'おお']), true);
+    assert.equal(hasMarkers(['小', 1, 'Small', 'しょう', 'ちい、!こ']), true);
+    assert.equal(hasMarkers(['大', 1, 'Big, Large', 'たい、だい', 'おお']), false);
   });
 });

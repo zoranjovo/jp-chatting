@@ -1,21 +1,30 @@
 // Builds shared/wanikani-kanji.json -- every kanji WaniKani teaches, with its
 // level, meanings and readings -- from davidluzgouveia/kanji-data (MIT). The
-// file isn't committed; this runs on `pnpm install` when it's missing, or
-// by hand with `pnpm kanji`.
+// file isn't committed; this runs on `pnpm install` when it's missing or was
+// built by an older version of this script, or by hand with `pnpm kanji`.
 //
 //   pnpm kanji                 # rebuild
 //   tsx scripts/build-kanji.ts --if-missing   # what postinstall runs
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { type KanjiRow, type SourceKanji, toRow } from './kanji-source.ts';
+import { hasMarkers, type KanjiRow, type SourceKanji, toRow } from './kanji-source.ts';
 
 /** Pinned so a rebuild gives the same levels every time. */
 const SOURCE = 'https://raw.githubusercontent.com/davidluzgouveia/kanji-data/00fd7079c3890f430759536f91aa5e854ec0ca4f/kanji.json';
 const OUT = path.join(import.meta.dirname, '..', 'shared', 'wanikani-kanji.json');
 
+/** Built, and not by a version of this script that kept the dataset's answer markers. */
+function upToDate(): boolean {
+  try {
+    return !(JSON.parse(fs.readFileSync(OUT, 'utf8')) as KanjiRow[]).some(hasMarkers);
+  } catch {
+    return false;
+  }
+}
+
 async function main() {
-  if (process.argv.includes('--if-missing') && fs.existsSync(OUT)) return;
+  if (process.argv.includes('--if-missing') && upToDate()) return;
 
   let raw: Record<string, SourceKanji>;
   try {
