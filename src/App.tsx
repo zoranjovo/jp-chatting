@@ -6,17 +6,25 @@ import { ChatSettingsDialog, type ChatPatch } from './components/ChatSettingsDia
 import { NewChatDialog } from './components/NewChatDialog.tsx';
 import { SettingsDialog } from './components/SettingsDialog.tsx';
 import { SetupNotice } from './components/SetupNotice.tsx';
+import { setDraft } from './drafts.ts';
 import { Sidebar } from './components/Sidebar.tsx';
 import { LanguageProvider, useT } from './i18n.tsx';
-import { useBackToClose } from './back.ts';
+import { onHistory, useBackToClose, whenSettled } from './back.ts';
 import { SettingsContext } from './settings.tsx';
 
 export function App() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.settings().then(setSettings, (err: Error) => setLoadError(err.message));
+    api.settings().then(
+      (s) => {
+        setSettings(s);
+        setLoaded(true);
+      },
+      (err: Error) => setLoadError(err.message),
+    );
   }, []);
 
   const update = useCallback(async (patch: Partial<Settings>) => {
@@ -28,7 +36,7 @@ export function App() {
     document.documentElement.lang = settings.uiLanguage;
   }, [settings.uiLanguage]);
 
-  const state = useMemo(() => ({ settings, update }), [settings, update]);
+  const state = useMemo(() => ({ settings, loaded, update }), [settings, loaded, update]);
 
   return (
     <SettingsContext.Provider value={state}>
@@ -44,30 +52,42 @@ function Shell({ loadError }: { loadError: string | null }) {
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [chat, setChat] = useState<Chat | null>(null);
   const [waiting, setWaiting] = useState<Set<string>>(new Set());
-  const waitingRef = useRef(waiting);
-  waitingRef.current = waiting;
   const [errors, setErrors] = useState<Record<string, string | null>>({});
   const [dialog, setDialog] = useState<'new' | 'settings' | 'chat' | null>(null);
   const [navOpen, setNavOpen] = useState(false);
   /** The chat just started, whose composer should take focus once it shows; cleared once it has. */
   const [focusChat, setFocusChat] = useState<string | null>(null);
+  const composerFocused = useCallback(() => setFocusChat(null), []);
   const activeId = useRef<string | null>(null);
 
   const refreshList = useCallback(() => api.chats().then(setChats).catch(() => {}), []);
 
+  /** The newest copy of each chat the server has sent, so a slow load can tell a reply landed meanwhile. */
+  const latest = useRef(new Map<string, Chat>());
+  /** The chat being loaded; a later select overtakes it. */
+  const selecting = useRef<string | null>(null);
+  /** Chats whose reply this page is waiting for, updated at once so two callers in one tick can't both ask. */
+  const pending = useRef(new Set<string>());
+
   /**
    * Each chat has its own history entry (#<id>), so Back goes to the previous chat and a reload stays put.
-   * An open menu or dialog sits on its own entry (see below); moving to a chat from there takes that entry over.
+   * An open menu or dialog sits on its own entry (back.ts); moving to a chat from there takes that entry over.
+   * Waits for any entry a closing overlay is taking off, so it never writes over the wrong one.
    */
-  const showInUrl = useCallback((id: string | null, replace = false) => {
-    const url = id ? `#${id}` : location.pathname + location.search;
-    if (id ? location.hash === url : !location.hash) return;
-    if (replace || history.state?.overlay) history.replaceState({ chat: id }, '', url);
-    else history.pushState({ chat: id }, '', url);
-  }, []);
+  const showInUrl = useCallback(
+    (id: string | null, replace = false) =>
+      whenSettled(() => {
+        const url = id ? `#${id}` : location.pathname + location.search;
+        if (id ? location.hash === url : !location.hash) return;
+        if (replace || history.state?.overlay !== undefined) history.replaceState(null, '', url);
+        else history.pushState(null, '', url);
+      }),
+    [],
+  );
 
   /** Shows a chat the server returned, if it is still the one on screen. */
   const show = useCallback((next: Chat) => {
+    latest.current.set(next.id, next);
     if (activeId.current === next.id) setChat(next);
   }, []);
 
@@ -83,6 +103,8 @@ function Shell({ loadError }: { loadError: string | null }) {
   );
 
   const requestReply = useCallback(async (id: string) => {
+    if (pending.current.has(id)) return;
+    pending.current.add(id);
     setBusy(id, true);
     setErrors((e) => ({ ...e, [id]: null }));
     try {
@@ -90,52 +112,70 @@ function Shell({ loadError }: { loadError: string | null }) {
     } catch (err) {
       setErrors((e) => ({ ...e, [id]: (err as Error).message }));
     } finally {
+      pending.current.delete(id);
       setBusy(id, false);
       refreshList();
     }
   }, [show, refreshList, setBusy]);
 
+  /** Moves to a chat once it has loaded; if it can't be (deleted, or a bad link), stays on the chat shown. */
   const select = useCallback(async (id: string, replace = false) => {
+    selecting.current = id;
+    setNavOpen(false);
+    const before = latest.current.get(id);
+    let loaded: Chat;
+    try {
+      loaded = await api.chat(id);
+    } catch (err) {
+      if (selecting.current !== id) return;
+      selecting.current = null;
+      const here = activeId.current;
+      showInUrl(here, true);
+      if (here) setErrors((e) => ({ ...e, [here]: (err as Error).message }));
+      return;
+    }
+    if (selecting.current !== id) return;
+    selecting.current = null;
     activeId.current = id;
     showInUrl(id, replace);
-    setNavOpen(false);
-    try {
-      const loaded = await api.chat(id);
-      show(loaded);
-      // A reply this page didn't ask for (it was reloaded while waiting): wait for it like any other.
-      if (loaded.replying && !waitingRef.current.has(id)) requestReply(id);
-    } catch (err) {
-      setErrors((e) => ({ ...e, [id]: (err as Error).message }));
-    }
+    // A reply landed while this was loading: it is newer than what was read.
+    const newer = latest.current.get(id);
+    if (newer && newer !== before) return show(newer);
+    show(loaded);
+    // A reply this page didn't ask for (it was reloaded while waiting): wait for it like any other.
+    if (loaded.replying) requestReply(id);
   }, [show, showInUrl, requestReply]);
 
   useEffect(() => {
     api.chats().then((list) => {
       setChats(list);
-      const linked = list.find((c) => `#${c.id}` === location.hash);
-      if (linked ?? list[0]) select((linked ?? list[0]).id, true);
+      const first = list.find((c) => `#${c.id}` === location.hash) ?? list[0];
+      if (first) select(first.id, true);
     }).catch(() => {});
   }, [select]);
 
   // Back and Forward between chats.
-  useEffect(() => {
-    const onPop = () => {
-      const id = location.hash.slice(1);
-      if (id && id !== activeId.current) select(id, true);
-      else if (!id && activeId.current) {
-        activeId.current = null;
-        setChat(null);
-      }
-    };
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
-  }, [select]);
+  useEffect(
+    () =>
+      onHistory((closedOverlay) => {
+        // Back only closed a menu or dialog: stay put, and make the entry it landed on name this chat (it may name one since deleted).
+        if (closedOverlay) return showInUrl(activeId.current, true);
+        const id = location.hash.slice(1);
+        if (id && id !== activeId.current) select(id, true);
+        else if (!id && activeId.current) {
+          activeId.current = null;
+          setChat(null);
+        }
+      }),
+    [select, showInUrl],
+  );
 
   useBackToClose(navOpen, () => setNavOpen(false));
 
   const startChat = async (topic: string, politeness: Politeness) => {
     setDialog(null);
     const created = await api.createChat(topic, politeness);
+    selecting.current = null;
     activeId.current = created.id;
     showInUrl(created.id);
     setChat(created);
@@ -146,13 +186,15 @@ function Shell({ loadError }: { loadError: string | null }) {
   };
 
   const send = async (text: string) => {
-    if (!chat) return;
+    if (!chat) return false;
     const id = chat.id;
     try {
       show(await api.send(id, text));
       requestReply(id);
+      return true;
     } catch (err) {
       setErrors((e) => ({ ...e, [id]: (err as Error).message }));
+      return false;
     }
   };
 
@@ -189,6 +231,8 @@ function Shell({ loadError }: { loadError: string | null }) {
 
   const remove = async (id: string) => {
     await api.deleteChat(id);
+    setDraft(id, '');
+    latest.current.delete(id);
     if (activeId.current === id) {
       activeId.current = null;
       setChat(null);
@@ -244,8 +288,9 @@ function Shell({ loadError }: { loadError: string | null }) {
             onRetry={() => requestReply(chat.id)}
             onMessageUpdated={messageUpdated}
             onRewind={rewind}
+            onOpenSettings={() => setDialog('settings')}
             focusComposer={focusChat === chat.id}
-            onComposerFocused={() => setFocusChat(null)}
+            onComposerFocused={composerFocused}
           />
         ) : (
           <div className="empty">

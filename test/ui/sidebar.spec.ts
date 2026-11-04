@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { chatsOnDisk, expect, startChat, test } from './fixtures.ts';
+import { chatsOnDisk, composer, expect, mine, startChat, test, theirs } from './fixtures.ts';
 
 const dialog = (app: Page) => app.locator('dialog[open]');
 
@@ -150,4 +150,46 @@ test('deleting a chat that is not open leaves the open one alone', async ({ app 
   await dialog(app).getByRole('button', { name: 'Delete' }).click();
   await expect(app.locator('.chat-item')).toHaveCount(1);
   await expect(app.locator('.topbar h1')).toHaveText('Foreground');
+});
+
+test('Back to a chat that was deleted stays on the chat shown, which keeps working', async ({ app }) => {
+  await startChat(app, 'Gone');
+  await startChat(app, 'Here');
+  const here = app.url();
+  const gone = app.locator('.chat-item', { hasText: 'Gone' });
+  await gone.hover();
+  await gone.getByRole('button', { name: 'Delete chat' }).click();
+  await app.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+  await expect(app.locator('.chat-item')).toHaveCount(1);
+  await app.goBack();
+  await expect(app.locator('h1')).toHaveText('Here');
+  await expect.poll(() => app.url()).toBe(here);
+  await composer(app).fill('まだ いますか');
+  await composer(app).press('Enter');
+  await expect(mine(app)).toHaveCount(1);
+  await expect(theirs(app)).toHaveCount(2);
+});
+
+test('a chat started from the dialog gets its own entry, after the dialog\'s is gone', async ({ app }) => {
+  await startChat(app, 'First');
+  const first = app.url();
+  await startChat(app, 'Second');
+  await expect.poll(() => app.url()).not.toBe(first);
+  await app.goBack();
+  await expect(app.locator('h1')).toHaveText('First');
+  expect(app.url()).toBe(first);
+});
+
+test('Forward onto a closed dialog\'s entry opens nothing, and Back still goes to the chat before', async ({ app }) => {
+  await startChat(app, 'First');
+  await startChat(app, 'Second');
+  await app.locator('.topbar').getByRole('button', { name: 'Chat settings' }).click();
+  await expect(app.getByRole('dialog')).toBeVisible();
+  await app.goBack();
+  await expect(app.getByRole('dialog')).toHaveCount(0);
+  await app.goForward();
+  await expect(app.getByRole('dialog')).toHaveCount(0);
+  await expect(app.locator('h1')).toHaveText('Second');
+  await app.goBack();
+  await expect(app.locator('h1')).toHaveText('First');
 });
