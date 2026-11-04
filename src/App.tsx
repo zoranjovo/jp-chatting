@@ -51,8 +51,6 @@ function Shell({ loadError }: { loadError: string | null }) {
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [chat, setChat] = useState<Chat | null>(null);
   const [waiting, setWaiting] = useState<Set<string>>(new Set());
-  const waitingRef = useRef(waiting);
-  waitingRef.current = waiting;
   const [errors, setErrors] = useState<Record<string, string | null>>({});
   const [dialog, setDialog] = useState<'new' | 'settings' | 'chat' | null>(null);
   const [navOpen, setNavOpen] = useState(false);
@@ -60,9 +58,16 @@ function Shell({ loadError }: { loadError: string | null }) {
 
   const refreshList = useCallback(() => api.chats().then(setChats).catch(() => {}), []);
 
+  /** Counts the chats shown, so a slow load can tell a newer one (a reply that landed meanwhile) has replaced it. */
+  const shown = useRef(0);
+  /** Chats whose reply this page is waiting for, updated at once so two callers in one tick can't both ask. */
+  const pending = useRef(new Set<string>());
+
   /** Shows a chat the server returned, if it is still the one on screen. */
   const show = useCallback((next: Chat) => {
-    if (activeId.current === next.id) setChat(next);
+    if (activeId.current !== next.id) return;
+    shown.current += 1;
+    setChat(next);
   }, []);
 
   const setBusy = useCallback(
@@ -77,6 +82,8 @@ function Shell({ loadError }: { loadError: string | null }) {
   );
 
   const requestReply = useCallback(async (id: string) => {
+    if (pending.current.has(id)) return;
+    pending.current.add(id);
     setBusy(id, true);
     setErrors((e) => ({ ...e, [id]: null }));
     try {
@@ -84,6 +91,7 @@ function Shell({ loadError }: { loadError: string | null }) {
     } catch (err) {
       setErrors((e) => ({ ...e, [id]: (err as Error).message }));
     } finally {
+      pending.current.delete(id);
       setBusy(id, false);
       refreshList();
     }
@@ -93,10 +101,13 @@ function Shell({ loadError }: { loadError: string | null }) {
     activeId.current = id;
     setNavOpen(false);
     try {
+      const before = shown.current;
       const loaded = await api.chat(id);
+      // A reply landed while this was loading: what is on screen is newer.
+      if (shown.current !== before) return;
       show(loaded);
       // A reply this page didn't ask for (it was reloaded while waiting): wait for it like any other.
-      if (loaded.replying && !waitingRef.current.has(id)) requestReply(id);
+      if (loaded.replying) requestReply(id);
     } catch (err) {
       setErrors((e) => ({ ...e, [id]: (err as Error).message }));
     }
