@@ -270,7 +270,7 @@ function Shell({ loadError }: { loadError: string | null }) {
           </button>
         </header>
         {loadError && (
-          <div className="error">
+          <div className="error" role="alert">
             {t.errorPrefix} {loadError}
           </div>
         )}

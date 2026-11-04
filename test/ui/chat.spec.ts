@@ -153,6 +153,52 @@ test('after a failed reply and a reload, the reply can still be asked for', asyn
   await expect(theirs(app)).toHaveCount(2);
 });
 
+test('screen readers hear that the partner is typing, then what it said, and errors as alerts', async ({ app, request }) => {
+  await startChat(app);
+  const status = app.locator('.chat > [role="status"]');
+  await expect(status).toHaveText(/^Your partner: いらっしゃいませ/);
+  // The Japanese is marked as such, so a screen reader reads it with a Japanese voice.
+  await expect(status.locator('span[lang="ja"]')).toHaveText(/^いらっしゃいませ/);
+  await mockControl(request, { delayMs: 800 });
+  await composer(app).fill('コーヒーをください');
+  await composer(app).press('Enter');
+  await expect(status).toHaveText('Typing…');
+  await expect(app.locator('.typing')).toHaveCount(0);
+  await expect(theirs(app)).toHaveCount(2);
+  await expect(status).toHaveText(/^Your partner: はい、大きいサイズと小さいサイズ/);
+  // Said once, then cleared, so it isn't left as a hidden copy of the message.
+  await expect(status).toHaveText('', { timeout: 8000 });
+
+  await mockControl(request, { delayMs: 0, fail: true });
+  await composer(app).fill('もしもし');
+  await composer(app).press('Enter');
+  await expect(app.getByRole('alert')).toContainText('mock model is down');
+});
+
+test('a chat opened from the list does not read out its old messages', async ({ app }) => {
+  await startChat(app, 'One');
+  await startChat(app, 'Two');
+  await app.locator('.chat-item', { hasText: 'One' }).locator('.chat-item-main').click();
+  await expect(app.locator('h1')).toHaveText('One');
+  await expect(theirs(app)).toHaveCount(1);
+  // Long enough for an announcement made after the chat appeared to show up.
+  await app.waitForTimeout(300);
+  await expect(app.locator('.chat > [role="status"]')).toHaveText('');
+});
+
+test('a rewind does not read out the partner message it leaves last', async ({ app }) => {
+  await startChat(app);
+  await composer(app).fill('コーヒーをください');
+  await composer(app).press('Enter');
+  await expect(theirs(app)).toHaveCount(2);
+  const status = app.locator('.chat > [role="status"]');
+  await expect(status).toHaveText('', { timeout: 8000 });
+  await mine(app).first().getByRole('button', { name: 'Rewind' }).click();
+  await expect(theirs(app)).toHaveCount(1);
+  await app.waitForTimeout(300);
+  await expect(status).toHaveText('');
+});
+
 const chatSettingsButton = (app: Page) => app.locator('.topbar').getByRole('button', { name: 'Chat settings' });
 
 async function openChatSettings(app: Page) {

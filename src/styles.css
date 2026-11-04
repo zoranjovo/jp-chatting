@@ -551,6 +551,21 @@ ruby rt {
   color: var(--warn);
 }
 
+/* Read by screen readers, not shown. Pinned to a corner, so it never sits far down a long page and stretches it. */
+.sr-only {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* --- analysis --- */
 
 .analysis {

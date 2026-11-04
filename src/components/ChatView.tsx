@@ -1,10 +1,15 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { stripFurigana } from '../../shared/kanji.ts';
 import type { Chat, Message } from '../../shared/types.ts';
+import { AnnounceContext } from '../announce.ts';
 import { prependDraft } from '../drafts.ts';
 import { useT } from '../i18n.tsx';
 import { Composer, type ComposerHandle } from './Composer.tsx';
 import { MessageBubble } from './MessageBubble.tsx';
 import { SetupNotice } from './SetupNotice.tsx';
+
+/** How long an announcement stays in the status region: long enough to be read, then gone, so it isn't a stray copy. */
+const ANNOUNCE_MS = 5000;
 
 export function ChatView({
   chat,
@@ -39,6 +44,30 @@ export function ChatView({
   const last = chat.messages.at(-1);
   const needsReply = !waiting && (!last || last.role === 'user');
 
+  const [announcement, setAnnouncement] = useState<ReactNode>(null);
+  const announce = useCallback((text: ReactNode) => setAnnouncement(text), []);
+  useEffect(() => {
+    if (!announcement) return;
+    const timer = setTimeout(() => setAnnouncement(null), ANNOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [announcement]);
+
+  // Screen readers hear a partner message that was added -- not the ones there when the chat opened
+  // (it remounts per chat), nor an older one that a rewind leaves last.
+  const known = useRef(new Set(chat.messages.map((m) => m.id)));
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the last message changes, not on every update to the chat.
+  useEffect(() => {
+    const added = last?.role === 'assistant' && !known.current.has(last.id);
+    known.current = new Set(chat.messages.map((m) => m.id));
+    if (added) {
+      announce(
+        <>
+          {t.partnerSays} <span lang="ja">{stripFurigana(last.content)}</span>
+        </>,
+      );
+    }
+  }, [last?.id]);
+
   // Straight to the end when the chat opens; smoothly for each new message.
   const opened = useRef(false);
   useEffect(() => {
@@ -47,42 +76,47 @@ export function ChatView({
   }, [chat.messages.length, waiting]);
 
   return (
-    <div className="chat">
-      <div className="messages">
-        {chat.topic && <div className="topic-banner">{chat.topic}</div>}
-        {chat.messages.map((m) => (
-          <MessageBubble
-            key={m.id}
-            chatId={chat.id}
-            message={m}
-            onUpdated={onMessageUpdated}
-            onRewind={m.role === 'user' ? () => rewind(m) : undefined}
-            rewindDisabled={waiting}
-          />
-        ))}
-        {waiting && (
-          <div className="message theirs">
-            <div className="bubble typing" aria-label={t.typing}>
-              <span />
-              <span />
-              <span />
+    <AnnounceContext.Provider value={announce}>
+      <div className="chat">
+        <div className="messages">
+          {chat.topic && <div className="topic-banner">{chat.topic}</div>}
+          {chat.messages.map((m) => (
+            <MessageBubble
+              key={m.id}
+              chatId={chat.id}
+              message={m}
+              onUpdated={onMessageUpdated}
+              onRewind={m.role === 'user' ? () => rewind(m) : undefined}
+              rewindDisabled={waiting}
+            />
+          ))}
+          {waiting && (
+            <div className="message theirs" aria-hidden>
+              <div className="bubble typing">
+                <span />
+                <span />
+                <span />
+              </div>
             </div>
-          </div>
-        )}
-        {error && (
-          <div className="error">
-            {t.errorPrefix} {error}
-          </div>
-        )}
-        {needsReply && <SetupNotice onOpenSettings={onOpenSettings} />}
-        {needsReply && (
-          <button type="button" className="secondary retry" onClick={onRetry}>
-            {t.retryReply}
-          </button>
-        )}
-        <div ref={end} />
+          )}
+          {error && (
+            <div className="error" role="alert">
+              {t.errorPrefix} {error}
+            </div>
+          )}
+          {needsReply && <SetupNotice onOpenSettings={onOpenSettings} />}
+          {needsReply && (
+            <button type="button" className="secondary retry" onClick={onRetry}>
+              {t.retryReply}
+            </button>
+          )}
+          <div ref={end} />
+        </div>
+        <div className="sr-only" role="status">
+          {waiting ? t.typing : announcement}
+        </div>
+        <Composer chatId={chat.id} disabled={waiting} onSend={onSend} handle={composer} />
       </div>
-      <Composer chatId={chat.id} disabled={waiting} onSend={onSend} handle={composer} />
-    </div>
+    </AnnounceContext.Provider>
   );
 }

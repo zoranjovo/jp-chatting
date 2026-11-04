@@ -1,4 +1,4 @@
-import { chatsOnDisk, composer, expect, mine, mockCalls, startChat, test, theirs } from './fixtures.ts';
+import { chatsOnDisk, composer, expect, mine, mockCalls, mockControl, startChat, test, theirs } from './fixtures.ts';
 
 const count = async (request: Parameters<typeof mockCalls>[0], kind: string) => (await mockCalls(request)).filter((c) => c.kind === kind).length;
 
@@ -16,6 +16,25 @@ test('Breakdown shows each line with its translation, explanation and words', as
   await expect(lines.nth(1).locator('.gloss:not(.gloss-plain)')).toHaveCount(2);
   await expect(lines.nth(1).locator('.gloss').first()).toContainText('what');
   await expect(lines.nth(1).locator('.gloss-line')).toHaveText(/何.*を.*飲みますか？/);
+});
+
+test('screen readers hear when a breakdown is being written and when it is ready', async ({ app, request }) => {
+  await startChat(app);
+  await mockControl(request, { delayMs: 800 });
+  const message = theirs(app).first();
+  await message.getByRole('button', { name: 'Breakdown' }).click();
+  const status = app.locator('.chat > [role="status"]');
+  await expect(status).toHaveText('Thinking…');
+  await expect(status).toHaveText('Breakdown ready.');
+  // Hidden and shown again from the cache: nothing new to say.
+  await message.getByRole('button', { name: 'Hide' }).click();
+  await expect(status).toHaveText('', { timeout: 8000 });
+  await message.getByRole('button', { name: 'Breakdown' }).click();
+  await expect(message.locator('.analysis-line')).toHaveCount(2);
+  await app.waitForTimeout(300);
+  await expect(status).toHaveText('');
+  // The only status region is the chat's: none per message.
+  await expect(app.getByRole('status')).toHaveCount(1);
 });
 
 test('Breakdown is fetched once, then hidden and shown from the cache', async ({ app, request }) => {
