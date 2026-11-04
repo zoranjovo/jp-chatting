@@ -1,4 +1,5 @@
-import { useImperativeHandle, useLayoutEffect, useRef, useState, type ChangeEvent, type KeyboardEvent, type Ref } from 'react';
+import { useImperativeHandle, useLayoutEffect, useRef, type ChangeEvent, type KeyboardEvent, type Ref } from 'react';
+import { prependDraft, useDraft } from '../drafts.ts';
 import { useT } from '../i18n.tsx';
 import { romajiToKana } from '../romaji.ts';
 import { useSettings } from '../settings.tsx';
@@ -8,21 +9,33 @@ export interface ComposerHandle {
   prepend: (message: string) => void;
 }
 
-export function Composer({ disabled, onSend, handle }: { disabled: boolean; onSend: (text: string) => void; handle?: Ref<ComposerHandle> }) {
+export function Composer({
+  chatId,
+  disabled,
+  onSend,
+  handle,
+}: {
+  chatId: string;
+  disabled: boolean;
+  /** Resolves false if the message wasn't stored; its text then goes back in the box. */
+  onSend: (text: string) => Promise<boolean>;
+  handle?: Ref<ComposerHandle>;
+}) {
   const t = useT();
   const { settings, update } = useSettings();
-  const [text, setText] = useState('');
+  // The chat's own draft, read by id, so the text can never belong to another chat.
+  const [text, setText] = useDraft(chatId);
   const ref = useRef<HTMLTextAreaElement>(null);
   const caret = useRef<number | null>(null);
   const romaji = settings.romajiInput;
 
   useImperativeHandle(handle, () => ({
     prepend(message) {
-      setText((current) => (current.trim() ? `${message}\n\n${current}` : message));
+      prependDraft(chatId, message);
       caret.current = message.length;
       ref.current?.focus();
     },
-  }), []);
+  }), [chatId]);
 
   // Keep the caret where the user was typing after a conversion changes the text's length.
   useLayoutEffect(() => {
@@ -46,11 +59,11 @@ export function Composer({ disabled, onSend, handle }: { disabled: boolean; onSe
     setText(before + value.slice(at));
   };
 
-  const send = () => {
+  const send = async () => {
     const out = (romaji ? romajiToKana(text, true) : text).trim();
     if (!out || disabled) return;
-    onSend(out);
     setText('');
+    if (!(await onSend(out))) prependDraft(chatId, out);
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
