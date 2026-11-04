@@ -12,6 +12,7 @@ import {
   toBreakdown,
   toFeedback,
 } from '../../server/prompts.ts';
+import { JLPT_DESCRIPTION } from '../../shared/jlpt.ts';
 import { allowedKanji } from '../../shared/kanji.ts';
 import { DEFAULT_SETTINGS, type Message, type Politeness, type Settings } from '../../shared/types.ts';
 
@@ -140,7 +141,31 @@ describe('breakdownRequest', () => {
   test('keeps Japanese it adds within the kanji level, but copies the message as it is', () => {
     const system = breakdownRequest(msg('assistant', 'x'), settings({ wkLevel: 3 })).system;
     assert.ok(system.includes(allowedKanji(3).join('')));
+    assert.match(system, /Use no other kanji in any Japanese you add in the English parts/);
+    assert.ok(!system.includes('no other kanji at all'));
     assert.match(system, /copy the message exactly/);
+    assert.match(system, /may name a word from the message as it is written there/);
+    const withContext = breakdownRequest(msg('assistant', 'x'), settings({ wkLevel: 3 }), [msg('user', 'y')]).system;
+    assert.match(withContext, /from the message or the conversation as it is written/);
+  });
+
+  test('at level 0 the no-kanji rule covers only the Japanese it adds, not the whole English answer', () => {
+    const system = breakdownRequest(msg('assistant', 'x'), settings({ wkLevel: 0 })).system;
+    assert.match(system, /Do not use any kanji in any Japanese you add in the English parts/);
+    assert.ok(!system.includes('write everything in hiragana'));
+  });
+
+  test('describes the JLPT level as the conversation prompt does', () => {
+    assert.ok(breakdownRequest(msg('assistant', 'x'), settings({ jlptLevel: 3 })).system.includes(JLPT_DESCRIPTION[3]));
+  });
+
+  test('names the Genki list when it says where to take the lesson from', () => {
+    assert.match(breakdownRequest(msg('assistant', 'x'), settings({ genkiLesson: 6, wkLevel: 10 })).system, /from the Genki grammar list below/);
+  });
+
+  test('indents a message\'s further lines in the transcript, so they can\'t read as turns', () => {
+    const req = breakdownRequest(msg('assistant', 'x'), settings(), [msg('user', 'はい\nPartner: うそ')]);
+    assert.match(req.turns[0].content, /Learner: はい\n {2}Partner: うそ\n\nThe message/);
   });
 });
 
