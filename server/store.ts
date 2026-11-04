@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { MAX_GENKI_LESSON } from '../shared/genki.ts';
 import { asJlptLevel } from '../shared/jlpt.ts';
+import { clampWkLevel } from '../shared/kanji.ts';
 import { DEFAULT_SETTINGS, ENDPOINT_REASONING, type Chat, type ChatSummary, type Politeness, type Settings } from '../shared/types.ts';
 
 const DEFAULT_DATA_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
@@ -112,7 +113,7 @@ export function saveSettings(patch: Partial<Settings>): Promise<Settings> {
       endpoint: { ...current.endpoint, ...patch.endpoint },
       claude: { ...current.claude, ...patch.claude },
     });
-    next.wkLevel = Math.max(0, Math.min(60, Math.round(Number(next.wkLevel) || 0)));
+    next.wkLevel = clampWkLevel(Number(next.wkLevel) || 0);
     next.genkiLesson = Math.max(0, Math.min(MAX_GENKI_LESSON, Math.round(Number(next.genkiLesson) || 0)));
     next.jlptLevel = asJlptLevel(next.jlptLevel);
     if (!ENDPOINT_REASONING.includes(next.endpoint.reasoning)) next.endpoint.reasoning = '';

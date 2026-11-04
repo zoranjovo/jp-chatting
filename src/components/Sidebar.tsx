@@ -66,9 +66,19 @@ export function Sidebar({
           {chats.length === 0 && <p className="muted small">{t.noChats}</p>}
           {chats.map((chat) => (
             <div key={chat.id} className={`chat-item ${chat.id === activeId ? 'active' : ''}`}>
-              <button type="button" className="chat-item-main" onClick={() => onSelect(chat.id)}>
+              <button
+                type="button"
+                className="chat-item-main"
+                onClick={() => onSelect(chat.id)}
+                aria-current={chat.id === activeId ? 'page' : undefined}
+              >
                 <span className="chat-title jp">{chat.title || t.untitled}</span>
-                <span className="chat-date">{new Date(chat.updatedAt).toLocaleDateString(settings.uiLanguage === 'ja' ? 'ja-JP' : 'en-GB', { month: 'short', day: 'numeric' })}</span>
+                <span className="chat-date">
+                  {new Date(chat.updatedAt).toLocaleDateString(settings.uiLanguage === 'ja' ? 'ja-JP' : 'en-GB', {
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                </span>
               </button>
               <div className="chat-item-actions">
                 <button type="button" className="icon-button" onClick={() => setRenaming(chat)} title={t.renameChat} aria-label={t.renameChat}>
@@ -82,13 +92,19 @@ export function Sidebar({
           ))}
         </nav>
         <div className="sidebar-footer">
-          <div className="lang-switch" role="group" aria-label={t.uiLanguage}>
-            <button type="button" className={settings.uiLanguage === 'en' ? 'active' : ''} onClick={() => setLanguage('en')}>
-              EN
-            </button>
-            <button type="button" className={settings.uiLanguage === 'ja' ? 'active' : ''} onClick={() => setLanguage('ja')}>
-              日本語
-            </button>
+          {/* One of two, like the speech-style switch: a radio group, not two toggle buttons. */}
+          <div className="lang-switch" role="radiogroup" aria-label={t.uiLanguage}>
+            {(
+              [
+                ['en', 'EN'],
+                ['ja', '日本語'],
+              ] as const
+            ).map(([language, label]) => (
+              <label key={language} className={settings.uiLanguage === language ? 'active' : ''}>
+                <input type="radio" name="ui-language" checked={settings.uiLanguage === language} onChange={() => setLanguage(language)} />
+                {label}
+              </label>
+            ))}
           </div>
           <button type="button" className="secondary" onClick={onSettings}>
             ⚙ {t.settings}

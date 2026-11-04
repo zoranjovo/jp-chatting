@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import rows from '../../shared/wanikani-kanji.json' with { type: 'json' };
-import { allowedKanji, isAllowed, isKanji, kanjiAboveLevel, kanjiInfo, MAX_WK_LEVEL, stripFurigana } from '../../shared/kanji.ts';
+import { allowedKanji, isAllowed, isKanji, kanjiAboveLevel, kanjiInfo, MAX_WK_LEVEL, parseWkLevel, stripFurigana } from '../../shared/kanji.ts';
 
 describe('the bundled WaniKani list', () => {
   test('covers all 60 levels with about 2,000 kanji', () => {
@@ -102,5 +102,26 @@ describe('kanjiAboveLevel', () => {
 
   test('at level 0 every kanji counts', () => {
     assert.deepEqual(kanjiAboveLevel('人', 0), ['人']);
+  });
+});
+
+describe('parseWkLevel', () => {
+  test('a typed number becomes a whole level within 0..60', () => {
+    assert.equal(parseWkLevel('12'), 12);
+    assert.equal(parseWkLevel('060'), 60);
+    assert.equal(parseWkLevel('2.5'), 3);
+    assert.equal(parseWkLevel('0'), 0);
+    assert.equal(parseWkLevel('-3'), 0);
+    assert.equal(parseWkLevel('75'), MAX_WK_LEVEL);
+    // Too big for a number is still above the top level, not "no level".
+    assert.equal(parseWkLevel('1e400'), MAX_WK_LEVEL);
+    assert.equal(parseWkLevel('-1e400'), 0);
+  });
+
+  test('text that is not a number yet is no level, not 0', () => {
+    assert.equal(parseWkLevel(''), null);
+    assert.equal(parseWkLevel('  '), null);
+    assert.equal(parseWkLevel('-'), null);
+    assert.equal(parseWkLevel('abc'), null);
   });
 });

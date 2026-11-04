@@ -6,7 +6,7 @@ import { useT } from '../i18n.tsx';
 import { BreakdownView, FeedbackView } from './Analysis.tsx';
 import { BreakdownIcon, CheckIcon, RewindIcon } from './Icons.tsx';
 import { MessageInfo } from './MessageInfo.tsx';
-import { JpText } from './JpText.tsx';
+import { JpText, WrittenAtLevelProvider } from './JpText.tsx';
 import { Tooltip } from './Tooltip.tsx';
 
 /** Matches the open/close transition in styles.css. */
@@ -74,73 +74,75 @@ export function MessageBubble({
   };
 
   return (
-    <div className={`message ${mine ? 'mine' : 'theirs'}`}>
-      <div className="bubble">
-        <div className="bubble-text">
-          <JpText text={message.content} highlight={!mine} />
-        </div>
-        <div className="bubble-actions">
-          {!mine && message.context && <MessageInfo context={message.context} createdAt={message.createdAt} />}
-          {onRewind && (
-            <Tooltip
-              label={
-                <>
-                  <strong>{t.rewind}</strong>
-                  <span className="tooltip-hint">{t.rewindTitle}</span>
-                </>
-              }
-            >
+    <WrittenAtLevelProvider value={message.context?.wkLevel}>
+      <div className={`message ${mine ? 'mine' : 'theirs'}`}>
+        <div className="bubble">
+          <div className="bubble-text">
+            <JpText text={message.content} highlight={!mine} />
+          </div>
+          <div className="bubble-actions">
+            {!mine && message.context && <MessageInfo context={message.context} createdAt={message.createdAt} />}
+            {onRewind && (
+              <Tooltip
+                label={
+                  <>
+                    <strong>{t.rewind}</strong>
+                    <span className="tooltip-hint">{t.rewindTitle}</span>
+                  </>
+                }
+              >
+                <button
+                  type="button"
+                  className="icon-button"
+                  onClick={onRewind}
+                  disabled={rewindDisabled}
+                  aria-label={t.rewind}
+                  aria-describedby={rewindHint}
+                >
+                  <RewindIcon />
+                </button>
+                {/* The tooltip only exists while shown, so screen readers get the warning from here. */}
+                <span id={rewindHint} hidden>
+                  {t.rewindTitle}
+                </span>
+              </Tooltip>
+            )}
+            <Tooltip label={<strong>{open ? t.hide : label}</strong>}>
               <button
                 type="button"
-                className="icon-button"
-                onClick={onRewind}
-                disabled={rewindDisabled}
-                aria-label={t.rewind}
-                aria-describedby={rewindHint}
+                className={`icon-button ${open ? 'active' : ''}`}
+                onClick={() => (open ? setOpen(false) : analyze(false))}
+                aria-expanded={open}
+                aria-label={open ? t.hide : label}
               >
-                <RewindIcon />
+                {mine ? <CheckIcon /> : <BreakdownIcon />}
               </button>
-              {/* The tooltip only exists while shown, so screen readers get the warning from here. */}
-              <span id={rewindHint} hidden>
-                {t.rewindTitle}
-              </span>
             </Tooltip>
-          )}
-          <Tooltip label={<strong>{open ? t.hide : label}</strong>}>
-            <button
-              type="button"
-              className={`icon-button ${open ? 'active' : ''}`}
-              onClick={() => (open ? setOpen(false) : analyze(false))}
-              aria-expanded={open}
-              aria-label={open ? t.hide : label}
-            >
-              {mine ? <CheckIcon /> : <BreakdownIcon />}
-            </button>
-          </Tooltip>
-        </div>
-      </div>
-      {mounted && (
-        <div ref={wrap} className={`analysis-wrap ${shown ? 'open' : ''}`} inert={!open}>
-          <div className="analysis-clip">
-            <div className="analysis" ref={panel}>
-              {busy && <div className="analysis-busy">{t.analyzing}</div>}
-              {error && (
-                <div className="error" role="alert">
-                  {t.errorPrefix} {error}
-                </div>
-              )}
-              {!busy && message.breakdown && !mine && <BreakdownView breakdown={message.breakdown} />}
-              {!busy && message.feedback && mine && <FeedbackView feedback={message.feedback} />}
-              {/* Kept while busy (aria-disabled, not disabled), so the keyboard focus on it isn't dropped to the page. */}
-              {(analysis || error) && (
-                <button type="button" className="link-button" aria-disabled={busy} onClick={() => !busy && analyze(true)}>
-                  {t.redo}
-                </button>
-              )}
-            </div>
           </div>
         </div>
-      )}
-    </div>
+        {mounted && (
+          <div ref={wrap} className={`analysis-wrap ${shown ? 'open' : ''}`} inert={!open}>
+            <div className="analysis-clip">
+              <div className="analysis" ref={panel}>
+                {busy && <div className="analysis-busy">{t.analyzing}</div>}
+                {error && (
+                  <div className="error" role="alert">
+                    {t.errorPrefix} {error}
+                  </div>
+                )}
+                {!busy && message.breakdown && !mine && <BreakdownView breakdown={message.breakdown} />}
+                {!busy && message.feedback && mine && <FeedbackView feedback={message.feedback} />}
+                {/* Kept while busy (aria-disabled, not disabled), so the keyboard focus on it isn't dropped to the page. */}
+                {(analysis || error) && (
+                  <button type="button" className="link-button" aria-disabled={busy} onClick={() => !busy && analyze(true)}>
+                    {t.redo}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </WrittenAtLevelProvider>
   );
 }
