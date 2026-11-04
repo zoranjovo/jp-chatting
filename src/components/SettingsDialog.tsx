@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { flushSync } from 'react-dom';
 import { genkiBook, MAX_GENKI_LESSON } from '../../shared/genki.ts';
 import { asJlptLevel, JLPT_LEVELS } from '../../shared/jlpt.ts';
 import { allowedKanji, MAX_WK_LEVEL, parseWkLevel } from '../../shared/kanji.ts';
@@ -33,14 +32,9 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const setEndpoint = (patch: Partial<Settings['endpoint']>) => setDraft((d) => ({ ...d, endpoint: { ...d.endpoint, ...patch } }));
   const setClaude = (patch: Partial<Settings['claude']>) => setDraft((d) => ({ ...d, claude: { ...d.claude, ...patch } }));
 
-  // The number box keeps its own text so it can be emptied and retyped; the level follows whenever the text is a number,
-  // and the box shows the level again (clamped, whole) when it loses focus.
-  const [wkText, setWkText] = useState(String(settings.wkLevel));
-  const setWkLevel = (level: number) => {
-    set('wkLevel', level);
-    setWkText(String(level));
-  };
-  const showWkLevel = () => setWkText(String(draft.wkLevel));
+  // While the number box is being typed in it shows the text as typed, so it can be emptied and retyped; the level
+  // follows whenever the text is a number. Otherwise it shows the level itself, so nothing can leave the two apart.
+  const [wkTyped, setWkTyped] = useState<string | null>(null);
 
   const loadModels = useCallback(async (provider: Settings['provider'], endpoint: Settings['endpoint']) => {
     setLoading(true);
@@ -93,7 +87,8 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   return (
     <Dialog title={t.settingsTitle} onClose={onClose}>
       {(close) => (
-        <form onSubmit={(e) => submit(e, close)} className="form">
+        // noValidate: the level box may hold "2.5" or "-3" mid-edit; the level it stands for is already clamped.
+        <form onSubmit={(e) => submit(e, close)} className="form" noValidate>
           <h3>{t.sectionLearning}</h3>
           <label className="field">
             <span>{t.uiLanguage}</span>
@@ -108,22 +103,18 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               {t.wkLevelLabel}: <strong>{draft.wkLevel}</strong>
             </span>
             <div className="level-row">
-              <input type="range" min={0} max={MAX_WK_LEVEL} value={draft.wkLevel} onChange={(e) => setWkLevel(Number(e.target.value))} />
+              <input type="range" min={0} max={MAX_WK_LEVEL} value={draft.wkLevel} onChange={(e) => set('wkLevel', Number(e.target.value))} />
               <input
                 type="number"
                 min={0}
                 max={MAX_WK_LEVEL}
-                value={wkText}
+                value={wkTyped ?? String(draft.wkLevel)}
                 onChange={(e) => {
-                  setWkText(e.target.value);
+                  setWkTyped(e.target.value);
                   const level = parseWkLevel(e.target.value);
                   if (level !== null) set('wkLevel', level);
                 }}
-                onBlur={showWkLevel}
-                onKeyDown={(e) => {
-                  // Enter submits straight from the box, so the box must show the clamped level before native validation runs.
-                  if (e.key === 'Enter') flushSync(showWkLevel);
-                }}
+                onBlur={() => setWkTyped(null)}
               />
             </div>
             <small className="muted">{t.wkLevelHint(draft.wkLevel, kanjiCount)}</small>

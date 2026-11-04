@@ -20,12 +20,16 @@ const KANJI = new Map<string, KanjiInfo>(
 
 export const MAX_WK_LEVEL = 60;
 
-/** A typed level as a whole number 0..MAX_WK_LEVEL, or null while the text isn't a number yet (empty, "-"). */
+/** Any number as a level: whole, 0..MAX_WK_LEVEL. The one rule for the UI and for saved settings. */
+export function clampWkLevel(n: number): number {
+  return Math.max(0, Math.min(MAX_WK_LEVEL, Math.round(n)));
+}
+
+/** A typed level, clamped, or null while the text isn't a number yet (empty, "-"). Too big a number ("1e400") is the top level. */
 export function parseWkLevel(text: string): number | null {
   if (!text.trim()) return null;
   const n = Number(text);
-  if (!Number.isFinite(n)) return null;
-  return Math.max(0, Math.min(MAX_WK_LEVEL, Math.round(n)));
+  return Number.isNaN(n) ? null : clampWkLevel(n);
 }
 
 const KANJI_CHAR = /[㐀-䶿一-鿿豈-﫿]/u;

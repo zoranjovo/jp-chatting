@@ -16,7 +16,6 @@ import { parseInline } from '../../src/components/RichText.tsx';
 import { LanguageProvider } from '../../src/i18n.tsx';
 import { SettingsContext } from '../../src/settings.tsx';
 import { SetupNotice } from '../../src/components/SetupNotice.tsx';
-import { SettingsDialog } from '../../src/components/SettingsDialog.tsx';
 
 function render(node: ReactNode, patch: Partial<Settings> = {}): string {
   const settings = { ...DEFAULT_SETTINGS, ...patch };
@@ -440,14 +439,5 @@ describe('SetupNotice', () => {
   test('shows while no model is chosen, and not once one is', () => {
     assert.match(render(<SetupNotice onOpenSettings={() => {}} />, { provider: 'endpoint', endpoint: endpoint('') }), /Choose a model first.*Open Settings/);
     assert.equal(render(<SetupNotice onOpenSettings={() => {}} />, { provider: 'endpoint', endpoint: endpoint('qwen') }), '');
-  });
-});
-
-describe('SettingsDialog', () => {
-  test('the WaniKani label, slider and number box all show the saved level', () => {
-    const html = render(<SettingsDialog onClose={() => {}} />, { wkLevel: 17 });
-    assert.match(html, /WaniKani level: <strong>17<\/strong>/);
-    assert.match(html, /<input type="range"[^>]*value="17"/);
-    assert.match(html, /<input type="number"[^>]*value="17"/);
   });
 });

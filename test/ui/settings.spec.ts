@@ -145,6 +145,25 @@ test('a negative level becomes 0, and Enter in the box saves it', async ({ app, 
   expect((await saved(request)).wkLevel).toBe(0);
 });
 
+for (const [typed, level] of [['2.5', 3], ['75', 60]] as const) {
+  test(`Enter in the level box saves ${typed} as ${level}`, async ({ app, request }) => {
+    const { box, label } = await clearLevelBox(app);
+    await box.pressSequentially(typed);
+    await expect(label).toHaveText(String(level));
+    await box.press('Enter');
+    await expect(app.getByRole('dialog')).toHaveCount(0);
+    expect((await saved(request)).wkLevel).toBe(level);
+  });
+}
+
+test('the Save button saves a level still typed as a fraction', async ({ app, request }) => {
+  const { dialog, box } = await clearLevelBox(app);
+  await box.pressSequentially('7.4');
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect(app.getByRole('dialog')).toHaveCount(0);
+  expect((await saved(request)).wkLevel).toBe(7);
+});
+
 test('leaving the level box empty keeps the level it had', async ({ app }) => {
   const { dialog, box, slider, label } = await clearLevelBox(app);
   await expect(label).toHaveText('10');
