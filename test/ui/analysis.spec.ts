@@ -70,6 +70,39 @@ test('Check gives feedback on the learner\'s message', async ({ app }) => {
   await expect(message.locator('.line-fix')).toHaveCount(1);
 });
 
+test('furigana in the learner\'s feedback uses the panel\'s colour, not the dark bubble\'s', async ({ app, request }) => {
+  // 願 is WaniKani level 13, so at the tests' level (TEST_SETTINGS.wkLevel) the correction would be spelled out in kana.
+  await request.put('/api/settings', { data: { wkLevel: 20 } });
+  await app.reload();
+  await startChat(app);
+  // Typed with furigana markup, so the learner's own bubble has a reading too.
+  await composer(app).fill('コーヒーがお{願|ねが}いします。');
+  await composer(app).press('Enter');
+  await expect(theirs(app)).toHaveCount(2);
+  const message = mine(app).first();
+  await message.getByRole('button', { name: 'Check' }).click();
+  const rt = message.locator('.fix-row-fix rt').first();
+  await expect(rt).toHaveText('ねが');
+  const colours = () =>
+    Promise.all([
+      rt.evaluate((el) => getComputedStyle(el).color),
+      message.locator('.bubble rt').first().evaluate((el) => getComputedStyle(el).color),
+      theirs(app).first().locator('rt').first().evaluate((el) => getComputedStyle(el).color),
+    ]);
+
+  // The panel uses --muted in each scheme, like the partner's bubble; the learner's dark bubble keeps its light ink.
+  let [panelRt, bubbleRt, partnerRt] = await colours();
+  expect(panelRt).toBe('rgb(111, 106, 98)');
+  expect(partnerRt).toBe(panelRt);
+  expect(bubbleRt).not.toBe(panelRt);
+
+  await app.emulateMedia({ colorScheme: 'dark' });
+  [panelRt, bubbleRt, partnerRt] = await colours();
+  expect(panelRt).toBe('rgb(155, 149, 140)');
+  expect(partnerRt).toBe(panelRt);
+  expect(bubbleRt).not.toBe(panelRt);
+});
+
 test('the partner\'s and the learner\'s analyses are independent', async ({ app, request }) => {
   await startChat(app);
   await composer(app).fill('コーヒーがおねがいします。');
