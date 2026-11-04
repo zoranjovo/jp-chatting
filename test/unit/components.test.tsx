@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { DEFAULT_SETTINGS, type Breakdown, type Chat, type Feedback, type Message, type MessageContext, type Settings } from '../../shared/types.ts';
+import { DEFAULT_SETTINGS, needsModel, type Breakdown, type Chat, type Feedback, type Message, type MessageContext, type Settings } from '../../shared/types.ts';
 import { BreakdownView, FeedbackView, glossSegments } from '../../src/components/Analysis.tsx';
 import { ChatSettingsDialog } from '../../src/components/ChatSettingsDialog.tsx';
 import { ContextLine } from '../../src/components/ContextLine.tsx';
@@ -14,13 +14,13 @@ import { ContextDetails } from '../../src/components/MessageInfo.tsx';
 import { JpText } from '../../src/components/JpText.tsx';
 import { parseInline } from '../../src/components/RichText.tsx';
 import { LanguageProvider } from '../../src/i18n.tsx';
-import { needsModel, SettingsContext } from '../../src/settings.tsx';
+import { SettingsContext } from '../../src/settings.tsx';
 import { SetupNotice } from '../../src/components/SetupNotice.tsx';
 
 function render(node: ReactNode, patch: Partial<Settings> = {}): string {
   const settings = { ...DEFAULT_SETTINGS, ...patch };
   return renderToStaticMarkup(
-    <SettingsContext.Provider value={{ settings, update: async () => {} }}>
+    <SettingsContext.Provider value={{ settings, loaded: true, update: async () => {} }}>
       <LanguageProvider language={settings.uiLanguage}>{node}</LanguageProvider>
     </SettingsContext.Provider>,
   );

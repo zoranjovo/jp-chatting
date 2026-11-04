@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { genkiBook, MAX_GENKI_LESSON } from '../../shared/genki.ts';
 import { asJlptLevel, JLPT_LEVELS } from '../../shared/jlpt.ts';
 import { allowedKanji, MAX_WK_LEVEL } from '../../shared/kanji.ts';
-import { ENDPOINT_REASONING, type ClaudeEffort, type EndpointReasoning, type ModelList, type Settings } from '../../shared/types.ts';
+import { ENDPOINT_REASONING, needsModel, type ClaudeEffort, type EndpointReasoning, type ModelList, type Settings } from '../../shared/types.ts';
 import { api } from '../api.ts';
 import { useT } from '../i18n.tsx';
 import { useSettings } from '../settings.tsx';
@@ -252,7 +252,8 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               </small>
             )}
             {models && !models.error && !loading && options.length === 0 && <small className="muted">{t.noModels}</small>}
-            {draft.provider === 'endpoint' && !draft.endpoint.model && !loading && <small className="warn-text">{t.noModelWarning}</small>}
+            {/* Only when nothing above already explains the empty picker. */}
+            {needsModel(draft) && !loading && !models?.error && options.length > 0 && <small className="warn-text">{t.noModelWarning}</small>}
           </div>
 
           <div className="field model-test">

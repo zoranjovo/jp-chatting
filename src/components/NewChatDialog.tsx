@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import type { Politeness } from '../../shared/types.ts';
 import { useT } from '../i18n.tsx';
-import { needsModel, useSettings } from '../settings.tsx';
+import { useNeedsModel } from '../settings.tsx';
 import { type CloseDialog, Dialog } from './Dialog.tsx';
 import { SetupNotice } from './SetupNotice.tsx';
 
@@ -15,13 +15,12 @@ export function NewChatDialog({
   onOpenSettings: () => void;
 }) {
   const t = useT();
-  const blocked = needsModel(useSettings().settings);
+  const blocked = useNeedsModel();
   const [topic, setTopic] = useState('');
   const [politeness, setPoliteness] = useState<Politeness>('polite');
 
   const submit = (e: FormEvent, close: CloseDialog) => {
     e.preventDefault();
-    if (blocked) return;
     close(() => onStart(topic.trim(), politeness));
   };
 
