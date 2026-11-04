@@ -83,10 +83,12 @@ export function Composer({
         type="button"
         className={`romaji-toggle ${romaji ? 'on' : ''}`}
         onClick={() => update({ romajiInput: !romaji })}
-        title={romaji ? t.romajiOn : t.romajiOff}
+        // Named by the glyph it shows then what it does, so a voice command for what is on screen works;
+        // aria-pressed carries the state. No title: it would only say the name again as a description.
         aria-pressed={romaji}
       >
         {romaji ? 'あ' : 'A'}
+        <span className="sr-only"> {t.romajiInput}</span>
       </button>
       <textarea
         ref={ref}
@@ -95,6 +97,7 @@ export function Composer({
         onChange={onChange}
         onKeyDown={onKeyDown}
         placeholder={romaji ? t.composerPlaceholderRomaji : t.composerPlaceholder}
+        aria-label={t.composerLabel}
         lang="ja"
         autoCapitalize="off"
         autoCorrect="off"

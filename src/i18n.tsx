@@ -33,11 +33,10 @@ const en = {
   partnerSays: 'Your partner:',
   breakdownReady: 'Breakdown ready.',
   feedbackReady: 'Check ready.',
+  composerLabel: 'Message',
   composerPlaceholder: 'Write in Japanese… (Enter to send, Shift+Enter for a new line)',
   composerPlaceholderRomaji: 'Type romaji — it turns into kana (CAPS for katakana)…',
   send: 'Send',
-  romajiOn: 'Romaji → kana is on',
-  romajiOff: 'Romaji → kana is off',
   retryReply: 'Get a reply',
   errorPrefix: 'Something went wrong:',
 
@@ -69,6 +68,7 @@ const en = {
   sectionAi: 'AI',
   uiLanguage: 'Interface language',
   wkLevelLabel: 'WaniKani level',
+  wkLevelNumber: 'Type a WaniKani level',
   wkLevelHint: (level: number, count: number) =>
     level === 0 ? 'Kana only — no kanji.' : `Your partner may use the ${count} kanji from levels 1–${level}. Others are written in kana.`,
   furigana: 'Show furigana (readings over kanji)',
@@ -168,11 +168,10 @@ const ja: Strings = {
   partnerSays: '相手：',
   breakdownReady: '解説ができました。',
   feedbackReady: 'チェックができました。',
+  composerLabel: 'メッセージ',
   composerPlaceholder: '日本語で書いてください…（Enterで送信、Shift+Enterで改行）',
   composerPlaceholderRomaji: 'ローマ字で入力するとかなになります（大文字はカタカナ）…',
   send: '送信',
-  romajiOn: 'ローマ字→かな：オン',
-  romajiOff: 'ローマ字→かな：オフ',
   retryReply: '返信をもらう',
   errorPrefix: 'エラーが発生しました：',
 
@@ -204,6 +203,7 @@ const ja: Strings = {
   sectionAi: 'AI',
   uiLanguage: '表示言語',
   wkLevelLabel: 'WaniKaniレベル',
+  wkLevelNumber: 'WaniKaniレベルを入力',
   wkLevelHint: (level: number, count: number) =>
     level === 0 ? 'かなのみ（漢字なし）。' : `相手はレベル1〜${level}の漢字${count}字を使えます。それ以外はかなで書きます。`,
   furigana: 'ふりがなを表示する',
