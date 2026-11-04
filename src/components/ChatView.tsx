@@ -75,7 +75,7 @@ export function ChatView({
           </div>
         )}
         {needsReply && <SetupNotice onOpenSettings={onOpenSettings} />}
-        {needsReply && (error || chat.messages.length === 0) && (
+        {needsReply && (
           <button type="button" className="secondary retry" onClick={onRetry}>
             {t.retryReply}
           </button>

@@ -64,6 +64,16 @@ const reply = async (id: string) => api<Chat>('POST', `/api/chats/${id}/reply`);
 const send = async (id: string, content: string) => api<Chat>('POST', `/api/chats/${id}/messages`, { content });
 const analyze = async (id: string, mid: string, refresh = false) =>
   api<Message>('POST', `/api/chats/${id}/messages/${mid}/analyze${refresh ? '?refresh=1' : ''}`);
+const chatCalls = () => calls.filter((c) => c.kind === 'chat').length;
+
+/** Polls instead of sleeping a fixed time, so a slow runner can't fail the test. */
+async function until(condition: () => boolean, timeoutMs = 2000) {
+  const started = Date.now();
+  while (!condition()) {
+    if (Date.now() - started > timeoutMs) throw new Error('timed out waiting');
+    await new Promise((r) => setTimeout(r, 1));
+  }
+}
 
 beforeEach(async () => {
   calls.length = 0;
@@ -229,6 +239,81 @@ describe('conversation', () => {
     assert.equal(res.body.messages.length, 3);
     assert.deepEqual(calls[0].request.turns.map((t) => t.role), ['user', 'assistant', 'user']);
     assert.equal(calls[0].request.turns[2].content, 'げんきです！');
+  });
+
+  test('a reply asked for again while one is being written waits for it, and reads show it is coming', async () => {
+    const chat = await newChat();
+    let finish!: (text: string) => void;
+    answers.chat = () => new Promise<string>((r) => (finish = r));
+    const first = reply(chat.id);
+    await until(() => chatCalls() === 1);
+    // Any second model call answers at once, so a regression fails the count below instead of hanging the run.
+    answers.chat = DEFAULT_ANSWERS.chat;
+    assert.equal((await api<Chat>('GET', `/api/chats/${chat.id}`)).body.replying, true);
+    // Whether it joins the first, catches it just as it lands, or arrives after, the second gets the same chat and makes no call.
+    const second = reply(chat.id);
+    finish('はい、どうぞ。');
+    const [a, b] = await Promise.all([first, second]);
+    assert.equal(calls.filter((c) => c.kind === 'chat').length, 1, 'one model call');
+    assert.deepEqual(a.body, b.body);
+    assert.equal(a.body.messages.length, 1);
+    const after = (await api<Chat>('GET', `/api/chats/${chat.id}`)).body;
+    assert.equal(after.replying, undefined);
+    assert.equal(after.messages.length, 1);
+  });
+
+  test('the partner never answers itself: asking again after a reply landed changes nothing', async () => {
+    const chat = await newChat();
+    await reply(chat.id);
+    calls.length = 0;
+    const again = await reply(chat.id);
+    assert.equal(again.status, 200);
+    assert.equal(again.body.messages.length, 1);
+    assert.equal(chatCalls(), 0);
+  });
+
+  test('a reply to a message that was rewound away is not joined; the new message gets its own', async () => {
+    const chat = await newChat();
+    await reply(chat.id);
+    const m1 = (await send(chat.id, 'ひとつめ')).body.messages[1];
+    let finish!: (text: string) => void;
+    answers.chat = () => new Promise<string>((r) => (finish = r));
+    const late = reply(chat.id);
+    await until(() => chatCalls() === 2);
+    await api('POST', `/api/chats/${chat.id}/messages/${m1.id}/rewind`);
+    await send(chat.id, 'ふたつめ');
+    answers.chat = () => 'はい。';
+    const fresh = await reply(chat.id);
+    assert.deepEqual(fresh.body.messages.map((m) => m.content).slice(1), ['ふたつめ', 'はい。']);
+    finish('おそい');
+    assert.equal((await late).body.messages.length, 3, 'the late reply is dropped');
+  });
+
+  test('a reply under new settings starts afresh instead of waiting for one that may hang', async () => {
+    const chat = await newChat();
+    let release!: (text: string) => void;
+    answers.chat = () => new Promise<string>((r) => (release = r));
+    const stuck = reply(chat.id);
+    await until(() => chatCalls() === 1);
+    await api('PUT', '/api/settings', { endpoint: { model: 'another' } });
+    answers.chat = () => 'こんにちは！';
+    const res = await reply(chat.id);
+    assert.equal(res.body.messages.length, 1);
+    assert.equal(chatCalls(), 2);
+    // The stuck one finishing late is dropped: the opener is already there.
+    release('おそい');
+    assert.equal((await stuck).body.messages.length, 1);
+  });
+
+  test('a failed reply is not left marked as coming', async () => {
+    const chat = await newChat();
+    answers.chat = () => {
+      throw new AiError('down');
+    };
+    assert.equal((await reply(chat.id)).status, 502);
+    assert.equal((await api<Chat>('GET', `/api/chats/${chat.id}`)).body.replying, undefined);
+    answers.chat = DEFAULT_ANSWERS.chat;
+    assert.equal((await reply(chat.id)).body.messages.length, 1);
   });
 
   test('an empty message is refused', async () => {
