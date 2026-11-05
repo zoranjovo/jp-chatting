@@ -19,7 +19,7 @@ import { generateBreakdown, generateFeedback, generateReply, type CallAi } from 
 import type { JlptLevel } from '../shared/jlpt.ts';
 import { kanjiAboveLevel, stripFurigana } from '../shared/kanji.ts';
 import { problemCount, replyProblems, type ReplyProblems } from '../shared/quality.ts';
-import { DEFAULT_SETTINGS, type Breakdown, type ClaudeEffort, type EndpointReasoning, type Feedback, type Message, type Politeness, type Settings } from '../shared/types.ts';
+import { CLAUDE_EFFORTS, DEFAULT_SETTINGS, ENDPOINT_REASONING, type Breakdown, type Feedback, type Message, type Politeness, type Settings } from '../shared/types.ts';
 
 export const OUT_DIR = path.join(import.meta.dirname, '..', '.cache', 'eval');
 export const msg = (role: Message['role'], content: string, id = content): Message => ({ id, role, content, createdAt: '' });
@@ -303,8 +303,14 @@ function settingsFor(model: string, level: number, genki = 0, jlpt: JlptLevel = 
   const [provider, spec] = model.split(/:(.*)/s);
   const [name, suffix = ''] = spec.split('#');
   const base = { ...DEFAULT_SETTINGS, wkLevel: level, genkiLesson: genki, jlptLevel: jlpt };
-  if (provider === 'claude') return { ...base, provider: 'claude', claude: { ...DEFAULT_SETTINGS.claude, model: name, effort: suffix as ClaudeEffort, timeoutMs: 600_000 } };
-  return { ...base, provider: 'endpoint', endpoint: { baseUrl: 'http://localhost:1234/v1', apiKey: '', model: name, reasoning: suffix as EndpointReasoning } };
+  if (provider === 'claude') {
+    const effort = CLAUDE_EFFORTS.find((e) => e === suffix);
+    if (effort === undefined) throw new Error(`${model}: Claude's effort is one of ${CLAUDE_EFFORTS.filter(Boolean).join(', ')}`);
+    return { ...base, provider: 'claude', claude: { ...DEFAULT_SETTINGS.claude, model: name, effort, timeoutMs: 600_000 } };
+  }
+  const reasoning = ENDPOINT_REASONING.find((r) => r === suffix);
+  if (reasoning === undefined) throw new Error(`${model}: an endpoint's thinking is one of ${ENDPOINT_REASONING.filter(Boolean).join(', ')}`);
+  return { ...base, provider: 'endpoint', endpoint: { baseUrl: 'http://localhost:1234/v1', apiKey: '', model: name, reasoning } };
 }
 
 async function runCase(model: string, c: Case, sample: number): Promise<Result> {
@@ -461,6 +467,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
     const label = flag('--label') ?? new Date().toISOString().replace(/[:.]/g, '-');
     const samples = Number(flag('--samples') ?? 2);
     const models = args.length > 0 ? args : ['claude:haiku'];
+    // A mistyped "#level" fails here, before any model is called, not on every case of the run.
+    for (const m of models) settingsFor(m, 0);
     const entries = await Promise.all(models.map(async (m) => [m, await runModel(m, samples)] as const));
     const run: Run = Object.fromEntries(entries);
     fs.mkdirSync(OUT_DIR, { recursive: true });

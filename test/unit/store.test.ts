@@ -193,3 +193,11 @@ describe('endpoint thinking', () => {
     assert.equal(kept.endpoint.baseUrl, DEFAULT_SETTINGS.endpoint.baseUrl, 'a partial endpoint patch keeps the rest');
   });
 });
+
+describe('Claude effort', () => {
+  test('keeps a known effort and drops anything else, which the CLI would refuse', async () => {
+    assert.equal((await store.saveSettings({ claude: { effort: 'xhigh' } as never })).claude.effort, 'xhigh');
+    assert.equal((await store.saveSettings({ claude: { effort: 'none' } as never })).claude.effort, '');
+    assert.equal((await store.saveSettings({ claude: { effort: 'hgih' } as never })).claude.effort, '');
+  });
+});

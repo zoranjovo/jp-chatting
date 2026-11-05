@@ -2,14 +2,12 @@ import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type R
 import { genkiBook, MAX_GENKI_LESSON } from '../../shared/genki.ts';
 import { asJlptLevel, JLPT_LEVELS } from '../../shared/jlpt.ts';
 import { allowedKanji, MAX_WK_LEVEL, parseWkLevel } from '../../shared/kanji.ts';
-import { ENDPOINT_REASONING, needsModel, type ClaudeEffort, type EndpointReasoning, type ModelList, type Settings } from '../../shared/types.ts';
+import { CLAUDE_EFFORTS, ENDPOINT_REASONING, needsModel, type ClaudeEffort, type EndpointReasoning, type ModelList, type Settings } from '../../shared/types.ts';
 import { api } from '../api.ts';
 import { useT } from '../i18n.tsx';
 import { useSettings } from '../settings.tsx';
 import { type CloseDialog, Dialog } from './Dialog.tsx';
 import { Reveal } from './Reveal.tsx';
-
-const EFFORTS: ClaudeEffort[] = ['', 'low', 'medium', 'high', 'xhigh', 'max'];
 
 type TestState =
   | { state: 'idle' }
@@ -252,9 +250,9 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               <Field label={t.effort}>
                 {(a11y) => (
                   <select {...a11y} value={draft.claude.effort} onChange={(e) => setClaude({ effort: e.target.value as ClaudeEffort })}>
-                    {EFFORTS.map((e) => (
+                    {CLAUDE_EFFORTS.map((e) => (
                       <option key={e} value={e}>
-                        {e || t.effortDefault}
+                        {t.effortOption(e)}
                       </option>
                     ))}
                   </select>

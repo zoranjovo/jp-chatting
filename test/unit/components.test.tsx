@@ -319,7 +319,7 @@ describe('message context line', () => {
   const ctx: MessageContext = { provider: 'claude', model: 'claude-opus-5-5', effort: 'high', politeness: 'casual', wkLevel: 12, genkiLesson: 6, jlptLevel: 4 };
 
   test('lists the model, effort, style and levels', () => {
-    assert.ok(render(<ContextLine context={ctx} />).includes('>Opus 5.5 · high effort · Casual · WK 12 · Genki L6 · N4<'));
+    assert.ok(render(<ContextLine context={ctx} />).includes('>Opus 5.5 · Effort: High · Casual · WK 12 · Genki L6 · N4<'));
   });
 
   test('leaves out what is not set, and says kana only for level 0', () => {
@@ -328,7 +328,7 @@ describe('message context line', () => {
   });
 
   test('follows the UI language', () => {
-    assert.ok(render(<ContextLine context={ctx} />, { uiLanguage: 'ja' }).includes('>Opus 5.5 · エフォート high · カジュアル · WK12 · げんき第6課 · N4<'));
+    assert.ok(render(<ContextLine context={ctx} />, { uiLanguage: 'ja' }).includes('>Opus 5.5 · 思考レベル：高 · カジュアル · WK12 · げんき第6課 · N4<'));
   });
 
 });
@@ -382,7 +382,7 @@ describe('message info', () => {
     assert.deepEqual(rows.slice(0, 7), [
       ['Model', 'Opus 5.5'],
       ['AI provider', 'Claude Code CLI'],
-      ['Effort', 'high'],
+      ['Effort', 'High'],
       ['Partner’s speech style', 'Casual (plain form)'],
       ['WaniKani level', '12'],
       ['Genki lesson', 'Genki I · Lesson 6'],
@@ -405,12 +405,15 @@ describe('message info', () => {
     const off: MessageContext = { provider: 'endpoint', model: 'qwen3', effort: 'none', politeness: 'polite', wkLevel: 5, genkiLesson: 0, jlptLevel: 0 };
     assert.ok(render(<ContextDetails context={off} createdAt="" />).includes('<dt>Thinking</dt><dd>Off</dd>'));
     assert.ok(render(<ContextDetails context={{ ...off, effort: undefined }} createdAt="" />).includes('<dt>Thinking</dt><dd>Model default</dd>'));
-    assert.ok(render(<ContextLine context={off} />).includes('>qwen3 · thinking off · Polite · WK 5<'));
+    assert.ok(render(<ContextLine context={off} />).includes('>qwen3 · Thinking: Off · Polite · WK 5<'));
+    assert.ok(render(<ContextLine context={off} />, { uiLanguage: 'ja' }).includes('>qwen3 · 思考：オフ · 丁寧 · WK5<'));
+    assert.ok(render(<ContextDetails context={{ ...off, effort: 'high' }} createdAt="" />, { uiLanguage: 'ja' }).includes('<dt>思考</dt><dd>高</dd>'));
   });
 
   test('Claude\'s default effort is named, and the labels follow the UI language', () => {
     const html = render(<ContextDetails context={{ ...ctx, effort: undefined }} createdAt={message.createdAt} />, { uiLanguage: 'ja' });
-    assert.ok(html.includes('<dt>思考レベル</dt><dd>デフォルト</dd>'));
+    assert.ok(html.includes('<dt>思考レベル</dt><dd>CLIの既定</dd>'));
+    assert.ok(render(<ContextDetails context={{ ...ctx, effort: 'xhigh' }} createdAt="" />, { uiLanguage: 'ja' }).includes('<dt>思考レベル</dt><dd>とても高い</dd>'));
     assert.ok(html.includes('<dd>げんきI・第6課</dd>'));
   });
 });
