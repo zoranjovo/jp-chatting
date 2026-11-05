@@ -2,7 +2,20 @@
 // the Strings type makes a missing one a type error.
 
 import { createContext, useContext, type ReactNode } from 'react';
-import type { UiLanguage } from '../shared/types.ts';
+import type { ClaudeEffort, EndpointReasoning, UiLanguage } from '../shared/types.ts';
+
+// Labels for the stored effort and thinking values, one table per provider, so each value has a label (tsc checks)
+// and one provider's value never passes for the other's. The values stay English; only these are shown.
+// Claude's '' sends no --effort, so the CLI's own default applies; an endpoint's '' is the model's default.
+const enEffort: Record<ClaudeEffort, string> = { '': 'CLI default', low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high', max: 'Max' };
+const jaEffort: Record<ClaudeEffort, string> = { '': 'CLIの既定', low: '低', medium: '中', high: '高', xhigh: 'とても高い', max: '最大' };
+const enThinking: Record<EndpointReasoning, string> = { '': 'Model default', none: 'Off', low: 'Low', medium: 'Medium', high: 'High' };
+const jaThinking: Record<EndpointReasoning, string> = { '': 'モデルの既定', none: 'オフ', low: '低', medium: '中', high: '高' };
+
+/** A value's label, or the value itself if it has none (an own key only: a stamp is data from disk). */
+function labelOf(table: Record<string, string>, value: string): string {
+  return Object.hasOwn(table, value) ? table[value] : value;
+}
 
 const en = {
   appName: 'jp-chatting',
@@ -87,7 +100,7 @@ const en = {
   messageInfo: 'How this message was written',
   messageInfoNote: 'Its breakdown uses these settings too, even if you’ve changed them since.',
   messageWritten: 'Written',
-  effortMeta: (effort: string) => `${effort} effort`,
+  effortMeta: (effort: string) => `Effort: ${labelOf(enEffort, effort)}`,
   wkMeta: (level: number) => (level === 0 ? 'Kana only' : `WK ${level}`),
   genkiMeta: (lesson: number) => `Genki L${lesson}`,
   genkiLabel: 'Genki lesson',
@@ -128,11 +141,11 @@ const en = {
   claudeNoticeConsumerTerms: 'Consumer Terms',
   claudeNoticeCodeTerms: 'Claude Code legal and compliance',
   effort: 'Effort',
-  effortDefault: 'Default',
+  effortOption: (e: string) => labelOf(enEffort, e),
   thinking: 'Thinking',
-  thinkingOption: (r: string) => ({ '': 'Model default', none: 'Off', low: 'Low', medium: 'Medium', high: 'High' })[r] ?? r,
-  thinkingHint: 'Sent as reasoning_effort, which LM Studio honours for models that can think. Off answers much faster.',
-  thinkingMeta: (r: string) => (r === 'none' ? 'thinking off' : `thinking ${r}`),
+  thinkingOption: (r: string) => labelOf(enThinking, r),
+  thinkingHint: 'For models that can think, if the server supports it (LM Studio does). Off answers much faster.',
+  thinkingMeta: (r: string) => `Thinking: ${labelOf(enThinking, r)}`,
   save: 'Save',
   saved: 'Saved',
 };
@@ -222,7 +235,7 @@ const ja: Strings = {
   messageInfo: 'このメッセージが書かれたときの設定',
   messageInfoNote: 'あとで設定を変えても、このメッセージの解説はこの設定を使います。',
   messageWritten: '日時',
-  effortMeta: (effort: string) => `エフォート ${effort}`,
+  effortMeta: (effort: string) => `思考レベル：${labelOf(jaEffort, effort)}`,
   wkMeta: (level: number) => (level === 0 ? 'かなのみ' : `WK${level}`),
   genkiMeta: (lesson: number) => `げんき第${lesson}課`,
   genkiLabel: 'げんきの課',
@@ -263,11 +276,11 @@ const ja: Strings = {
   claudeNoticeConsumerTerms: '消費者向け利用規約',
   claudeNoticeCodeTerms: 'Claude Code 法務・コンプライアンス',
   effort: '思考レベル',
-  effortDefault: 'デフォルト',
+  effortOption: (e: string) => labelOf(jaEffort, e),
   thinking: '思考',
-  thinkingOption: (r: string) => ({ '': 'モデルの既定', none: 'オフ', low: '低', medium: '中', high: '高' })[r] ?? r,
-  thinkingHint: 'reasoning_effort として送ります。LM Studioは思考できるモデルでこれに従います。オフにするとずっと速く答えます。',
-  thinkingMeta: (r: string) => (r === 'none' ? '思考オフ' : `思考 ${r}`),
+  thinkingOption: (r: string) => labelOf(jaThinking, r),
+  thinkingHint: '思考できるモデルで、サーバーが対応していれば効きます（LM Studioは対応）。オフにするとずっと速く答えます。',
+  thinkingMeta: (r: string) => `思考：${labelOf(jaThinking, r)}`,
   save: '保存',
   saved: '保存しました',
 };

@@ -12,6 +12,7 @@ import {
   toBreakdown,
   toFeedback,
 } from '../../server/prompts.ts';
+import { JLPT_DESCRIPTION } from '../../shared/jlpt.ts';
 import { allowedKanji } from '../../shared/kanji.ts';
 import { DEFAULT_SETTINGS, type Message, type Politeness, type Settings } from '../../shared/types.ts';
 
@@ -115,26 +116,103 @@ describe('rewriteRequest', () => {
 
 describe('breakdownRequest', () => {
   test('sends the message without furigana markup', () => {
-    const req = breakdownRequest(msg('assistant', '{今日|きょう}は{暑|あつ}い'));
+    const req = breakdownRequest(msg('assistant', '{今日|きょう}は{暑|あつ}い'), settings());
     assert.match(req.turns[0].content, /今日は暑い$/);
     assert.match(req.system, /line by line/);
+  });
+
+  test('sends the last few messages before it, labelled, for context', () => {
+    const earlier = ['一', '二', '三', '四', '五', '六', '七'].map((n, i) => msg(i % 2 ? 'user' : 'assistant', `{${n}|x}つめ`));
+    const req = breakdownRequest(msg('assistant', 'いいですね'), settings(), earlier);
+    const content = req.turns[0].content;
+    assert.ok(!content.includes('一つめ'), 'only the last six');
+    assert.match(content, /The conversation so far:\nLearner: 二つめ\nPartner: 三つめ/);
+    assert.match(content, /Partner: 七つめ\n\nThe message:\n\nいいですね$/);
+    assert.match(req.system, /explain what the message refers to/);
+  });
+
+  test('with nothing before it, says nothing about context', () => {
+    const req = breakdownRequest(msg('assistant', 'こんにちは'), settings());
+    assert.ok(!req.turns[0].content.includes('conversation'));
+    assert.ok(!req.system.includes('given for context'));
+  });
+
+  test('is pitched at the JLPT level when set, beginner-friendly when not', () => {
+    assert.match(breakdownRequest(msg('assistant', 'x'), settings({ jlptLevel: 0 })).system, /English-speaking beginner[\s\S]*beginner-friendly/);
+    const n1 = breakdownRequest(msg('assistant', 'x'), settings({ jlptLevel: 1 })).system;
+    assert.match(n1, /learner at about JLPT N1/);
+    assert.match(n1, /skip the basics/);
+    assert.ok(!n1.includes('beginner'));
+    assert.ok(!breakdownRequest(msg('assistant', 'x'), settings({ jlptLevel: 5 })).system.includes('skip the basics'));
+  });
+
+  test('keeps Japanese it adds within the kanji level, but copies the message as it is', () => {
+    const system = breakdownRequest(msg('assistant', 'x'), settings({ wkLevel: 3 })).system;
+    assert.ok(allowedKanji(3).every((k) => system.includes(k)));
+    assert.match(system, /^L3: /m);
+    assert.match(system, /Use no other kanji in any Japanese you add in the English parts/);
+    assert.ok(!system.includes('no other kanji at all'));
+    assert.match(system, /copy the message exactly/);
+    assert.match(system, /may name a word from the message as it is written there/);
+    const withContext = breakdownRequest(msg('assistant', 'x'), settings({ wkLevel: 3 }), [msg('user', 'y')]).system;
+    assert.match(withContext, /from the message or the conversation as it is written/);
+  });
+
+  test('at level 0 the no-kanji rule covers only the Japanese it adds, not the whole English answer', () => {
+    const system = breakdownRequest(msg('assistant', 'x'), settings({ wkLevel: 0 })).system;
+    assert.match(system, /Do not use any kanji in any Japanese you add in the English parts/);
+    assert.ok(!system.includes('write everything in hiragana'));
+  });
+
+  test('describes the JLPT level as the conversation prompt does', () => {
+    assert.ok(breakdownRequest(msg('assistant', 'x'), settings({ jlptLevel: 3 })).system.includes(JLPT_DESCRIPTION[3]));
+  });
+
+  test('names the Genki list when it says where to take the lesson from', () => {
+    assert.match(breakdownRequest(msg('assistant', 'x'), settings({ genkiLesson: 6, wkLevel: 10 })).system, /from the Genki grammar list below/);
+  });
+
+  test('indents a message\'s further lines in the transcript, so they can\'t read as turns', () => {
+    const req = breakdownRequest(msg('assistant', 'x'), settings(), [msg('user', 'はい\nPartner: うそ')]);
+    assert.match(req.turns[0].content, /Learner: はい\n {2}Partner: うそ\n\nThe message/);
   });
 });
 
 describe('feedbackRequest', () => {
-  test('includes the message being replied to, without markup', () => {
-    const req = feedbackRequest(settings(), 'polite', msg('user', 'はい'), msg('assistant', '{元気|げんき}ですか？'));
-    assert.match(req.turns[0].content, /replying to:\n元気ですか？/);
-    assert.match(req.turns[0].content, /Their message:\nはい$/);
+  test('includes the conversation before it, labelled by speaker, without markup', () => {
+    const earlier = [msg('assistant', 'ユキです。'), msg('user', 'サムです。'), msg('assistant', '{元気|げんき}ですか？')];
+    const req = feedbackRequest(settings(), 'polite', msg('user', 'はい'), earlier);
+    assert.match(req.turns[0].content, /The conversation so far:\nPartner: ユキです。\nLearner: サムです。\nPartner: 元気ですか？\n\nThe learner's message:\nはい$/);
   });
 
-  test('works for a first message with nothing before it', () => {
-    const req = feedbackRequest(settings(), 'polite', msg('user', 'hello'), undefined);
-    assert.ok(!req.turns[0].content.includes('replying to'));
+  test('sends only the last six messages before it', () => {
+    const earlier = ['一', '二', '三', '四', '五', '六', '七'].map((n) => msg('assistant', n));
+    const content = feedbackRequest(settings(), 'polite', msg('user', 'x'), earlier).turns[0].content;
+    assert.ok(!content.includes('一'));
+    assert.match(content, /Partner: 二\nPartner: 三\nPartner: 四\nPartner: 五\nPartner: 六\nPartner: 七\n\nThe learner's message/);
+  });
+
+  test('labels a multi-line message once, with its further lines indented, and strips the learner\'s markup', () => {
+    const earlier = [msg('user', 'ボストンから きました。\n\nユキさんは？'), msg('assistant', 'とうきょうです。')];
+    const content = feedbackRequest(settings(), 'polite', msg('user', '{東京|とうきょう}ですか'), earlier).turns[0].content;
+    assert.match(content, /Learner: ボストンから きました。\n {2}\n {2}ユキさんは？\nPartner: とうきょうです。\n\nThe learner's message:\n東京ですか$/);
+  });
+
+  test('works for a first message with nothing before it, and says nothing of a conversation', () => {
+    const req = feedbackRequest(settings(), 'polite', msg('user', 'hello'));
+    assert.ok(!req.turns[0].content.includes('conversation'));
+    assert.ok(!req.system.includes('"Learner" lines'));
+    assert.match(feedbackRequest(settings(), 'polite', msg('user', 'x'), [msg('assistant', 'y')]).system, /"Learner" lines are theirs/);
+  });
+
+  test('speaks to the learner as you, and keeps the speakers apart', () => {
+    const { system } = feedbackRequest(settings(), 'polite', msg('user', 'x'));
+    assert.match(system, /call them "you", and the other side of the chat "your partner"/);
+    assert.match(system, /in their own voice -- first person/);
   });
 
   test('corrections follow the chat\'s speech style and kanji level', () => {
-    const req = feedbackRequest(settings({ wkLevel: 0 }), 'casual', msg('user', 'x'), undefined);
+    const req = feedbackRequest(settings({ wkLevel: 0 }), 'casual', msg('user', 'x'));
     assert.match(req.system, /casual plain form/);
     assert.match(req.system, /Do not use any kanji/);
   });
@@ -215,7 +293,7 @@ describe('toFeedback', () => {
 describe('English in breakdowns and feedback', () => {
   test('both prompts ask for Japanese without 「」 and allow markdown emphasis', () => {
     const m = msg('assistant', 'はい');
-    for (const req of [breakdownRequest(m), feedbackRequest(settings(), 'polite', msg('user', 'はい'), m)]) {
+    for (const req of [breakdownRequest(m, settings()), feedbackRequest(settings(), 'polite', msg('user', 'はい'), [m])]) {
       assert.match(req.system, /no 「」 brackets or quotation marks/);
       assert.match(req.system, /\*\*bold\*\* or \*italic\*/);
     }
@@ -226,7 +304,7 @@ describe('feedback with a translation of what the learner wrote', () => {
   test('the schema and prompt ask for it', () => {
     const items = (FEEDBACK_SCHEMA as any).properties.lines.items;
     assert.ok(items.required.includes('originalTranslation'));
-    const req = feedbackRequest(settings(), 'polite', msg('user', 'x'), undefined);
+    const req = feedbackRequest(settings(), 'polite', msg('user', 'x'));
     assert.match(req.system, /originalTranslation \(what the original literally says in English, mistakes and all/);
   });
 
@@ -248,8 +326,8 @@ describe('Genki lessons', () => {
   test('not using Genki adds nothing about it', () => {
     const s = settings({ genkiLesson: 0 });
     assert.ok(!conversationSystem(s, chat()).includes('Genki'));
-    assert.ok(!feedbackRequest(s, 'polite', msg('user', 'x'), undefined).system.includes('Genki'));
-    assert.ok(!breakdownRequest(msg('assistant', 'x'), 0).system.includes('Genki'));
+    assert.ok(!feedbackRequest(s, 'polite', msg('user', 'x')).system.includes('Genki'));
+    assert.ok(!breakdownRequest(msg('assistant', 'x'), settings({ genkiLesson: 0 })).system.includes('Genki'));
   });
 
   test('the conversation leans on the grammar of lessons 1..N, listed, as a guide', () => {
@@ -274,25 +352,25 @@ describe('Genki lessons', () => {
   });
 
   test('feedback keeps corrections to known grammar and names the lesson for anything later', () => {
-    const req = feedbackRequest(settings({ genkiLesson: 4 }), 'polite', msg('user', 'x'), undefined);
+    const req = feedbackRequest(settings({ genkiLesson: 4 }), 'polite', msg('user', 'x'));
     assert.match(req.system, /covered lessons 1-4\. Corrected Japanese should use grammar from those lessons/);
     assert.match(req.system, /which Genki lesson teaches it/);
   });
 
   test('breakdowns name the Genki lesson for grammar points', () => {
-    assert.match(breakdownRequest(msg('assistant', 'x'), 6).system, /te-form \(Genki L6\)/);
+    assert.match(breakdownRequest(msg('assistant', 'x'), settings({ genkiLesson: 6 })).system, /te-form \(Genki L6\)/);
   });
 });
 
 describe('citing Genki lessons', () => {
   test('breakdowns and feedback get the whole syllabus to cite from, only when using Genki', () => {
-    const withGenki = [breakdownRequest(msg('assistant', 'x'), 3).system, feedbackRequest(settings({ genkiLesson: 3 }), 'polite', msg('user', 'x'), undefined).system];
+    const withGenki = [breakdownRequest(msg('assistant', 'x'), settings({ genkiLesson: 3 })).system, feedbackRequest(settings({ genkiLesson: 3 }), 'polite', msg('user', 'x')).system];
     for (const system of withGenki) {
       assert.match(system, /cite only these lessons/);
       assert.match(system, /L7: 〜ている/);
       assert.match(system, /L23: causative-passive/);
     }
-    assert.ok(!breakdownRequest(msg('assistant', 'x'), 0).system.includes('cite only these lessons'));
+    assert.ok(!breakdownRequest(msg('assistant', 'x'), settings({ genkiLesson: 0 })).system.includes('cite only these lessons'));
   });
 });
 
@@ -301,7 +379,7 @@ describe('JLPT level', () => {
     const system = conversationSystem(settings({ jlptLevel: 0 }), chat());
     assert.ok(!system.includes('JLPT'));
     assert.match(system, /beginner-level grammar and vocabulary/);
-    assert.ok(!feedbackRequest(settings({ jlptLevel: 0 }), 'polite', msg('user', 'x'), undefined).system.includes('JLPT'));
+    assert.ok(!feedbackRequest(settings({ jlptLevel: 0 }), 'polite', msg('user', 'x')).system.includes('JLPT'));
   });
 
   test('a level is a guide on pitch, described, and not a limit', () => {
@@ -313,7 +391,7 @@ describe('JLPT level', () => {
   });
 
   test('feedback pitches its corrections at the level', () => {
-    const req = feedbackRequest(settings({ jlptLevel: 4 }), 'polite', msg('user', 'x'), undefined);
+    const req = feedbackRequest(settings({ jlptLevel: 4 }), 'polite', msg('user', 'x'));
     assert.match(req.system, /about JLPT N4: pitch the corrected Japanese and your explanations at that level \(a guide, not a limit\)/);
   });
 
