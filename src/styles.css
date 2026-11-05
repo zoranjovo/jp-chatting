@@ -19,6 +19,12 @@
   --bad: #b3261e;
   --bad-soft: #f8dedb;
   --over: #fff0b8;
+  /* The undo toast: inverted on the light page; in the dark, a raised panel whose action carries the accent. */
+  --toast: #1f1d1a;
+  --toast-ink: #fffdf9;
+  --toast-edge: transparent;
+  --toast-action: rgb(255 253 249 / 16%);
+  --toast-action-ink: #fffdf9;
   --shadow: 0 1px 2px rgb(30 25 20 / 6%), 0 4px 16px rgb(30 25 20 / 5%);
   --radius: 14px;
   --font: 'Inter', system-ui, -apple-system, 'Segoe UI', 'Hiragino Sans', 'Yu Gothic UI', 'Meiryo', 'Noto Sans JP', sans-serif;
@@ -47,6 +53,11 @@
     --bad: #f08a80;
     --bad-soft: #3d2220;
     --over: #5a4a12;
+    --toast: #2c2b31;
+    --toast-ink: #ece8e1;
+    --toast-edge: #3b3941;
+    --toast-action: #e0644e;
+    --toast-action-ink: #1a0f0c;
     --shadow: 0 1px 2px rgb(0 0 0 / 30%);
     color-scheme: dark;
   }
@@ -1040,8 +1051,9 @@ ruby rt {
   gap: 12px;
   padding: 8px 8px 8px 14px;
   border-radius: 12px;
-  background: var(--ink);
-  color: var(--surface);
+  border: 1px solid var(--toast-edge);
+  background: var(--toast);
+  color: var(--toast-ink);
   box-shadow: var(--shadow);
   font-size: 14px;
 }
@@ -1049,15 +1061,15 @@ ruby rt {
 .undo-toast button {
   border: 0;
   border-radius: 8px;
-  padding: 6px 12px;
-  background: color-mix(in srgb, var(--surface) 16%, transparent);
-  color: inherit;
+  padding: 6px 14px;
+  background: var(--toast-action);
+  color: var(--toast-action-ink);
   font: inherit;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .undo-toast button:hover {
-  background: color-mix(in srgb, var(--surface) 26%, transparent);
+  background: color-mix(in srgb, var(--toast-action) 82%, var(--toast-ink));
 }
 
 .composer {
