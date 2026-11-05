@@ -743,8 +743,46 @@ describe('message context', () => {
   });
 });
 
+describe('drafts', () => {
+  const saveDraft = (id: string, draft: unknown) => api('PUT', `/api/chats/${id}/draft`, { draft });
+  const get = async (id: string) => (await api<Chat>('GET', `/api/chats/${id}`)).body;
+
+  test('are saved with the chat, and an empty one is dropped', async () => {
+    const chat = await newChat();
+    assert.deepEqual((await saveDraft(chat.id, 'とうきょう\nまで')).body, { ok: true });
+    assert.equal((await get(chat.id)).draft, 'とうきょう\nまで');
+    await saveDraft(chat.id, '');
+    assert.equal('draft' in (await get(chat.id)), false);
+  });
+
+  test('saving one leaves the chat where it is in the list', async () => {
+    const a = await newChat('older');
+    await new Promise((r) => setTimeout(r, 5));
+    const b = await newChat('newer');
+    await saveDraft(a.id, 'まだ');
+    const order = (await api<Chat[]>('GET', '/api/chats')).body.map((c) => c.id).filter((id) => id === a.id || id === b.id);
+    assert.deepEqual(order, [b.id, a.id]);
+  });
+
+  test('must be text, and an unknown chat is a 404', async () => {
+    const chat = await newChat();
+    assert.equal((await saveDraft(chat.id, 3)).status, 400);
+    assert.equal((await saveDraft('00000000-0000-4000-8000-000000000000', 'x')).status, 404);
+  });
+
+  test('sending a message clears the draft', async () => {
+    const chat = await newChat();
+    await saveDraft(chat.id, 'げんきです');
+    const sent = (await send(chat.id, 'げんきです')).body;
+    assert.equal(sent.draft, undefined);
+    assert.equal((await get(chat.id)).draft, undefined);
+  });
+});
+
 describe('rewind', () => {
-  const rewind = (id: string, mid: string) => api<Chat>('POST', `/api/chats/${id}/messages/${mid}/rewind`);
+  const rewind = (id: string, mid: string, draft?: string) =>
+    api<Chat>('POST', `/api/chats/${id}/messages/${mid}/rewind`, draft === undefined ? undefined : { draft });
+  const undo = (id: string) => api<Chat>('POST', `/api/chats/${id}/undo-rewind`);
 
   async function conversation() {
     const chat = await newChat();
@@ -762,6 +800,94 @@ describe('rewind', () => {
     assert.equal(res.status, 200);
     assert.deepEqual(res.body.messages.map((m) => m.id), [chat.messages[0].id]);
     assert.deepEqual((await api<Chat>('GET', `/api/chats/${chat.id}`)).body.messages.length, 1);
+  });
+
+  test('puts the rewound text in the saved draft, above what the page says is typed', async () => {
+    const chat = await conversation();
+    await api('PUT', `/api/chats/${chat.id}/draft`, { draft: 'saved earlier' });
+    const res = (await rewind(chat.id, chat.messages[1].id, 'typed just now')).body;
+    assert.equal(res.draft, 'one\n\ntyped just now');
+    assert.equal((await api<Chat>('GET', `/api/chats/${chat.id}`)).body.draft, 'one\n\ntyped just now');
+  });
+
+  test('without the typed text, it goes above the saved draft, or alone', async () => {
+    const chat = await conversation();
+    assert.equal((await rewind(chat.id, chat.messages[3].id)).body.draft, 'two');
+    await api('PUT', `/api/chats/${chat.id}/draft`, { draft: 'あと' });
+    assert.equal((await rewind(chat.id, chat.messages[1].id)).body.draft, 'one\n\nあと');
+  });
+
+  test('pins the rewound message\'s feedback, and pins nothing when it was never checked', async () => {
+    const chat = await conversation();
+    await analyze(chat.id, chat.messages[3].id);
+    const pinned = (await rewind(chat.id, chat.messages[3].id)).body;
+    assert.equal(pinned.pinned?.content, 'two');
+    assert.equal(pinned.pinned?.feedback.verdict, 'correct');
+    assert.equal(calls.filter((c) => c.kind === 'feedback').length, 1, 'no model call for the rewind itself');
+
+    const unpinned = (await rewind(chat.id, chat.messages[1].id)).body;
+    assert.equal(unpinned.pinned, undefined, 'a rewind of an unchecked message replaces the pin with nothing');
+  });
+
+  test('the pinned feedback can be dismissed, and goes once a message is sent', async () => {
+    const chat = await conversation();
+    await analyze(chat.id, chat.messages[1].id);
+    await rewind(chat.id, chat.messages[1].id);
+    assert.equal((await api<Chat>('DELETE', `/api/chats/${chat.id}/pinned`)).body.pinned, undefined);
+    assert.equal((await api<Chat>('GET', `/api/chats/${chat.id}`)).body.pinned, undefined);
+
+    const again = await conversation();
+    await analyze(again.id, again.messages[1].id);
+    await rewind(again.id, again.messages[1].id);
+    assert.equal((await send(again.id, 'one, fixed')).body.pinned, undefined);
+  });
+
+  test('undo puts back the messages and their analyses, and the draft and pin from before', async () => {
+    const chat = await conversation();
+    await analyze(chat.id, chat.messages[1].id);
+    await analyze(chat.id, chat.messages[2].id);
+    await rewind(chat.id, chat.messages[3].id);
+    const before = (await api<Chat>('GET', `/api/chats/${chat.id}`)).body;
+    await rewind(chat.id, chat.messages[1].id, before.draft);
+    await api('PUT', `/api/chats/${chat.id}/draft`, { draft: 'typed after the rewind' });
+
+    const restored = (await undo(chat.id)).body;
+    assert.deepEqual(restored.messages.map((m) => m.id), before.messages.map((m) => m.id));
+    assert.ok(restored.messages[1].feedback, 'the learner\'s feedback is back');
+    assert.ok(restored.messages[2].breakdown, 'the partner\'s breakdown is back');
+    assert.equal(restored.draft, before.draft, 'the draft is as it was before the rewind; typing since is gone');
+    assert.deepEqual(restored.pinned, before.pinned);
+    assert.equal(restored.undo, undefined);
+  });
+
+  test('only the last rewind can be undone, and only until a message is added', async () => {
+    const chat = await conversation();
+    await rewind(chat.id, chat.messages[3].id);
+    await rewind(chat.id, chat.messages[1].id);
+    assert.equal((await undo(chat.id)).body.messages.length, 3, 'back to before the second rewind');
+    const nothing = await api<{ error: string }>('POST', `/api/chats/${chat.id}/undo-rewind`);
+    assert.equal(nothing.status, 400);
+    assert.match(nothing.body.error, /nothing to undo/);
+
+    await rewind(chat.id, chat.messages[1].id);
+    await send(chat.id, 'one again');
+    assert.equal((await undo(chat.id)).status, 400, 'a sent message ends it');
+
+    const other = await newChat();
+    await reply(other.id);
+    const sent = (await send(other.id, 'hi')).body;
+    await rewind(other.id, sent.messages[1].id);
+    await send(other.id, 'hi again');
+    await reply(other.id);
+    assert.equal((await undo(other.id)).status, 400);
+  });
+
+  test('a new reply ends the undo too', async () => {
+    const chat = await newChat();
+    const sent = (await send(chat.id, 'はじめまして')).body;
+    await rewind(chat.id, sent.messages[0].id);
+    await reply(chat.id);
+    assert.equal((await undo(chat.id)).status, 400);
   });
 
   test('rewinding to the last message removes just that one', async () => {

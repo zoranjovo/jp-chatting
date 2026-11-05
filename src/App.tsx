@@ -6,12 +6,17 @@ import { ChatSettingsDialog, type ChatPatch } from './components/ChatSettingsDia
 import { NewChatDialog } from './components/NewChatDialog.tsx';
 import { SettingsDialog } from './components/SettingsDialog.tsx';
 import { SetupNotice } from './components/SetupNotice.tsx';
-import { setDraft } from './drafts.ts';
+import { getDraft, replaceDraft, seedDraft, setDraft, setDraftSaver, takeDraft } from './drafts.ts';
 import { Sidebar } from './components/Sidebar.tsx';
 import { LanguageProvider, useT } from './i18n.tsx';
 import { onHistory, useBackToClose, whenSettled } from './back.ts';
 import { NARROW, useMediaQuery } from './layout.ts';
 import { SettingsContext } from './settings.tsx';
+
+// A save that fails (the chat was deleted meanwhile, the server stopped) leaves the text in the box to try again.
+setDraftSaver((chatId, text) => {
+  api.saveDraft(chatId, text).catch(() => {});
+});
 
 export function App() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
@@ -120,6 +125,7 @@ function Shell({ loadError }: { loadError: string | null }) {
   /** Shows a chat the server returned, if it is still the one on screen. */
   const show = useCallback((next: Chat) => {
     latest.current.set(next.id, next);
+    seedDraft(next.id, next.draft ?? '');
     if (activeId.current === next.id) setChat(next);
   }, []);
 
@@ -242,19 +248,41 @@ function Shell({ loadError }: { loadError: string | null }) {
     }
   };
 
-  /** Deletes the message and everything after it; ChatView then puts its text back in the composer. */
+  /** Deletes the message and everything after it; the server puts its text in the draft, above what is typed. */
   const rewind = async (m: Message) => {
     if (!chat) return false;
     const id = chat.id;
     try {
-      show(await api.rewind(id, m.id));
+      const saved = await api.rewind(id, m.id, takeDraft(id));
+      replaceDraft(id, saved.draft ?? '');
+      show(saved);
       setErrors((e) => ({ ...e, [id]: null }));
       refreshList();
       return true;
     } catch (err) {
+      // The text typed meanwhile still needs saving.
+      setDraft(id, getDraft(id));
       setErrors((e) => ({ ...e, [id]: (err as Error).message }));
       return false;
     }
+  };
+
+  /** Puts back what the last rewind removed, with the draft and pinned feedback from before it. */
+  const undoRewind = async (id: string) => {
+    try {
+      const saved = await api.undoRewind(id);
+      replaceDraft(id, saved.draft ?? '');
+      show(saved);
+      setErrors((e) => ({ ...e, [id]: null }));
+      refreshList();
+    } catch (err) {
+      setErrors((e) => ({ ...e, [id]: (err as Error).message }));
+    }
+  };
+
+  const dismissPinned = (id: string) => {
+    setChat((c) => (c?.id === id ? { ...c, pinned: undefined } : c));
+    api.dismissPinned(id).then(show, () => {});
   };
 
   const rename = async (id: string, title: string) => {
@@ -264,7 +292,7 @@ function Shell({ loadError }: { loadError: string | null }) {
 
   const remove = async (id: string) => {
     await api.deleteChat(id);
-    setDraft(id, '');
+    replaceDraft(id, '');
     latest.current.delete(id);
     if (activeId.current === id) {
       activeId.current = null;
@@ -332,6 +360,8 @@ function Shell({ loadError }: { loadError: string | null }) {
             onRetry={() => requestReply(chat.id)}
             onMessageUpdated={messageUpdated}
             onRewind={rewind}
+            onUndoRewind={() => undoRewind(chat.id)}
+            onDismissPinned={() => dismissPinned(chat.id)}
             onOpenSettings={() => setDialog('settings')}
             focusComposer={focusChat === chat.id}
             onComposerFocused={composerFocused}

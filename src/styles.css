@@ -1009,6 +1009,57 @@ ruby rt {
 
 /* --- composer --- */
 
+/* Above the composer: the check pinned by a rewind, and the toast that can undo it. */
+.composer-extras {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 max(20px, calc((100% - var(--column)) / 2)) 8px;
+}
+
+.pinned {
+  max-height: 35vh;
+  overflow: auto;
+}
+
+.pinned-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  align-self: stretch;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.undo-toast {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 8px 8px 14px;
+  border-radius: 12px;
+  background: var(--ink);
+  color: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 14px;
+}
+
+.undo-toast button {
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 12px;
+  background: color-mix(in srgb, var(--surface) 16%, transparent);
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+}
+
+.undo-toast button:hover {
+  background: color-mix(in srgb, var(--surface) 26%, transparent);
+}
+
 .composer {
   display: flex;
   align-items: flex-end;
@@ -1411,6 +1462,10 @@ ruby rt {
 
   .composer {
     margin: 0 12px 12px;
+  }
+
+  .composer-extras {
+    margin: 0 12px 8px;
   }
 
   .bubble {
