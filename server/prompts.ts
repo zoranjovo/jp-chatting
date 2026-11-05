@@ -2,7 +2,7 @@
 // conversation going, break down its own messages, and give feedback on the
 // learner's.
 
-import { allowedKanji, stripFurigana } from '../shared/kanji.ts';
+import { allowedKanji, kanjiInfo, stripFurigana } from '../shared/kanji.ts';
 import type { ReplyProblems } from '../shared/quality.ts';
 import { genkiBook, genkiGrammarThrough, MAX_GENKI_LESSON } from '../shared/genki.ts';
 import { JLPT_DESCRIPTION, type JlptLevel } from '../shared/jlpt.ts';
@@ -14,10 +14,20 @@ const OPENER_CUE = '(The learner has just opened a new chat. Start the conversat
 
 const FURIGANA_RULE = `Furigana: give the reading of every word that contains kanji in this exact markup: {kanji|reading}. The reading is always hiragana -- never romaji, never katakana. Wrap only the kanji part; okurigana stays outside the braces. Examples: {日本語|にほんご}を{話|はな}します。 {今日|きょう}は{暑|あつ}いですね。 Words written only in kana (コーヒー, カフェ, ありがとう) never get markup.`;
 
+/** One line per level. Some tokenizers (Nemotron's in llama.cpp) fail on a run of a few hundred kanji; a level has at most 42. */
+function kanjiByLevel(level: number): string {
+  const lines = new Map<number, string>();
+  for (const k of allowedKanji(level)) {
+    const l = kanjiInfo(k)?.level ?? 0;
+    lines.set(l, (lines.get(l) ?? '') + k);
+  }
+  return [...lines].map(([l, kanji]) => `L${l}: ${kanji}`).join('\n');
+}
+
 function kanjiRule(level: number): string {
   if (level <= 0) return 'Kanji: the learner knows hiragana and katakana but no kanji yet. Do not use any kanji at all -- write everything in hiragana, and katakana for loanwords.';
-  return `Kanji: the learner knows all hiragana and katakana, but only these kanji (WaniKani levels 1-${level}):
-${allowedKanji(level).join('')}
+  return `Kanji: the learner knows all hiragana and katakana, but only these kanji (WaniKani levels 1-${level}, one line per level):
+${kanjiByLevel(level)}
 Use no other kanji at all. Any word that needs a kanji outside that list must be written in hiragana instead (katakana for loanwords). Check every kanji you write against the list; if you are unsure about one, write that word in hiragana.`;
 }
 
