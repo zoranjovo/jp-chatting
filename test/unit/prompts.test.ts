@@ -23,9 +23,17 @@ const chat = (topic = '', politeness: Politeness = 'polite') => ({ topic, polite
 describe('conversationSystem', () => {
   test('lists exactly the kanji up to the level', () => {
     const system = conversationSystem(settings({ wkLevel: 3 }), chat(''));
-    assert.ok(system.includes(allowedKanji(3).join('')));
-    assert.ok(!system.includes(allowedKanji(4).join('')));
+    assert.ok(allowedKanji(3).every((k) => system.includes(k)));
+    assert.ok(!allowedKanji(4).every((k) => system.includes(k)));
     assert.match(system, /levels 1-3/);
+  });
+
+  test('writes the kanji one level per line, so no tokenizer sees a long unbroken run', () => {
+    const system = conversationSystem(settings({ wkLevel: 60 }), chat(''));
+    assert.match(system, /^L1: 一/m);
+    assert.match(system, /^L60: /m);
+    const longest = Math.max(...(system.match(/[一-鿿]+/g) ?? []).map((run) => run.length));
+    assert.ok(longest <= 60, `longest kanji run is ${longest}`);
   });
 
   test('level 0 forbids kanji entirely', () => {
@@ -140,7 +148,8 @@ describe('breakdownRequest', () => {
 
   test('keeps Japanese it adds within the kanji level, but copies the message as it is', () => {
     const system = breakdownRequest(msg('assistant', 'x'), settings({ wkLevel: 3 })).system;
-    assert.ok(system.includes(allowedKanji(3).join('')));
+    assert.ok(allowedKanji(3).every((k) => system.includes(k)));
+    assert.match(system, /^L3: /m);
     assert.match(system, /Use no other kanji in any Japanese you add in the English parts/);
     assert.ok(!system.includes('no other kanji at all'));
     assert.match(system, /copy the message exactly/);
