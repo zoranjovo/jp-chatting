@@ -25,7 +25,11 @@ export const api = {
   deleteChat: (id: string) => request<{ ok: true }>('DELETE', `/api/chats/${id}`),
   send: (id: string, content: string) => request<Chat>('POST', `/api/chats/${id}/messages`, { content }),
   reply: (id: string) => request<Chat>('POST', `/api/chats/${id}/reply`),
-  rewind: (id: string, messageId: string) => request<Chat>('POST', `/api/chats/${id}/messages/${messageId}/rewind`),
+  saveDraft: (id: string, draft: string) => request<{ ok: true }>('PUT', `/api/chats/${id}/draft`, { draft }),
+  /** `draft` is what is typed now, so the rewound text goes above it. */
+  rewind: (id: string, messageId: string, draft: string) => request<Chat>('POST', `/api/chats/${id}/messages/${messageId}/rewind`, { draft }),
+  undoRewind: (id: string) => request<Chat>('POST', `/api/chats/${id}/undo-rewind`),
+  dismissPinned: (id: string) => request<Chat>('DELETE', `/api/chats/${id}/pinned`),
   analyze: (id: string, messageId: string, refresh = false) =>
     request<Message>('POST', `/api/chats/${id}/messages/${messageId}/analyze${refresh ? '?refresh=1' : ''}`),
 };

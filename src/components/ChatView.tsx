@@ -2,14 +2,16 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { stripFurigana } from '../../shared/kanji.ts';
 import type { Chat, Message } from '../../shared/types.ts';
 import { AnnounceContext } from '../announce.ts';
-import { prependDraft } from '../drafts.ts';
 import { useT } from '../i18n.tsx';
+import { FeedbackView } from './Analysis.tsx';
 import { Composer, type ComposerHandle } from './Composer.tsx';
 import { MessageBubble } from './MessageBubble.tsx';
 import { SetupNotice } from './SetupNotice.tsx';
 
 /** How long an announcement stays in the status region: long enough to be read, then gone, so it isn't a stray copy. */
 const ANNOUNCE_MS = 5000;
+/** How long the undo toast stays after a rewind. The rewind stays undoable on the server until the next message. */
+const UNDO_MS = 8000;
 
 export function ChatView({
   chat,
@@ -19,6 +21,8 @@ export function ChatView({
   onRetry,
   onMessageUpdated,
   onRewind,
+  onUndoRewind,
+  onDismissPinned,
   onOpenSettings,
   focusComposer,
   onComposerFocused,
@@ -31,6 +35,8 @@ export function ChatView({
   onMessageUpdated: (m: Message) => void;
   /** Resolves true once the message and everything after it are gone. */
   onRewind: (m: Message) => Promise<boolean>;
+  onUndoRewind: () => void;
+  onDismissPinned: () => void;
   onOpenSettings: () => void;
   /** Moves focus to the composer once (then calls onComposerFocused), e.g. for a chat just started. */
   focusComposer?: boolean;
@@ -40,12 +46,23 @@ export function ChatView({
   const end = useRef<HTMLDivElement>(null);
   const composer = useRef<ComposerHandle>(null);
 
+  /** How many messages the last rewind here removed, while its toast is up. */
+  const [rewound, setRewound] = useState<number | null>(null);
   const rewind = async (m: Message) => {
+    const removed = chat.messages.length - chat.messages.findIndex((x) => x.id === m.id);
     if (!(await onRewind(m))) return;
-    // The learner may have switched chats meanwhile; the text still goes to this chat's draft.
-    if (composer.current) composer.current.prepend(m.content);
-    else prependDraft(chat.id, m.content);
+    setRewound(removed);
+    announce(t.rewound(removed));
+    // The server put the text at the top of the draft; the caret goes at its end.
+    composer.current?.focusAt(m.content.length);
   };
+  useEffect(() => {
+    if (rewound === null) return;
+    const timer = setTimeout(() => setRewound(null), UNDO_MS);
+    return () => clearTimeout(timer);
+  }, [rewound]);
+  // Gone once there is nothing left to undo: a message was sent or the partner replied.
+  const undoable = rewound !== null && !!chat.undo;
   const last = chat.messages.at(-1);
   const needsReply = !waiting && (!last || last.role === 'user');
 
@@ -135,6 +152,35 @@ export function ChatView({
         <div className="sr-only" role="status">
           {waiting ? t.typing : announcement}
         </div>
+        {(chat.pinned || undoable) && (
+          <div className="composer-extras">
+            {chat.pinned && (
+              <section className="analysis pinned" aria-label={t.pinnedTitle}>
+                <div className="pinned-head">
+                  <span>{t.pinnedTitle}</span>
+                  <button type="button" className="icon-button" onClick={onDismissPinned} aria-label={t.dismissPinned} title={t.dismissPinned}>
+                    ×
+                  </button>
+                </div>
+                <FeedbackView feedback={chat.pinned.feedback} />
+              </section>
+            )}
+            {undoable && (
+              <div className="undo-toast">
+                <span>{t.rewound(rewound)}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRewound(null);
+                    onUndoRewind();
+                  }}
+                >
+                  {t.undo}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         <Composer chatId={chat.id} disabled={waiting} onSend={onSend} handle={composer} />
       </div>
     </AnnounceContext.Provider>

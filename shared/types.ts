@@ -126,6 +126,22 @@ export interface Message {
   feedback?: Feedback;
 }
 
+/** The feedback on a message the learner rewound, kept in view while they fix it. */
+export interface PinnedFeedback {
+  /** The rewound message, as it was written. */
+  content: string;
+  feedback: Feedback;
+}
+
+/** What the last rewind took away, so it can be put back until the conversation moves on. */
+export interface RewindUndo {
+  /** The rewound message and everything after it, analyses included. */
+  messages: Message[];
+  /** The draft and pinned feedback from just before the rewind. */
+  draft: string;
+  pinned?: PinnedFeedback;
+}
+
 export interface Chat {
   id: string;
   title: string;
@@ -135,6 +151,10 @@ export interface Chat {
   createdAt: string;
   updatedAt: string;
   messages: Message[];
+  /** Unsent text in the composer, saved as the learner types; absent when empty. */
+  draft?: string;
+  pinned?: PinnedFeedback;
+  undo?: RewindUndo;
   /** Only on reads from the API, never stored: the partner's reply is being written right now. */
   replying?: boolean;
 }

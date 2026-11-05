@@ -502,6 +502,77 @@ test('rewind deletes my message and everything after it, and puts it back in the
   await expect(theirs(app)).toHaveCount(2);
 });
 
+test('a rewind can be undone from its toast: the messages come back and the box is as it was', async ({ app, request }) => {
+  await startChat(app);
+  await sendAndWait(app, 'コーヒーをください');
+  await sendAndWait(app, 'ありがとう');
+  await composer(app).fill('まだ');
+  await mine(app).first().getByRole('button', { name: /Rewind/ }).click();
+  const toast = app.locator('.undo-toast');
+  await expect(toast).toContainText('Rewound 4 messages');
+  await expect(composer(app)).toHaveValue('コーヒーをください\n\nまだ');
+
+  await toast.getByRole('button', { name: 'Undo' }).click();
+  await expect(toast).toHaveCount(0);
+  await expect(mine(app)).toHaveCount(2);
+  await expect(theirs(app)).toHaveCount(3);
+  await expect(composer(app)).toHaveValue('まだ');
+  const [chat] = await chatsOnDisk(request);
+  expect(chat.messages).toHaveLength(5);
+  expect(chat.undo).toBeUndefined();
+});
+
+test('the undo toast goes once a message is sent', async ({ app }) => {
+  await startChat(app);
+  await sendAndWait(app, 'もも');
+  await mine(app).first().getByRole('button', { name: /Rewind/ }).click();
+  await expect(app.locator('.undo-toast')).toBeVisible();
+  await composer(app).press('Enter');
+  await expect(app.locator('.undo-toast')).toHaveCount(0);
+  await expect(mine(app)).toHaveCount(1);
+});
+
+test('a rewound message and its check are still there after a reload', async ({ app }) => {
+  await startChat(app);
+  await sendAndWait(app, 'コーヒーがおねがいします。');
+  const message = mine(app).first();
+  await message.getByRole('button', { name: 'Check' }).click();
+  await expect(message.locator('.verdict')).toBeVisible();
+  await message.getByRole('button', { name: /Rewind/ }).click();
+  const pinned = app.getByRole('region', { name: 'Check on the message you rewound' });
+  await expect(pinned.locator('.verdict')).toHaveText('Almost — small fixes');
+  await expect(composer(app)).toHaveValue('コーヒーがおねがいします。');
+
+  await app.reload();
+  await expect(composer(app)).toHaveValue('コーヒーがおねがいします。');
+  await expect(pinned.locator('.fix-row-fix')).toBeVisible();
+
+  await pinned.getByRole('button', { name: 'Close the check' }).click();
+  await expect(pinned).toHaveCount(0);
+  await app.reload();
+  await expect(composer(app)).toHaveValue('コーヒーがおねがいします。');
+  await expect(pinned).toHaveCount(0);
+});
+
+test('rewinding a message that was never checked pins nothing', async ({ app }) => {
+  await startChat(app);
+  await sendAndWait(app, 'もも');
+  await mine(app).first().getByRole('button', { name: /Rewind/ }).click();
+  await expect(composer(app)).toHaveValue('もも');
+  await expect(app.locator('.pinned')).toHaveCount(0);
+});
+
+test('a draft is saved as you type and is still there after a reload', async ({ app, request }) => {
+  await startChat(app);
+  await composer(app).pressSequentially('toukyou made');
+  await expect.poll(async () => (await chatsOnDisk(request))[0].draft, { timeout: 5000 }).toBe('とうきょう まで');
+  await app.reload();
+  await expect(composer(app)).toHaveValue('とうきょう まで');
+  await composer(app).press('Enter');
+  await expect(mine(app)).toHaveCount(1);
+  expect((await chatsOnDisk(request))[0].draft).toBeUndefined();
+});
+
 test('rewinding with something already typed puts the message above it, with a blank line between', async ({ app }) => {
   await startChat(app);
   await sendAndWait(app, 'もも');

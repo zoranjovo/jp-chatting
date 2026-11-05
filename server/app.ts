@@ -177,7 +177,46 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
     }),
   );
 
-  /** Adds the learner's message. The reply is a separate call, so a failed reply can be retried without resending. */
+  /** Saves the composer's unsent text. Answers without the chat, so a slow save can't overwrite a newer view. */
+  app.put(
+    '/api/chats/:id/draft',
+    route(async (req, res) => {
+      const draft = req.body?.draft;
+      if (typeof draft !== 'string') throw new BadRequest('draft must be a string');
+      await updateChat(String(req.params.id), (chat) => {
+        if ((chat.draft ?? '') === draft) return 'none';
+        if (draft) chat.draft = draft;
+        else delete chat.draft;
+        return 'meta';
+      });
+      res.json({ ok: true });
+    }),
+  );
+
+  /** The pinned feedback's close button. */
+  app.delete(
+    '/api/chats/:id/pinned',
+    route(async (req, res) => {
+      res.json(
+        await updateChat(String(req.params.id), (chat) => {
+          if (!chat.pinned) return 'none';
+          delete chat.pinned;
+          return 'meta';
+        }),
+      );
+    }),
+  );
+
+  /** A new message moves the conversation on: the last rewind can no longer be undone. */
+  function addMessage(chat: Chat, message: Message) {
+    chat.messages.push(message);
+    delete chat.undo;
+  }
+
+  /**
+   * Adds the learner's message. The reply is a separate call, so a failed reply can be retried without resending.
+   * The composer is empty once it's sent, and the feedback pinned for fixing it has done its job.
+   */
   app.post(
     '/api/chats/:id/messages',
     route(async (req, res) => {
@@ -186,7 +225,9 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
       const settings = await store.getSettings();
       res.json(
         await updateChat(String(req.params.id), (chat) => {
-          chat.messages.push({ id: store.newId(), role: 'user', content, createdAt: store.now(), context: contextOf(settings, chat.politeness) });
+          addMessage(chat, { id: store.newId(), role: 'user', content, createdAt: store.now(), context: contextOf(settings, chat.politeness) });
+          delete chat.draft;
+          delete chat.pinned;
           return 'conversation';
         }),
       );
@@ -200,7 +241,7 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
     return updateChat(chat.id, (chat) => {
       // Rewound, or answered by another reply, while this one was being written: it answers a history that is gone.
       if (chat.messages.at(-1)?.id !== answering) return 'none';
-      chat.messages.push(message);
+      addMessage(chat, message);
       if (!chat.title) chat.title = titleFrom(content);
       return 'conversation';
     });
@@ -234,17 +275,48 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
     }),
   );
 
-  /** Deletes one of the learner's messages and everything after it; the UI puts its text back in the composer. */
+  /**
+   * Deletes one of the learner's messages and everything after it, all in one write: its text goes into the draft
+   * (above what the page says is typed, `draft` in the body, so nothing still waiting to be saved is lost), its
+   * feedback is pinned, and what was there before is kept so the rewind can be undone.
+   */
   app.post(
     '/api/chats/:id/messages/:mid/rewind',
     route(async (req, res) => {
       const mid = String(req.params.mid);
+      const typed = typeof req.body?.draft === 'string' ? (req.body.draft as string) : undefined;
       res.json(
         await updateChat(String(req.params.id), (chat) => {
           const index = chat.messages.findIndex((m) => m.id === mid);
           if (index < 0) throw new NotFound('message not found');
           if (chat.messages[index].role !== 'user') throw new BadRequest("only the learner's messages can be rewound to");
-          chat.messages.splice(index);
+          const before = typed ?? chat.draft ?? '';
+          const removed = chat.messages.splice(index);
+          const [rewound] = removed;
+          chat.undo = { messages: removed, draft: before, ...(chat.pinned && { pinned: chat.pinned }) };
+          chat.draft = before.trim() ? `${rewound.content}\n\n${before}` : rewound.content;
+          if (rewound.feedback) chat.pinned = { content: rewound.content, feedback: rewound.feedback };
+          else delete chat.pinned;
+          return 'conversation';
+        }),
+      );
+    }),
+  );
+
+  /** Puts back what the last rewind removed, and the draft and pinned feedback from before it. */
+  app.post(
+    '/api/chats/:id/undo-rewind',
+    route(async (req, res) => {
+      res.json(
+        await updateChat(String(req.params.id), (chat) => {
+          const undo = chat.undo;
+          if (!undo) throw new BadRequest('nothing to undo');
+          chat.messages.push(...undo.messages);
+          if (undo.draft) chat.draft = undo.draft;
+          else delete chat.draft;
+          if (undo.pinned) chat.pinned = undo.pinned;
+          else delete chat.pinned;
+          delete chat.undo;
           return 'conversation';
         }),
       );

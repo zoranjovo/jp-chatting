@@ -5,8 +5,8 @@ import { romajiToKana } from '../romaji.ts';
 import { useSettings } from '../settings.tsx';
 
 export interface ComposerHandle {
-  /** Puts a rewound message back in the box, above anything already typed. */
-  prepend: (message: string) => void;
+  /** Focuses the box with the caret at `at`, e.g. at the end of a rewound message now at its top. */
+  focusAt: (at: number) => void;
   focus: () => void;
 }
 
@@ -31,15 +31,15 @@ export function Composer({
   const romaji = settings.romajiInput;
 
   useImperativeHandle(handle, () => ({
-    prepend(message) {
-      prependDraft(chatId, message);
-      caret.current = message.length;
+    focusAt(at) {
+      caret.current = at;
       ref.current?.focus();
+      ref.current?.setSelectionRange(at, at);
     },
     focus() {
       ref.current?.focus();
     },
-  }), [chatId]);
+  }), []);
 
   // Keep the caret where the user was typing after a conversion changes the text's length.
   useLayoutEffect(() => {
