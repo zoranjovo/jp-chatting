@@ -415,6 +415,20 @@ describe('analysis', () => {
     assert.deepEqual(stored.breakdown, first.body.breakdown);
   });
 
+  test('a breakdown sees the conversation before the message, under the levels it was written with', async () => {
+    const chat = await newChat();
+    await reply(chat.id);
+    await send(chat.id, 'ちどりが すきです');
+    await api('PUT', '/api/settings', { jlptLevel: 2 });
+    const second = (await reply(chat.id)).body.messages[2];
+    await api('PUT', '/api/settings', { jlptLevel: 0 });
+    calls.length = 0;
+    await analyze(chat.id, second.id);
+    const { request } = calls.find((c) => c.kind === 'breakdown')!;
+    assert.match(request.turns[0].content, /Partner: こんにちは！げんきですか？\nLearner: ちどりが すきです/);
+    assert.match(request.system, /JLPT N2/);
+  });
+
   test('refresh asks again', async () => {
     const { chat, partner } = await chatWithBoth();
     await analyze(chat.id, partner.id);
@@ -430,7 +444,7 @@ describe('analysis', () => {
     assert.equal(res.body.feedback!.verdict, 'correct');
     assert.equal(res.body.breakdown, undefined);
     assert.equal(calls[0].kind, 'feedback');
-    assert.match(calls[0].request.turns[0].content, /replying to:\nこんにちは！げんきですか？/);
+    assert.match(calls[0].request.turns[0].content, /Partner: こんにちは！げんきですか？\n\nThe learner's message:\nげんきです$/);
   });
 
   test('a malformed AI answer is coerced into shape', async () => {
