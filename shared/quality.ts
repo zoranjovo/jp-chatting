@@ -43,9 +43,9 @@ function readingCoversBase(base: string, reading: string): boolean {
  * のみもの). Only when the reading is hiragana and spells the whole base; a
  * bare kanji, or markup like {お願|ねが}, is left for a rewrite.
  */
-export function kanaForKanjiAboveLevel(text: string, level: number): string {
+export function kanaForKanjiAboveLevel(text: string, level: number, known = ''): string {
   return text.replace(MARKUP, (whole, base: string, reading: string) =>
-    kanjiAboveLevel(base, level).length > 0 && READING.test(reading) && readingCoversBase(base, reading) ? reading : whole,
+    kanjiAboveLevel(base, level, known).length > 0 && READING.test(reading) && readingCoversBase(base, reading) ? reading : whole,
   );
 }
 
@@ -59,9 +59,14 @@ function dropThinking(text: string): string {
   return text.replace(/<think>[\s\S]*?(<\/think>|$)/g, '');
 }
 
-/** The fixes that need no model: stray reasoning and empty braces removed, furigana dropped from kana, out-of-level kanji spelled out from their readings. */
-export function autoFix(text: string, level: number): string {
-  return kanaForKanjiAboveLevel(dropKanaFurigana(dropEmptyMarkup(dropThinking(text))), level).trim();
+/** Stray reasoning, empty braces and furigana on kana removed -- the fixes for any Japanese the model writes. */
+export function tidyMarkup(text: string): string {
+  return dropKanaFurigana(dropEmptyMarkup(dropThinking(text))).trim();
+}
+
+/** The fixes that need no model: tidyMarkup, and kanji the learner doesn't know spelled out from their readings. */
+export function autoFix(text: string, level: number, known = ''): string {
+  return kanaForKanjiAboveLevel(tidyMarkup(text), level, known).trim();
 }
 
 /** Share of distinct characters two texts have in common (Jaccard), furigana ignored. */
@@ -81,7 +86,7 @@ function similarity(a: string, b: string): number {
  *   clean draft + note + clean redo   -> the redo, if it is the same message again
  * Returns null when it can't tell.
  */
-export function salvageFromForeign(text: string, level: number): string | null {
+export function salvageFromForeign(text: string, level: number, known = ''): string | null {
   const masked = text.replace(MARKUP, (m) => '　'.repeat(m.length));
   const runs = [...masked.matchAll(/[A-Za-z][A-Za-z'’-]*(?:[\s,.!?:;—–-]+[A-Za-z][A-Za-z'’-]*){2,}[.!?]?|\b[a-z]{3,}\b/g)];
   if (runs.length === 0) return null;
@@ -91,7 +96,7 @@ export function salvageFromForeign(text: string, level: number): string | null {
   const last = runs.at(-1)!;
   const after = trim(text.slice(last.index! + last[0].length));
   const japanese = (s: string) => /[぀-ヿ一-鿿]{2,}/u.test(s);
-  const clean = (s: string) => japanese(s) && problemCount(replyProblems(s, level)) === 0;
+  const clean = (s: string) => japanese(s) && problemCount(replyProblems(s, level, known)) === 0;
 
   if (clean(before) && !japanese(after)) return before;
   if (clean(after) && japanese(before) && !clean(before)) return after;
@@ -116,14 +121,14 @@ export function foreignText(text: string): string[] {
 }
 
 export interface ReplyProblems {
-  /** Kanji above the learner's WaniKani level. */
+  /** Kanji above the learner's WaniKani level that they haven't typed in the chat. */
   kanji: string[];
   furigana: string[];
   foreign: string[];
 }
 
-export function replyProblems(text: string, level: number): ReplyProblems {
-  return { kanji: kanjiAboveLevel(text, level), furigana: badFurigana(text), foreign: foreignText(text) };
+export function replyProblems(text: string, level: number, known = ''): ReplyProblems {
+  return { kanji: kanjiAboveLevel(text, level, known), furigana: badFurigana(text), foreign: foreignText(text) };
 }
 
 export function problemCount(p: ReplyProblems): number {

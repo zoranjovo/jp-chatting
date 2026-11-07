@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { contextOf, settingsFor } from '../shared/context.ts';
+import { kanjiTypedIn } from '../shared/kanji.ts';
 import { stripFurigana } from '../shared/kanji.ts';
 import type { Chat, Message, ModelTest, Politeness, ProviderKind, Settings } from '../shared/types.ts';
 import { AiError, callAi as realCallAi, listModels as realListModels, type AiRequest } from './ai/index.ts';
@@ -339,12 +340,14 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
       // Under the settings the message was written with, so changing them since doesn't change the answer.
       const settings = settingsFor(await store.getSettings(), message.context);
       const earlier = chat.messages.slice(0, index);
+      // Anywhere in the chat, as the UI counts them: once typed, the learner knows it.
+      const known = kanjiTypedIn(chat.messages);
       let patch: Partial<Message>;
       if (message.role === 'assistant') {
-        patch = { breakdown: await generateBreakdown(deps.callAi, settings, message, earlier) };
+        patch = { breakdown: await generateBreakdown(deps.callAi, settings, message, earlier, known) };
       } else {
         const politeness = message.context?.politeness ?? chat.politeness;
-        patch = { feedback: await generateFeedback(deps.callAi, settings, politeness, message, earlier) };
+        patch = { feedback: await generateFeedback(deps.callAi, settings, politeness, message, earlier, known) };
       }
       const saved = await updateChat(id, (c) => {
         const m = c.messages.find((x) => x.id === mid);

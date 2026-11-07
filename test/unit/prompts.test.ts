@@ -41,6 +41,21 @@ describe('conversationSystem', () => {
     assert.match(system, /Do not use any kanji at all/);
   });
 
+  test('also allows the kanji the learner has typed, listing only those the level lacks', () => {
+    // 人 is level 1, 串 isn't on WaniKani, 語 is above level 3.
+    const system = conversationSystem(settings({ wkLevel: 3 }), chat(''), '人串語');
+    assert.match(system, /They have also typed these kanji themselves in this chat, so they know them too: 串語\n/);
+    assert.match(system, /Any word that needs a kanji outside those must be written in hiragana/);
+    const none = conversationSystem(settings({ wkLevel: 3 }), chat(''), '人');
+    assert.ok(!none.includes('typed these kanji'));
+    assert.match(none, /outside that list/);
+  });
+
+  test('at level 0, the kanji the learner has typed are the only ones allowed', () => {
+    const system = conversationSystem(settings({ wkLevel: 0 }), chat(''), '串');
+    assert.match(system, /no kanji yet apart from these, which they have typed themselves in this chat: 串\nUse no other kanji at all/);
+  });
+
   test('follows the speech style setting', () => {
     assert.match(conversationSystem(settings(), chat('', 'polite')), /です\/ます/);
     assert.match(conversationSystem(settings(), chat('', 'casual')), /casual plain form/);
@@ -164,6 +179,11 @@ describe('breakdownRequest', () => {
     assert.ok(!system.includes('write everything in hiragana'));
   });
 
+  test('also allows the kanji the learner has typed in the Japanese it adds', () => {
+    const system = breakdownRequest(msg('assistant', 'x'), settings({ wkLevel: 3 }), [], '串').system;
+    assert.match(system, /so they know them too: 串\nUse no other kanji in any Japanese you add in the English parts/);
+  });
+
   test('describes the JLPT level as the conversation prompt does', () => {
     assert.ok(breakdownRequest(msg('assistant', 'x'), settings({ jlptLevel: 3 })).system.includes(JLPT_DESCRIPTION[3]));
   });
@@ -211,10 +231,29 @@ describe('feedbackRequest', () => {
     assert.match(system, /in their own voice -- first person/);
   });
 
-  test('corrections follow the chat\'s speech style and kanji level', () => {
-    const req = feedbackRequest(settings({ wkLevel: 0 }), 'casual', msg('user', 'x'));
-    assert.match(req.system, /casual plain form/);
-    assert.match(req.system, /Do not use any kanji/);
+  test('corrections follow the chat\'s speech style', () => {
+    assert.match(feedbackRequest(settings({ wkLevel: 0 }), 'casual', msg('user', 'x')).system, /casual plain form/);
+  });
+
+  test('corrections use the kanji their words need, keeping the learner\'s own spelling', () => {
+    const { system } = feedbackRequest(settings({ wkLevel: 3 }), 'polite', msg('user', 'x'));
+    assert.match(system, /Kanji in corrected Japanese: write it as natural Japanese, with whatever kanji its words need/);
+    assert.match(system, /a word they wrote in kana stays in kana, and a word they wrote in kanji stays in kanji, unless that word is itself the mistake/);
+    assert.ok(!system.includes('This applies to corrected Japanese'));
+  });
+
+  test('only Japanese it adds beyond the message and the correction keeps to the known kanji', () => {
+    const { system } = feedbackRequest(settings({ wkLevel: 3 }), 'polite', msg('user', 'x'), [], '串');
+    assert.match(system, /^L3: /m);
+    assert.match(system, /so they know them too: 串\nUse no other kanji in any other Japanese you add in the English parts \(another form of a word, an example, an alternative\)/);
+    assert.match(system, /When the English quotes their message or your correction, write it as it is there/);
+    assert.match(feedbackRequest(settings({ wkLevel: 0 }), 'polite', msg('user', 'x')).system, /Do not use any kanji in any other Japanese you add/);
+  });
+
+  test('never talks about the kanji level, or calls a correct kanji a problem', () => {
+    const { system } = feedbackRequest(settings({ wkLevel: 3 }), 'polite', msg('user', 'x'));
+    assert.match(system, /Never comment on kanji versus kana, on the learner's kanji level, or on why a word is spelled the way it is/);
+    assert.match(system, /A kanji they used correctly is fine whatever its level, so don't point it out/);
   });
 });
 
