@@ -13,7 +13,7 @@ import { ConfirmDialog } from '../../src/components/Dialog.tsx';
 import { ContextLine } from '../../src/components/ContextLine.tsx';
 import { MessageBubble } from '../../src/components/MessageBubble.tsx';
 import { ContextDetails } from '../../src/components/MessageInfo.tsx';
-import { JpText } from '../../src/components/JpText.tsx';
+import { JpText, KnownKanjiProvider } from '../../src/components/JpText.tsx';
 import { parseInline } from '../../src/components/RichText.tsx';
 import { LanguageProvider } from '../../src/i18n.tsx';
 import { SettingsContext } from '../../src/settings.tsx';
@@ -356,6 +356,33 @@ describe('kanji marks follow the level a message was written at', () => {
     assert.equal(count(html, 'over-level'), 1);
     assert.match(html, /title="Above your WaniKani level \(7\)\n飲/);
     assert.equal(count(bubble(old, 20), 'over-level'), 0);
+  });
+});
+
+describe('kanji the learner has typed', () => {
+  test('are never marked as above the level', () => {
+    // 語 and 串 are both above level 1.
+    const html = render(
+      <KnownKanjiProvider value="串">
+        <JpText text="串と語" />
+      </KnownKanjiProvider>,
+      { wkLevel: 1 },
+    );
+    assert.equal(count(html, 'over-level'), 1);
+    assert.match(html, /class="kanji over-level"[^>]*>語/);
+  });
+});
+
+describe('readings with furigana off', () => {
+  test('a word with a kanji the learner doesn\'t know keeps its reading; known ones lose theirs', () => {
+    const html = render(
+      <KnownKanjiProvider value="串">
+        <JpText text="{日本語|にほんご}と{串|くし}と{人|ひと}" />
+      </KnownKanjiProvider>,
+      { wkLevel: 1, furigana: false },
+    );
+    assert.equal(count(html, '<rt>'), 1);
+    assert.match(html, /<rt>にほんご<\/rt>/);
   });
 });
 

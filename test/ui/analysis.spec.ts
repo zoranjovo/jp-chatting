@@ -89,10 +89,7 @@ test('Check gives feedback on the learner\'s message', async ({ app }) => {
   await expect(message.locator('.line-fix')).toHaveCount(1);
 });
 
-test('furigana in the learner\'s feedback uses the panel\'s colour, not the dark bubble\'s', async ({ app, request }) => {
-  // 願 is WaniKani level 13, so at the tests' level (TEST_SETTINGS.wkLevel) the correction would be spelled out in kana.
-  await request.put('/api/settings', { data: { wkLevel: 20 } });
-  await app.reload();
+test('furigana in the learner\'s feedback uses the panel\'s colour, not the dark bubble\'s', async ({ app }) => {
   await startChat(app);
   // Typed with furigana markup, so the learner's own bubble has a reading too.
   await composer(app).fill('コーヒーがお{願|ねが}いします。');
@@ -120,6 +117,35 @@ test('furigana in the learner\'s feedback uses the panel\'s colour, not the dark
   expect(panelRt).toBe('rgb(155, 149, 140)');
   expect(partnerRt).toBe(panelRt);
   expect(bubbleRt).not.toBe(panelRt);
+});
+
+// 願 is WaniKani level 13, above the tests' level (TEST_SETTINGS.wkLevel); 何 and 飲 in the opener are within it.
+test('a correction keeps a kanji above the level, boxed as new, and its reading even with furigana off', async ({ app, request }) => {
+  await request.put('/api/settings', { data: { furigana: false } });
+  await app.reload();
+  await startChat(app);
+  await composer(app).fill('コーヒーがおねがいします。');
+  await composer(app).press('Enter');
+  await expect(theirs(app)).toHaveCount(2);
+  await expect(theirs(app).first().locator('rt')).toHaveCount(0);
+  const message = mine(app).first();
+  await message.getByRole('button', { name: 'Check' }).click();
+  await expect(message.locator('.fix-row-fix rt')).toHaveText('ねが');
+  await expect(message.locator('.fix-row-fix .over-level')).toHaveText('願');
+});
+
+test('a kanji the learner has typed is known: never boxed in the chat, and no reading forced on it', async ({ app, request }) => {
+  await request.put('/api/settings', { data: { furigana: false } });
+  await app.reload();
+  await startChat(app);
+  await composer(app).fill('コーヒーがお願いします。');
+  await composer(app).press('Enter');
+  await expect(theirs(app)).toHaveCount(2);
+  const message = mine(app).first();
+  await message.getByRole('button', { name: 'Check' }).click();
+  await expect(message.locator('.fix-row-fix .line-jp')).toHaveText('コーヒーをお願いします。');
+  await expect(message.locator('.fix-row-fix rt')).toHaveCount(0);
+  await expect(app.locator('.over-level')).toHaveCount(0);
 });
 
 test('the partner\'s and the learner\'s analyses are independent', async ({ app, request }) => {

@@ -1,4 +1,6 @@
-// WaniKani kanji levels, and finding kanji above the learner's level.
+// WaniKani kanji levels, and finding kanji above the learner's level. A kanji
+// the learner has typed in a chat counts as known in that chat whatever its
+// level ("known": a string of those kanji).
 //
 // wanikani-kanji.json is built from davidluzgouveia/kanji-data (MIT), whose
 // wk_level fields follow WaniKani's level layout at the time it was compiled.
@@ -44,7 +46,8 @@ export function kanjiInfo(ch: string): KanjiInfo | undefined {
   return KANJI.get(ch);
 }
 
-export function isAllowed(ch: string, level: number): boolean {
+export function isAllowed(ch: string, level: number, known = ''): boolean {
+  if (known.includes(ch)) return true;
   const info = KANJI.get(ch);
   return !!info && info.level <= level;
 }
@@ -58,11 +61,21 @@ export function stripFurigana(text: string): string {
   return text.replace(/\{([^|{}]+)\|[^{}]*\}/g, '$1');
 }
 
-/** Distinct kanji in the text that are above the level, in order of appearance. */
-export function kanjiAboveLevel(text: string, level: number): string[] {
+/** Distinct kanji in the text that are above the level and not known, in order of appearance. */
+export function kanjiAboveLevel(text: string, level: number, known = ''): string[] {
   const out = new Set<string>();
   for (const ch of stripFurigana(text)) {
-    if (ch !== REPEAT && isKanji(ch) && !isAllowed(ch, level)) out.add(ch);
+    if (ch !== REPEAT && isKanji(ch) && !isAllowed(ch, level, known)) out.add(ch);
   }
   return [...out];
+}
+
+/** Every distinct kanji the learner has typed in these messages: if they typed it, they know it. */
+export function kanjiTypedIn(messages: readonly { role: string; content: string }[]): string {
+  const out = new Set<string>();
+  for (const m of messages) {
+    if (m.role !== 'user') continue;
+    for (const ch of stripFurigana(m.content)) if (ch !== REPEAT && isKanji(ch)) out.add(ch);
+  }
+  return [...out].join('');
 }

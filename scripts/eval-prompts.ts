@@ -17,7 +17,7 @@ import path from 'node:path';
 import { callAi } from '../server/ai/index.ts';
 import { generateBreakdown, generateFeedback, generateReply, type CallAi } from '../server/generate.ts';
 import type { JlptLevel } from '../shared/jlpt.ts';
-import { kanjiAboveLevel, stripFurigana } from '../shared/kanji.ts';
+import { kanjiAboveLevel, kanjiTypedIn, stripFurigana } from '../shared/kanji.ts';
 import { problemCount, replyProblems, type ReplyProblems } from '../shared/quality.ts';
 import { CLAUDE_EFFORTS, DEFAULT_SETTINGS, ENDPOINT_REASONING, type Breakdown, type Feedback, type Message, type Politeness, type Settings } from '../shared/types.ts';
 
@@ -59,6 +59,8 @@ export interface FeedbackCase {
   verdicts: Feedback['verdict'][];
   /** The corrected Japanese should contain one of these. */
   expect: string[];
+  /** The corrected Japanese should contain all of these, spelled as the learner spelled them. */
+  keeps?: string[];
 }
 export type Case = ReplyCase | BreakdownCase | FeedbackCase;
 
@@ -92,6 +94,15 @@ export const CASES: Case[] = [
     politeness: 'polite',
     topic: '',
     messages: [msg('assistant', '{週末|しゅうまつ}は{何|なに}をしましたか？'), msg('user', 'きのう、ともだちと えいがを みます。')],
+  },
+  // Kanji the learner typed are known: the partner may use them, whatever the level.
+  {
+    kind: 'reply',
+    name: 'turn · learner types kanji above the level',
+    level: 10,
+    politeness: 'polite',
+    topic: '',
+    messages: [msg('assistant', '{週末|しゅうまつ}は{何|なに}をしましたか？'), msg('user', '大阪で串カツを食べました。')],
   },
   {
     kind: 'breakdown',
@@ -135,6 +146,27 @@ export const CASES: Case[] = [
     message: "I don't understand. What does ongaku mean?",
     verdicts: ['english'],
     expect: ['{音楽|おんがく}', '音楽', 'おんがく'],
+  },
+  // Spelling in corrections: an advanced learner's correct kanji stay, unremarked; a beginner's kana stay kana, so the fix stands out.
+  {
+    kind: 'feedback',
+    name: 'feedback · correct kanji above the level',
+    level: 10,
+    earlier: [msg('assistant', '{最近|さいきん}、どんな{勉強|べんきょう}をしていますか？')],
+    message: '語彙力を上げるために、毎朝新聞を読んでいます。',
+    verdicts: ['correct', 'minor'],
+    expect: ['語彙力'],
+    keeps: ['語彙力', '新聞'],
+  },
+  {
+    kind: 'feedback',
+    name: 'feedback · beginner in kana, wrong particle',
+    level: 3,
+    earlier: [msg('assistant', 'がくせいですか？')],
+    message: 'はい、わたしはだいがくせいをです。',
+    verdicts: ['minor', 'incorrect'],
+    expect: ['だいがくせいです'],
+    keeps: ['わたし', 'だいがくせい'],
   },
   // Genki: the same kinds of scenario with the grammar guided to early lessons.
   { kind: 'reply', name: 'genki · opener · café · lesson 3', level: 10, genki: 3, politeness: 'polite', topic: 'Ordering at a café', messages: [] },
@@ -235,8 +267,11 @@ export interface Result {
   checks: Record<string, boolean>;
 }
 
+/** Feedback that explains spelling by the kanji limit, which it never should. */
+const LIMIT_TALK = /kanji (limit|level)|WaniKani|(written|write|spelled|spell) (it |this |that )?(in|with) (hiragana|kana)|in (hiragana|kana) (here )?because/i;
+
 function scoreReply(c: ReplyCase, text: string): Pick<Result, 'problems' | 'checks'> {
-  const problems = replyProblems(text, c.level);
+  const problems = replyProblems(text, c.level, kanjiTypedIn(c.messages));
   const plain = stripFurigana(text);
   return {
     problems,
@@ -252,12 +287,13 @@ function scoreReply(c: ReplyCase, text: string): Pick<Result, 'problems' | 'chec
 }
 
 function scoreBreakdown(c: BreakdownCase, b: Breakdown): Pick<Result, 'problems' | 'checks'> {
+  const known = kanjiTypedIn(c.earlier ?? []);
   const joined = normalise(b.lines.map((l) => l.japanese).join(''));
   const message = normalise(c.message);
   const texts = b.lines.flatMap((l) => [l.japanese, ...l.words.map((w) => w.text)]);
   // Kanji above the learner's level in the English, other than in words named from the message or the conversation, as the prompt allows.
   const quoted = new Set(stripFurigana([c.message, ...(c.earlier ?? []).map((m) => m.content)].join('')));
-  const added = b.lines.flatMap((l) => [l.translation, l.explanation, ...l.words.map((w) => w.meaning)]).flatMap((t) => kanjiAboveLevel(t, c.level));
+  const added = b.lines.flatMap((l) => [l.translation, l.explanation, ...l.words.map((w) => w.meaning)]).flatMap((t) => kanjiAboveLevel(t, c.level, known));
   return {
     problems: sumProblems(texts.map((t) => ({ ...replyProblems(t, 60), foreign: [] }))),
     checks: {
@@ -275,9 +311,13 @@ function scoreBreakdown(c: BreakdownCase, b: Breakdown): Pick<Result, 'problems'
 
 function scoreFeedback(c: FeedbackCase, f: Feedback): Pick<Result, 'problems' | 'checks'> {
   const corrected = stripFurigana(f.corrected);
+  const english = [f.meaning, f.summary, ...f.lines.flatMap((l) => [l.translation, l.explanation])];
   return {
-    problems: replyProblems(f.corrected, c.level),
+    // Corrections may use any kanji their words need, so only markup and stray English count.
+    problems: { ...replyProblems(f.corrected, c.level), kanji: [] },
     checks: {
+      ...(c.keeps ? { keepsSpelling: c.keeps.every((k) => corrected.includes(k)) } : {}),
+      noLimitTalk: !english.some((t) => LIMIT_TALK.test(t)),
       verdict: c.verdicts.includes(f.verdict),
       corrected: c.expect.some((e) => corrected.includes(stripFurigana(e)) || f.corrected.includes(e)),
       explained: f.summary.trim().length > 0 && f.meaning.trim().length > 0,
@@ -328,10 +368,12 @@ async function runCase(model: string, c: Case, sample: number): Promise<Result> 
       return { ...base, ms: Date.now() - started, output: text, ...scoreReply(c, text) };
     }
     if (c.kind === 'breakdown') {
-      const b = await generateBreakdown(recording, settingsFor(model, c.level, c.genki, c.jlpt), msg('assistant', c.message), c.earlier ?? []);
+      const earlier = c.earlier ?? [];
+      const b = await generateBreakdown(recording, settingsFor(model, c.level, c.genki, c.jlpt), msg('assistant', c.message), earlier, kanjiTypedIn(earlier));
       return { ...base, ms: Date.now() - started, output: b, ...scoreBreakdown(c, b) };
     }
-    const f = await generateFeedback(recording, settingsFor(model, c.level, c.genki), 'polite', msg('user', c.message), c.earlier);
+    const mine = msg('user', c.message);
+    const f = await generateFeedback(recording, settingsFor(model, c.level, c.genki), 'polite', mine, c.earlier, kanjiTypedIn([...c.earlier, mine]));
     return { ...base, ms: Date.now() - started, output: f, ...scoreFeedback(c, f) };
   } catch (err) {
     return { ...base, ms: Date.now() - started, error: (err as Error).message, output: null, problems: { kanji: [], furigana: [], foreign: [] }, checks: { ran: false } };
