@@ -171,3 +171,26 @@ test('on a phone, the action tooltips leave the message text uncovered too', asy
     await expectTooltipBeside(app, message.getByRole('button', { name }), message.locator('.bubble-text'));
   }
 });
+
+test.describe('on a touch screen', () => {
+  test.use({ isMobile: true });
+
+  test('every control is at least 44px each way, the message actions included', async ({ app }) => {
+    expect(await app.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true);
+    await startChat(app, 'Phone chat');
+    await composer(app).fill('はい');
+    await composer(app).press('Enter');
+    await expect(theirs(app)).toHaveCount(2);
+    await app.getByRole('button', { name: 'Menu' }).click();
+    await expect(app.locator('.sidebar')).toBeInViewport();
+
+    const small: string[] = [];
+    const targets = app.locator('.bubble-actions button, .chat-item-actions button, .menu-button, .topbar-new, .romaji-toggle, .send');
+    for (const button of await targets.all()) {
+      const box = await button.boundingBox();
+      if (box && (box.width < 44 || box.height < 44)) small.push(`${await button.getAttribute('class')} ${box.width}x${box.height}`);
+    }
+    expect(small).toEqual([]);
+    expect(await targets.count()).toBeGreaterThan(8);
+  });
+});
