@@ -38,7 +38,13 @@ const en = {
   topicExamples: ['Ordering at a café', 'Weekend plans', 'Self-introduction', 'Shopping for clothes', 'Asking for directions'],
 
   emptyTitle: 'Practise Japanese by chatting',
-  emptyBody: 'Start a new chat and your partner will send the first message. Tap “Breakdown” on any of their messages for a line-by-line translation, and “Check” on yours for feedback.',
+  /** `breakdown` and `check` are the buttons as they look on a message: their icon and name. */
+  emptyBody: (breakdown: ReactNode, check: ReactNode) => (
+    <>
+      Start a new chat and your partner will send the first message. Use {breakdown} on any of their messages for a line-by-line
+      translation, and {check} on yours for feedback.
+    </>
+  ),
 
   you: 'You',
   partner: 'Partner',
@@ -177,7 +183,11 @@ const ja: Strings = {
   topicExamples: ['カフェで注文', '週末の予定', '自己紹介', '服の買い物', '道を聞く'],
 
   emptyTitle: 'チャットで日本語を練習しよう',
-  emptyBody: '新しいチャットを始めると、相手が最初のメッセージを送ります。相手のメッセージの「解説」で一行ずつの翻訳を、自分のメッセージの「チェック」で添削を見られます。',
+  emptyBody: (breakdown: ReactNode, check: ReactNode) => (
+    <>
+      新しいチャットを始めると、相手が最初のメッセージを送ります。相手のメッセージの{breakdown}で一行ずつの翻訳を、自分のメッセージの{check}で添削を見られます。
+    </>
+  ),
 
   you: 'あなた',
   partner: '相手',

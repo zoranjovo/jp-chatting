@@ -15,7 +15,7 @@ import { MessageBubble } from '../../src/components/MessageBubble.tsx';
 import { ContextDetails } from '../../src/components/MessageInfo.tsx';
 import { JpText, KnownKanjiProvider } from '../../src/components/JpText.tsx';
 import { parseInline } from '../../src/components/RichText.tsx';
-import { LanguageProvider } from '../../src/i18n.tsx';
+import { LanguageProvider, STRINGS } from '../../src/i18n.tsx';
 import { SettingsContext } from '../../src/settings.tsx';
 import { SettingsDialog } from '../../src/components/SettingsDialog.tsx';
 import { SetupNotice } from '../../src/components/SetupNotice.tsx';
@@ -413,6 +413,16 @@ describe('readings with furigana off', () => {
     );
     assert.equal(count(html, '<rt>'), 1);
     assert.match(html, /<rt>にほんご<\/rt>/);
+  });
+});
+
+describe('the welcome text', () => {
+  test('puts the buttons it names in place, in both languages, and says nothing about tapping', () => {
+    for (const lang of ['en', 'ja'] as const) {
+      const html = renderToStaticMarkup(<>{STRINGS[lang].emptyBody(<b>B</b>, <b>C</b>)}</>);
+      assert.match(html, /<b>B<\/b>.*<b>C<\/b>/s, lang);
+      assert.ok(!/Tap|タップ/.test(html), lang);
+    }
   });
 });
 

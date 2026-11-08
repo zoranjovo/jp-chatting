@@ -1160,6 +1160,21 @@ ruby rt {
   font-size: 22px;
 }
 
+/* A message button named in running text, looking as it does on a message: its icon, then its name. */
+.inline-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+  white-space: nowrap;
+  vertical-align: baseline;
+}
+
 .empty > p {
   max-width: 460px;
   color: var(--muted);
