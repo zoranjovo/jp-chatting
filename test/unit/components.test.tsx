@@ -557,6 +557,13 @@ describe('accessible names and states', () => {
     assert.match(render(<Sidebar {...props} activeId={null} />, { uiLanguage: 'ja' }), /<label class="active"><input type="radio" name="ui-language" checked=""\/>日本語/);
   });
 
+  test('past level 60 the WaniKani level is No limit, said as such to the eye and to screen readers', () => {
+    const html = render(<SettingsDialog onClose={() => {}} />, { wkLevel: 61 });
+    assert.match(html, /<strong>No limit<\/strong>/);
+    assert.match(html, /type="range"[^>]*max="61"[^>]*aria-valuetext="No limit"/);
+    assert.match(html, /No limit — any kanji, including ones that aren’t on WaniKani\./);
+  });
+
   test('the WaniKani level is a group, its slider and number box named apart, with the hint as their description', () => {
     const html = render(<SettingsDialog onClose={() => {}} />, { wkLevel: 5 });
     const group = html.match(/<div class="field" role="group" aria-labelledby="([^"]+)"><label class="field-label" id="([^"]+)" for="([^"]+)">/);

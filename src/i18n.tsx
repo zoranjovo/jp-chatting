@@ -2,6 +2,7 @@
 // the Strings type makes a missing one a type error.
 
 import { createContext, useContext, type ReactNode } from 'react';
+import { NO_KANJI_LIMIT } from '../shared/kanji.ts';
 import type { ClaudeEffort, EndpointReasoning, UiLanguage } from '../shared/types.ts';
 
 // Labels for the stored effort and thinking values, one table per provider, so each value has a label (tsc checks)
@@ -93,7 +94,13 @@ const en = {
   wkLevelLabel: 'WaniKani level',
   wkLevelNumber: 'Type a WaniKani level',
   wkLevelHint: (level: number, count: number) =>
-    level === 0 ? 'Kana only — no kanji.' : `Your partner may use the ${count} kanji from ${level === 1 ? 'level 1' : `levels 1–${level}`}. Others are written in kana.`,
+    level === 0
+      ? 'Kana only — no kanji.'
+      : level >= NO_KANJI_LIMIT
+        ? 'No limit — any kanji, including ones that aren’t on WaniKani.'
+        : `Your partner may use the ${count} kanji from ${level === 1 ? 'level 1' : `levels 1–${level}`}. Others are written in kana.`,
+  /** The WaniKani level past 60. */
+  noKanjiLimit: 'No limit',
   furigana: 'Show furigana (readings over kanji)',
   romajiInput: 'Convert romaji to kana while typing',
   politeness: 'Partner’s speech style',
@@ -111,7 +118,7 @@ const en = {
   messageInfoNote: 'Its breakdown uses these settings too, even if you’ve changed them since.',
   messageWritten: 'Written',
   effortMeta: (effort: string) => `Effort: ${labelOf(enEffort, effort)}`,
-  wkMeta: (level: number) => (level === 0 ? 'Kana only' : `WK ${level}`),
+  wkMeta: (level: number) => (level === 0 ? 'Kana only' : level >= NO_KANJI_LIMIT ? 'No kanji limit' : `WK ${level}`),
   genkiMeta: (lesson: number) => `Genki L${lesson}`,
   genkiLabel: 'Genki lesson',
   genkiNone: 'Not using Genki',
@@ -236,7 +243,12 @@ const ja: Strings = {
   wkLevelLabel: 'WaniKaniレベル',
   wkLevelNumber: 'WaniKaniレベルを入力',
   wkLevelHint: (level: number, count: number) =>
-    level === 0 ? 'かなのみ（漢字なし）。' : `相手は${level === 1 ? 'レベル1' : `レベル1〜${level}`}の漢字${count}字を使えます。それ以外はかなで書きます。`,
+    level === 0
+      ? 'かなのみ（漢字なし）。'
+      : level >= NO_KANJI_LIMIT
+        ? '制限なし：WaniKaniにない漢字も含め、どの漢字も使えます。'
+        : `相手は${level === 1 ? 'レベル1' : `レベル1〜${level}`}の漢字${count}字を使えます。それ以外はかなで書きます。`,
+  noKanjiLimit: '制限なし',
   furigana: 'ふりがなを表示する',
   romajiInput: '入力中にローマ字をかなに変換する',
   politeness: '相手の話し方',
@@ -254,7 +266,7 @@ const ja: Strings = {
   messageInfoNote: 'あとで設定を変えても、このメッセージの解説はこの設定を使います。',
   messageWritten: '日時',
   effortMeta: (effort: string) => `思考レベル：${labelOf(jaEffort, effort)}`,
-  wkMeta: (level: number) => (level === 0 ? 'かなのみ' : `WK${level}`),
+  wkMeta: (level: number) => (level === 0 ? 'かなのみ' : level >= NO_KANJI_LIMIT ? '漢字制限なし' : `WK${level}`),
   genkiMeta: (lesson: number) => `げんき第${lesson}課`,
   genkiLabel: 'げんきの課',
   genkiNone: 'げんきを使っていない',

@@ -21,10 +21,12 @@ const KANJI = new Map<string, KanjiInfo>(
 );
 
 export const MAX_WK_LEVEL = 60;
+/** One past the last level: no kanji limit at all, kanji that aren't on WaniKani included. */
+export const NO_KANJI_LIMIT = MAX_WK_LEVEL + 1;
 
-/** Any number as a level: whole, 0..MAX_WK_LEVEL. The one rule for the UI and for saved settings. */
+/** Any number as a level: whole, 0..NO_KANJI_LIMIT. The one rule for the UI and for saved settings. */
 export function clampWkLevel(n: number): number {
-  return Math.max(0, Math.min(MAX_WK_LEVEL, Math.round(n)));
+  return Math.max(0, Math.min(NO_KANJI_LIMIT, Math.round(n)));
 }
 
 /** A typed level, clamped, or null while the text isn't a number yet (empty, "-"). Too big a number ("1e400") is the top level. */
@@ -47,7 +49,7 @@ export function kanjiInfo(ch: string): KanjiInfo | undefined {
 }
 
 export function isAllowed(ch: string, level: number, known = ''): boolean {
-  if (known.includes(ch)) return true;
+  if (level >= NO_KANJI_LIMIT || known.includes(ch)) return true;
   const info = KANJI.get(ch);
   return !!info && info.level <= level;
 }

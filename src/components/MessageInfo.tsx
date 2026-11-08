@@ -16,6 +16,7 @@ import {
 import { useState } from 'react';
 import { modelLabel } from '../../shared/context.ts';
 import { genkiBook } from '../../shared/genki.ts';
+import { NO_KANJI_LIMIT } from '../../shared/kanji.ts';
 import type { MessageContext } from '../../shared/types.ts';
 import { useT } from '../i18n.tsx';
 import { useSettings } from '../settings.tsx';
@@ -32,7 +33,7 @@ export function ContextDetails({ context, createdAt }: { context: MessageContext
     [t.provider, context.provider === 'claude' ? t.providerClaude : t.providerEndpoint],
     context.provider === 'claude' ? [t.effort, t.effortOption(context.effort ?? '')] : [t.thinking, t.thinkingOption(context.effort ?? '')],
     [t.politeness, context.politeness === 'casual' ? t.casual : t.polite],
-    [t.wkLevelLabel, context.wkLevel === 0 ? t.wkMeta(0) : String(context.wkLevel)],
+    [t.wkLevelLabel, context.wkLevel === 0 || context.wkLevel >= NO_KANJI_LIMIT ? t.wkMeta(context.wkLevel) : String(context.wkLevel)],
     [t.genkiLabel, context.genkiLesson > 0 ? t.genkiLesson(genkiBook(context.genkiLesson), context.genkiLesson) : t.genkiNone],
     [t.jlptLabel, context.jlptLevel > 0 ? t.jlptOption(context.jlptLevel) : t.jlptNone],
     [t.messageWritten, new Date(createdAt).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' })],

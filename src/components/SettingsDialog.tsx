@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { genkiBook, MAX_GENKI_LESSON } from '../../shared/genki.ts';
 import { asJlptLevel, JLPT_LEVELS } from '../../shared/jlpt.ts';
-import { allowedKanji, MAX_WK_LEVEL, parseWkLevel } from '../../shared/kanji.ts';
+import { allowedKanji, NO_KANJI_LIMIT, parseWkLevel } from '../../shared/kanji.ts';
 import { CLAUDE_EFFORTS, ENDPOINT_REASONING, needsModel, type ClaudeEffort, type EndpointReasoning, type ModelList, type Settings } from '../../shared/types.ts';
 import { api } from '../api.ts';
 import { useT } from '../i18n.tsx';
@@ -81,6 +81,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const current = draft.provider === 'claude' ? draft.claude.model : draft.endpoint.model;
   const options = models?.models ?? [];
   const kanjiCount = allowedKanji(draft.wkLevel).length;
+  const noLimit = draft.wkLevel >= NO_KANJI_LIMIT;
   const wkIds = { label: useId(), slider: useId(), hint: useId() };
 
   return (
@@ -101,23 +102,25 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           {/* Two controls for one level: a group named by the heading, each control with a name of its own. */}
           <div className="field" role="group" aria-labelledby={wkIds.label}>
             <label className="field-label" id={wkIds.label} htmlFor={wkIds.slider}>
-              {t.wkLevelLabel}: <strong>{draft.wkLevel}</strong>
+              {t.wkLevelLabel}: <strong>{noLimit ? t.noKanjiLimit : draft.wkLevel}</strong>
             </label>
             <div className="level-row">
               <input
                 id={wkIds.slider}
                 type="range"
                 min={0}
-                max={MAX_WK_LEVEL}
+                // One past level 60: no limit.
+                max={NO_KANJI_LIMIT}
                 value={draft.wkLevel}
                 onChange={(e) => set('wkLevel', Number(e.target.value))}
+                aria-valuetext={noLimit ? t.noKanjiLimit : undefined}
                 aria-label={t.wkLevelLabel}
                 aria-describedby={wkIds.hint}
               />
               <input
                 type="number"
                 min={0}
-                max={MAX_WK_LEVEL}
+                max={NO_KANJI_LIMIT}
                 value={wkTyped ?? String(draft.wkLevel)}
                 onChange={(e) => {
                   setWkTyped(e.target.value);
