@@ -355,7 +355,7 @@ test('the partner\'s messages show how they were written, and keep it after the 
   await request.put('/api/settings', { data: { endpoint: { model: 'mock-large' }, wkLevel: 20, jlptLevel: 3 } });
   await app.reload();
   const dialog = await openChatSettings(app);
-  await expect(dialog.locator('.chat-uses')).toHaveText('mock-large · Polite · WK 20 · N3');
+  await expect(dialog.locator('.chat-uses')).toHaveText('mock-large · WK 20 · N3');
   await dialog.getByText('Casual (plain form)').click();
   await dialog.getByRole('button', { name: 'Save' }).click();
   await app.reload();

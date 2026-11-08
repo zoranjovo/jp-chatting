@@ -40,7 +40,8 @@ export function ChatSettingsDialog({ chat, onSave, onClose }: { chat: Chat; onSa
           </div>
           <div className="field">
             <span>{t.chatUses}</span>
-            <ContextLine context={contextOf(settings, politeness)} className="chat-uses" />
+            {/* Only what comes from Settings: the speech style is this chat's own, chosen just above. */}
+            <ContextLine context={contextOf(settings, politeness)} className="chat-uses" withStyle={false} />
             <small className="muted">{t.chatUsesHint}</small>
           </div>
           <p className="muted small">{t.chatSettingsHint}</p>
