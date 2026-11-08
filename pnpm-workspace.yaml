@@ -1,2 +1,4 @@
 allowBuilds:
   esbuild: true
+# `pnpm add` writes exact versions, never ranges.
+saveExact: true
