@@ -1,4 +1,4 @@
-import { composer, expect, mine, startChat, test, theirs } from './fixtures.ts';
+import { chatsOnDisk, composer, expect, mine, startChat, test, theirs } from './fixtures.ts';
 
 test('romaji typed key by key turns into kana', async ({ app }) => {
   await startChat(app);
@@ -10,6 +10,25 @@ test('CAPS romaji turns into katakana', async ({ app }) => {
   await startChat(app);
   await composer(app).pressSequentially('KO-HI-wo nomimasu');
   await expect(composer(app)).toHaveValue('コーヒーを のみます');
+});
+
+test('spaces typed between romaji words are kept while typing and dropped from the message', async ({ app, request }) => {
+  await startChat(app);
+  await composer(app).pressSequentially('hai, ii tenki desu ne.');
+  await expect(composer(app)).toHaveValue('はい、 いい てんき です ね。');
+  await composer(app).press('Enter');
+  await expect(mine(app).first().locator('.bubble-text')).toHaveText('はい、いいてんきですね。');
+  // The model is sent the message without them too, so it doesn't copy them.
+  const [chat] = await chatsOnDisk(request);
+  expect(chat.messages[1].content).toBe('はい、いいてんきですね。');
+});
+
+test('with romaji input off, spaces are sent as typed', async ({ app }) => {
+  await startChat(app);
+  await app.locator('.romaji-toggle').click();
+  await composer(app).fill('はい いい てんき');
+  await composer(app).press('Enter');
+  await expect(mine(app).first().locator('.bubble-text')).toHaveText('はい いい てんき');
 });
 
 test('a trailing n becomes ん when the message is sent', async ({ app }) => {

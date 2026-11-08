@@ -162,3 +162,15 @@ export function romajiAtCaret(before: string): string {
   const start = before.slice(0, -1).search(/\S*$/);
   return before.slice(0, start) + romajiToKana(before.slice(start));
 }
+
+const JAPANESE = String.raw`\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}ー々、。！？「」『』〜・…`;
+const SPACE_BETWEEN_JAPANESE = new RegExp(String.raw`(?<=[${JAPANESE}])[ 　]+(?=[${JAPANESE}])`, 'gu');
+
+/**
+ * Spaces between Japanese characters dropped. Romaji is typed with spaces
+ * between words (hai, ii tenki desu), but Japanese is written without them, so
+ * Check called them a mistake and the partner started copying them.
+ */
+export function withoutJapaneseSpaces(text: string): string {
+  return text.replace(SPACE_BETWEEN_JAPANESE, '');
+}
