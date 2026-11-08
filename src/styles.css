@@ -886,6 +886,8 @@ ruby rt {
   max-width: 6.5em;
   text-align: center;
   margin-top: 2px;
+  /* A long gloss wraps inside its column instead of running into the next: after a slash, or mid-word as a last resort. */
+  overflow-wrap: anywhere;
 }
 
 .feedback {
