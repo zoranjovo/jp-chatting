@@ -20,6 +20,11 @@ export interface AppDeps {
   listModels: typeof realListModels;
   /** Serve the built UI from dist/ when it exists. */
   serveUi: boolean;
+  /**
+   * In LAN mode (`pnpm start:lan`), this machine's own addresses, answered as well as loopback. Asked per request,
+   * so a new Wi-Fi address works without a restart.
+   */
+  lanHosts: () => Iterable<string>;
 }
 
 class NotFound extends Error {}
@@ -38,14 +43,18 @@ const asPoliteness = (v: unknown): Politeness | undefined => (v === 'polite' || 
  * rebind its own hostname to 127.0.0.1 (then it is same-origin and can read
  * and write everything), or post here cross-site. So only loopback hostnames
  * are answered, and a request a page sends must come from a loopback origin.
+ * In LAN mode this machine's own IP addresses are answered too: a rebinding
+ * page's Host is always its own hostname, never a bare IP, so that stays shut.
  */
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]']);
+const NO_LAN = (): Iterable<string> => [];
 
-export function fromLoopback(host: string | undefined, origin: string | undefined): boolean {
-  if (!LOOPBACK.has((host ?? '').replace(/:\d+$/, '').toLowerCase())) return false;
+export function fromThisMachine(host: string | undefined, origin: string | undefined, lanHosts = NO_LAN): boolean {
+  const allowed = (name: string) => LOOPBACK.has(name) || [...lanHosts()].includes(name);
+  if (!allowed((host ?? '').replace(/:\d+$/, '').toLowerCase())) return false;
   if (origin === undefined) return true;
   try {
-    return LOOPBACK.has(new URL(origin).hostname);
+    return allowed(new URL(origin).hostname);
   } catch {
     return false;
   }
@@ -57,10 +66,10 @@ function titleFrom(text: string): string {
 }
 
 export function createApp(overrides: Partial<AppDeps> = {}) {
-  const deps: AppDeps = { callAi: realCallAi, listModels: realListModels, serveUi: true, ...overrides };
+  const deps: AppDeps = { callAi: realCallAi, listModels: realListModels, serveUi: true, lanHosts: NO_LAN, ...overrides };
   const app = express();
   app.use((req, res, next) => {
-    if (fromLoopback(req.headers.host, req.headers.origin)) return next();
+    if (fromThisMachine(req.headers.host, req.headers.origin, deps.lanHosts)) return next();
     res.status(403).json({ error: 'only answers requests from this machine' });
   });
   app.use(express.json({ limit: '1mb' }));

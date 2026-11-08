@@ -3,7 +3,7 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { after, beforeEach, describe, test } from 'node:test';
 import { AiError, type AiRequest } from '../../server/ai/index.ts';
-import { createApp, fromLoopback } from '../../server/app.ts';
+import { createApp, fromThisMachine } from '../../server/app.ts';
 import { BREAKDOWN_SCHEMA, FEEDBACK_SCHEMA } from '../../server/prompts.ts';
 import type { Chat, Message, ModelList, Settings } from '../../shared/types.ts';
 import { clearTempData, useTempData } from './helpers.ts';
@@ -109,9 +109,9 @@ describe('settings API', () => {
 
 describe('loopback guard', () => {
   /** node:http, not fetch, so the Host header is sent exactly as given. */
-  const raw = (method: string, url: string, headers: Record<string, string>) =>
+  const raw = (method: string, url: string, headers: Record<string, string>, to = base) =>
     new Promise<number>((resolve, reject) => {
-      const req = http.request(base + url, { method, headers }, (res) => {
+      const req = http.request(to + url, { method, headers }, (res) => {
         res.resume();
         resolve(res.statusCode ?? 0);
       });
@@ -132,12 +132,37 @@ describe('loopback guard', () => {
   });
 
   test('the app itself, Vite and tools without an Origin get through', () => {
-    assert.ok(fromLoopback('127.0.0.1:5174', undefined));
-    assert.ok(fromLoopback('localhost:5173', 'http://localhost:5173'));
-    assert.ok(fromLoopback('127.0.0.1:5173', 'http://127.0.0.1:5173'));
-    assert.ok(fromLoopback('[::1]:5174', 'http://[::1]:5174'));
-    assert.ok(!fromLoopback('127.0.0.1.evil.example', undefined));
-    assert.ok(!fromLoopback(undefined, undefined));
+    assert.ok(fromThisMachine('127.0.0.1:5174', undefined));
+    assert.ok(fromThisMachine('localhost:5173', 'http://localhost:5173'));
+    assert.ok(fromThisMachine('127.0.0.1:5173', 'http://127.0.0.1:5173'));
+    assert.ok(fromThisMachine('[::1]:5174', 'http://[::1]:5174'));
+    assert.ok(!fromThisMachine('127.0.0.1.evil.example', undefined));
+    assert.ok(!fromThisMachine(undefined, undefined));
+  });
+
+  test('in LAN mode, this machine’s own addresses get through and nothing else does', () => {
+    const lan = () => ['192.168.1.50'];
+    assert.ok(fromThisMachine('192.168.1.50:5174', undefined, lan));
+    assert.ok(fromThisMachine('192.168.1.50:5174', 'http://192.168.1.50:5174', lan));
+    assert.ok(fromThisMachine('127.0.0.1:5174', 'http://127.0.0.1:5174', lan));
+    assert.ok(!fromThisMachine('192.168.1.50:5174', undefined), 'not without LAN mode');
+    assert.ok(!fromThisMachine('192.168.1.51:5174', undefined, lan), 'another machine’s address');
+    assert.ok(!fromThisMachine('evil.example:5174', undefined, lan), 'a rebound hostname');
+    assert.ok(!fromThisMachine('192.168.1.50:5174', 'https://evil.example', lan), 'a cross-site post');
+  });
+
+  test('a LAN-mode app answers its own address, the default app does not', async () => {
+    const lanServer = createApp({ callAi: fakeAi, lanHosts: () => ['192.168.1.50'] }).listen(0, '127.0.0.1');
+    await new Promise((r) => lanServer.once('listening', r));
+    try {
+      const lanBase = `http://127.0.0.1:${(lanServer.address() as AddressInfo).port}`;
+      const phone = { Host: '192.168.1.50:5174', Origin: 'http://192.168.1.50:5174', 'Content-Type': 'application/json' };
+      assert.equal(await raw('GET', '/api/settings', { Host: phone.Host }, lanBase), 200);
+      assert.equal(await raw('PUT', '/api/settings', phone, lanBase), 200);
+      assert.equal(await raw('GET', '/api/settings', { Host: phone.Host }), 403);
+    } finally {
+      lanServer.close();
+    }
   });
 });
 
