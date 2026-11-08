@@ -1433,6 +1433,55 @@ ruby rt {
 
 /* --- narrow screens: the sidebar slides over --- */
 
+/* Touch screens: every control at least 44px in each direction, the size a fingertip needs (WCAG 2.5.5).
+   The message actions keep their 28px circles drawn inside a 44px target, so a bubble doesn't look heavier. */
+@media (pointer: coarse) {
+  .icon-button,
+  .menu-button,
+  .topbar-new {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .bubble-actions {
+    gap: 0;
+    margin: -6px -14px -12px;
+  }
+
+  .bubble-actions .icon-button {
+    width: 44px;
+    height: 44px;
+    padding: 8px;
+    background-clip: content-box;
+  }
+
+  .chat-item-actions {
+    gap: 4px;
+  }
+
+  .romaji-toggle,
+  .send {
+    height: 44px;
+  }
+
+  .romaji-toggle {
+    width: 44px;
+  }
+
+  .link-button {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 8px;
+    margin-left: -8px;
+  }
+
+  .chip {
+    min-height: 44px;
+    padding: 2px 14px;
+  }
+}
+
 @media (max-width: 760px) {
   .app {
     grid-template-columns: 1fr;
