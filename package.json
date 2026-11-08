@@ -9,6 +9,7 @@
     "dev": "concurrently -k -n server,web -c blue,magenta \"tsx watch --clear-screen=false server/index.ts\" \"vite\"",
     "build": "vite build",
     "start": "tsx server/index.ts",
+    "start:lan": "tsx server/index.ts --host",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test \"test/unit/**/*.test.ts\" \"test/unit/**/*.test.tsx\"",
     "test:ui": "playwright test",
