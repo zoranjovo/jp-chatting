@@ -43,7 +43,7 @@ Use no other kanji${where}. Any word that needs another kanji must be written in
   }
   return `Kanji: the learner knows all hiragana and katakana, but only these kanji (WaniKani levels 1-${level}, one line per level):
 ${kanjiByLevel(level)}${typed ? `\nThey have also typed these kanji themselves in this chat, so they know them too: ${typed}` : ''}
-Use no other kanji${where}. Any word that needs a kanji outside ${typed ? 'those' : 'that list'} must be written in hiragana instead (katakana for loanwords). Check every kanji you write against the list; if you are unsure about one, write that word in hiragana.${exempt}`;
+Use no other kanji${where}. Any word that needs a kanji outside ${typed ? 'those' : 'that list'} must be written in hiragana instead (katakana for loanwords). Check every kanji you write against ${typed ? 'both lists' : 'the list'}; if you are unsure about one, write that word in hiragana.${exempt}`;
 }
 
 function styleRule(politeness: Politeness): string {

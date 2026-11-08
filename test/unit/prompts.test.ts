@@ -46,9 +46,11 @@ describe('conversationSystem', () => {
     const system = conversationSystem(settings({ wkLevel: 3 }), chat(''), '人串語');
     assert.match(system, /They have also typed these kanji themselves in this chat, so they know them too: 串語\n/);
     assert.match(system, /Any word that needs a kanji outside those must be written in hiragana/);
+    assert.match(system, /Check every kanji you write against both lists/);
     const none = conversationSystem(settings({ wkLevel: 3 }), chat(''), '人');
     assert.ok(!none.includes('typed these kanji'));
     assert.match(none, /outside that list/);
+    assert.match(none, /Check every kanji you write against the list/);
   });
 
   test('at level 0, the kanji the learner has typed are the only ones allowed', () => {

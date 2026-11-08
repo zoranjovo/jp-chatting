@@ -612,6 +612,20 @@ describe('reply clean-up', () => {
     assert.match(breakdown.request.system, /so they know them too: 串語彙/);
     assert.match(feedback.request.system, /so they know them too: 串語彙/);
   });
+
+  test('and the kanji in a rewound message pinned above the composer, as the UI counts them', async () => {
+    await api('PUT', '/api/settings', { wkLevel: 1 });
+    const chat = await newChat();
+    await reply(chat.id);
+    const sent = await send(chat.id, '串カツ');
+    const [partner, mine] = sent.body.messages;
+    await analyze(chat.id, mine.id);
+    const rewound = await api<Chat>('POST', `/api/chats/${chat.id}/messages/${mine.id}/rewind`);
+    assert.equal(rewound.body.pinned?.content, '串カツ');
+    calls.length = 0;
+    await analyze(chat.id, partner.id);
+    assert.match(calls.find((c) => c.kind === 'breakdown')!.request.system, /so they know them too: 串/);
+  });
 });
 
 describe('test model', () => {

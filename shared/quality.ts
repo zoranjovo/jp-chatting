@@ -66,7 +66,7 @@ export function tidyMarkup(text: string): string {
 
 /** The fixes that need no model: tidyMarkup, and kanji the learner doesn't know spelled out from their readings. */
 export function autoFix(text: string, level: number, known = ''): string {
-  return kanaForKanjiAboveLevel(tidyMarkup(text), level, known).trim();
+  return kanaForKanjiAboveLevel(tidyMarkup(text), level, known);
 }
 
 /** Share of distinct characters two texts have in common (Jaccard), furigana ignored. */

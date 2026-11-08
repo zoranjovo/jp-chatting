@@ -6,8 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { contextOf, settingsFor } from '../shared/context.ts';
-import { kanjiTypedIn } from '../shared/kanji.ts';
-import { stripFurigana } from '../shared/kanji.ts';
+import { kanjiKnownIn, stripFurigana } from '../shared/kanji.ts';
 import type { Chat, Message, ModelTest, Politeness, ProviderKind, Settings } from '../shared/types.ts';
 import { AiError, callAi as realCallAi, listModels as realListModels, type AiRequest } from './ai/index.ts';
 import { generateBreakdown, generateFeedback, generateReply } from './generate.ts';
@@ -341,7 +340,7 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
       const settings = settingsFor(await store.getSettings(), message.context);
       const earlier = chat.messages.slice(0, index);
       // Anywhere in the chat, as the UI counts them: once typed, the learner knows it.
-      const known = kanjiTypedIn(chat.messages);
+      const known = kanjiKnownIn(chat);
       let patch: Partial<Message>;
       if (message.role === 'assistant') {
         patch = { breakdown: await generateBreakdown(deps.callAi, settings, message, earlier, known) };

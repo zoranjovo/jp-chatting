@@ -79,3 +79,11 @@ export function kanjiTypedIn(messages: readonly { role: string; content: string 
   }
   return [...out].join('');
 }
+
+/**
+ * The kanji a chat counts as known: typed in its messages, or in the rewound message pinned above the composer
+ * (gone from the messages, but the learner wrote it). The UI and the analyses both count them this way.
+ */
+export function kanjiKnownIn(chat: { messages: readonly { role: string; content: string }[]; pinned?: { content: string } }): string {
+  return kanjiTypedIn(chat.pinned ? [...chat.messages, { role: 'user', content: chat.pinned.content }] : chat.messages);
+}
