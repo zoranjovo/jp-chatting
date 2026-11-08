@@ -90,7 +90,8 @@ export function BreakdownView({ breakdown }: { breakdown: Breakdown }) {
                       <JpText text={s.text} />
                     </span>
                     <span className="gloss-en">
-                      <RichText text={s.meaning} />
+                      {/* A break allowed after a slash, so "contrast/emphasis" splits there rather than mid-word. */}
+                      <RichText text={s.meaning.replace(/\//g, '/\u200b')} />
                     </span>
                   </span>
                 ) : (
