@@ -2,7 +2,7 @@
 // conversation going, break down its own messages, and give feedback on the
 // learner's.
 
-import { allowedKanji, kanjiAboveLevel, kanjiInfo, stripFurigana } from '../shared/kanji.ts';
+import { allowedKanji, kanjiAboveLevel, kanjiInfo, NO_KANJI_LIMIT, stripFurigana } from '../shared/kanji.ts';
 import type { ReplyProblems } from '../shared/quality.ts';
 import { genkiBook, genkiGrammarThrough, MAX_GENKI_LESSON } from '../shared/genki.ts';
 import { JLPT_DESCRIPTION, type JlptLevel } from '../shared/jlpt.ts';
@@ -30,6 +30,9 @@ function kanjiByLevel(level: number): string {
  * stated in the rule itself so it never reads as covering everything.
  */
 function kanjiRule(level: number, known = '', scope?: { appliesTo: string; exempt?: string }): string {
+  if (level >= NO_KANJI_LIMIT) {
+    return `Kanji: there is no kanji limit -- the learner reads kanji freely. Write words${scope ? ` in ${scope.appliesTo}` : ''} with the kanji they are normally written with.`;
+  }
   const where = scope ? ` in ${scope.appliesTo}` : ' at all';
   const exempt = scope?.exempt ? ` ${scope.exempt}` : '';
   // Only the ones the level doesn't already cover, so the list stays short.
@@ -79,6 +82,21 @@ Build your messages mainly from this grammar, with vocabulary a Genki student at
 }
 
 /** `known`: the kanji the learner has typed in this chat (kanjiTypedIn). */
+/**
+ * How long a message may be. Beginners get one to three short sentences (as with no level set); an advanced
+ * learner gets a real chat partner's length, up to a short paragraph when the topic wants depth.
+ */
+function lengthRule(jlptLevel: number, levelGuide: boolean): string {
+  const pitch = levelGuide ? "grammar and vocabulary at the learner's level (see the level guide)" : 'beginner-level grammar and vocabulary';
+  if (jlptLevel === 1 || jlptLevel === 2) {
+    return `Write as much as a real chat partner would: usually two to four sentences, and up to a short paragraph (about six sentences) when the topic calls for it -- say, when the learner wants to talk about something seriously or in depth. Use ${pitch}. Usually end with something to answer, such as a question.`;
+  }
+  if (jlptLevel === 3) {
+    return `Keep each message fairly short: up to four sentences with ${pitch}. Usually end with something easy to answer, such as a question.`;
+  }
+  return `Keep each message short: one to three short sentences with ${pitch}. Usually end with something easy to answer, such as a simple question.`;
+}
+
 export function conversationSystem(settings: Settings, chat: Pick<Chat, 'topic' | 'politeness'>, known = ''): string {
   const topic = chat.topic;
   const genki = genkiRule(settings.genkiLesson, chat.politeness);
@@ -87,7 +105,7 @@ export function conversationSystem(settings: Settings, chat: Pick<Chat, 'topic' 
 
 Rules:
 - Write only in Japanese. Never write English or romaji, even when the learner writes in English -- then just answer in simple Japanese as if they had said it in Japanese.
-- Keep each message short: one to three short sentences with ${jlpt ? "grammar and vocabulary at the learner's level (see the level guide)" : 'beginner-level grammar and vocabulary'}. Usually end with something easy to answer, such as a simple question.
+- ${lengthRule(settings.jlptLevel, jlpt !== '')}
 - ${styleRule(chat.politeness)}
 - Do not correct the learner's mistakes or explain grammar; a separate tool does that. Keep the conversation going naturally, guessing what they meant if needed.
 - ${topic.trim() ? `Topic or scenario for this chat, chosen by the learner: ${topic.trim()}. Stay in it (play a role if it calls for one).` : 'No topic was chosen: start with an everyday topic and follow wherever the learner takes it.'}

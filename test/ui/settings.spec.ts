@@ -148,11 +148,12 @@ test('a negative level becomes 0, and Enter in the box saves it', async ({ app, 
   expect((await saved(request)).wkLevel).toBe(0);
 });
 
-for (const [typed, level] of [['2.5', 3], ['75', 60]] as const) {
+// Past 60 is No limit (61).
+for (const [typed, level, shown] of [['2.5', 3, '3'], ['75', 61, 'No limit']] as const) {
   test(`Enter in the level box saves ${typed} as ${level}`, async ({ app, request }) => {
     const { box, label } = await clearLevelBox(app);
     await box.pressSequentially(typed);
-    await expect(label).toHaveText(String(level));
+    await expect(label).toHaveText(shown);
     await box.press('Enter');
     await expect(app.getByRole('dialog')).toHaveCount(0);
     expect((await saved(request)).wkLevel).toBe(level);

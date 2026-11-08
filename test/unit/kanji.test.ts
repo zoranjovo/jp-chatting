@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import rows from '../../shared/wanikani-kanji.json' with { type: 'json' };
-import { allowedKanji, isAllowed, isKanji, kanjiAboveLevel, kanjiInfo, kanjiKnownIn, kanjiTypedIn, MAX_WK_LEVEL, parseWkLevel, stripFurigana } from '../../shared/kanji.ts';
+import { allowedKanji, isAllowed, isKanji, kanjiAboveLevel, kanjiInfo, kanjiKnownIn, kanjiTypedIn, MAX_WK_LEVEL, NO_KANJI_LIMIT, parseWkLevel, stripFurigana } from '../../shared/kanji.ts';
 
 describe('the bundled WaniKani list', () => {
   test('covers all 60 levels with about 2,000 kanji', () => {
@@ -141,15 +141,22 @@ describe('kanjiKnownIn', () => {
 });
 
 describe('parseWkLevel', () => {
-  test('a typed number becomes a whole level within 0..60', () => {
+  test('with no limit every kanji is allowed, ones not on WaniKani too, and none is above the level', () => {
+    assert.ok(isAllowed('薔', NO_KANJI_LIMIT));
+    assert.ok(!isAllowed('薔', MAX_WK_LEVEL));
+    assert.deepEqual(kanjiAboveLevel('薔薇と鬱', NO_KANJI_LIMIT), []);
+  });
+
+  test('a typed number becomes a whole level within 0..61, where 61 is no limit', () => {
     assert.equal(parseWkLevel('12'), 12);
-    assert.equal(parseWkLevel('060'), 60);
+    assert.equal(parseWkLevel('060'), MAX_WK_LEVEL);
     assert.equal(parseWkLevel('2.5'), 3);
     assert.equal(parseWkLevel('0'), 0);
     assert.equal(parseWkLevel('-3'), 0);
-    assert.equal(parseWkLevel('75'), MAX_WK_LEVEL);
-    // Too big for a number is still above the top level, not "no level".
-    assert.equal(parseWkLevel('1e400'), MAX_WK_LEVEL);
+    assert.equal(parseWkLevel('61'), NO_KANJI_LIMIT);
+    assert.equal(parseWkLevel('75'), NO_KANJI_LIMIT);
+    // Too big for a number is still past the top level, not "no level".
+    assert.equal(parseWkLevel('1e400'), NO_KANJI_LIMIT);
     assert.equal(parseWkLevel('-1e400'), 0);
   });
 

@@ -600,6 +600,13 @@ describe('accessible names and states', () => {
     for (const input of [slider, box]) assert.ok(input.includes(`aria-describedby="${hint}"`));
   });
 
+  test('past level 60 the WaniKani level is No limit, said as such to the eye and to screen readers', () => {
+    const html = render(<SettingsDialog onClose={() => {}} />, { wkLevel: 61 });
+    assert.match(html, /<strong>No limit<\/strong>/);
+    assert.match(html, /type="range"[^>]*max="61"[^>]*aria-valuetext="No limit"/);
+    assert.match(html, /No limit — any kanji, including ones that aren’t on WaniKani\./);
+  });
+
   test('every other field\'s hint describes its control rather than running into its name', () => {
     for (const patch of [{ provider: 'endpoint' as const }, { provider: 'claude' as const }]) {
       const html = render(<SettingsDialog onClose={() => {}} />, patch);

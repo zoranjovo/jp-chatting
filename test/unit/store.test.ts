@@ -36,8 +36,8 @@ describe('settings', () => {
     assert.equal(saved.endpoint.baseUrl, DEFAULT_SETTINGS.endpoint.baseUrl);
   });
 
-  test('the WaniKani level is clamped to 0-60 and rounded', async () => {
-    assert.equal((await store.saveSettings({ wkLevel: 99 })).wkLevel, 60);
+  test('the WaniKani level is clamped to 0-61 (61 is no limit) and rounded', async () => {
+    assert.equal((await store.saveSettings({ wkLevel: 99 })).wkLevel, 61);
     assert.equal((await store.saveSettings({ wkLevel: -4 })).wkLevel, 0);
     assert.equal((await store.saveSettings({ wkLevel: 7.6 })).wkLevel, 8);
     assert.equal((await store.saveSettings({ wkLevel: 'abc' as never })).wkLevel, 0);

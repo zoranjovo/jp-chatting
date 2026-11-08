@@ -13,7 +13,7 @@ import {
   toFeedback,
 } from '../../server/prompts.ts';
 import { JLPT_DESCRIPTION } from '../../shared/jlpt.ts';
-import { allowedKanji } from '../../shared/kanji.ts';
+import { allowedKanji, NO_KANJI_LIMIT } from '../../shared/kanji.ts';
 import { DEFAULT_SETTINGS, type Message, type Politeness, type Settings } from '../../shared/types.ts';
 
 const settings = (patch: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, ...patch });
@@ -34,6 +34,22 @@ describe('conversationSystem', () => {
     assert.match(system, /^L60: /m);
     const longest = Math.max(...(system.match(/[一-鿿]+/g) ?? []).map((run) => run.length));
     assert.ok(longest <= 60, `longest kanji run is ${longest}`);
+  });
+
+  test('with no kanji limit, lists no kanji and asks for normal spelling', () => {
+    const system = conversationSystem(settings({ wkLevel: NO_KANJI_LIMIT }), chat(''));
+    assert.match(system, /no kanji limit/);
+    assert.doesNotMatch(system, /^L1: /m);
+  });
+
+  test('messages may be longer at N2-N1, a little at N3, and stay one to three short sentences below that or with no level', () => {
+    const none = conversationSystem(settings({ jlptLevel: 0 }), chat(''));
+    assert.match(none, /one to three short sentences with beginner-level grammar/);
+    assert.match(conversationSystem(settings({ jlptLevel: 4 }), chat('')), /one to three short sentences/);
+    assert.match(conversationSystem(settings({ jlptLevel: 3 }), chat('')), /up to four sentences/);
+    for (const jlptLevel of [2, 1] as const) {
+      assert.match(conversationSystem(settings({ jlptLevel }), chat('')), /up to a short paragraph/);
+    }
   });
 
   test('level 0 forbids kanji entirely', () => {

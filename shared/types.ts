@@ -24,7 +24,7 @@ export function asEndpointReasoning(v: unknown): EndpointReasoning {
 
 export interface Settings {
   uiLanguage: UiLanguage;
-  /** Highest WaniKani level whose kanji the AI may use. 0 means kana only. */
+  /** Highest WaniKani level whose kanji the AI may use. 0 means kana only; NO_KANJI_LIMIT (61), any kanji at all. */
   wkLevel: number;
   /** The Genki lesson the learner has studied up to; the AI leans on grammar from lessons 1..N (a guide, not a limit). 0 means not using Genki. */
   genkiLesson: number;

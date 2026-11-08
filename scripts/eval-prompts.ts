@@ -17,7 +17,7 @@ import path from 'node:path';
 import { callAi } from '../server/ai/index.ts';
 import { generateBreakdown, generateFeedback, generateReply, type CallAi } from '../server/generate.ts';
 import type { JlptLevel } from '../shared/jlpt.ts';
-import { kanjiAboveLevel, kanjiTypedIn, stripFurigana } from '../shared/kanji.ts';
+import { kanjiAboveLevel, kanjiTypedIn, NO_KANJI_LIMIT, stripFurigana } from '../shared/kanji.ts';
 import { problemCount, replyProblems, type ReplyProblems } from '../shared/quality.ts';
 import { CLAUDE_EFFORTS, DEFAULT_SETTINGS, ENDPOINT_REASONING, type Breakdown, type Feedback, type Message, type Politeness, type Settings } from '../shared/types.ts';
 
@@ -221,6 +221,18 @@ export const CASES: Case[] = [
   { kind: 'reply', name: 'jlpt · opener · café · N2', level: 60, jlpt: 2, politeness: 'polite', topic: 'Ordering at a café', messages: [] },
   {
     kind: 'reply',
+    name: 'jlpt · turn · serious topic · N1 · no kanji limit',
+    level: NO_KANJI_LIMIT,
+    jlpt: 1,
+    politeness: 'casual',
+    topic: 'Japanese comedy',
+    messages: [
+      msg('assistant', '{最近|さいきん}、{何|なに}かおもろい{漫才|まんざい}{見|み}た？'),
+      msg('user', '見たで。せや、「緊張と緩和」について、ちょっと真面目に話そうや。笑いって結局なんで起きると思う？'),
+    ],
+  },
+  {
+    kind: 'reply',
     name: 'jlpt · turn · weekend · N4',
     level: 20,
     jlpt: 4,
@@ -276,12 +288,14 @@ export const LIMIT_TALK = /kanji (limit|level)|WaniKani|(only|just) (written|spe
 function scoreReply(c: ReplyCase, text: string): Pick<Result, 'problems' | 'checks'> {
   const problems = replyProblems(text, c.level, kanjiTypedIn(c.messages));
   const plain = stripFurigana(text);
+  // As the prompt's length rule: up to a short paragraph at N2-N1, four sentences at N3, three short ones below.
+  const [maxSentences, maxChars] = c.jlpt === 1 || c.jlpt === 2 ? [7, 300] : c.jlpt === 3 ? [5, 160] : [4, 120];
   return {
     problems,
     checks: {
       clean: problemCount(problems) === 0,
       style: c.politeness === 'polite' ? POLITE.test(plain) : !POLITE.test(plain),
-      short: [...plain.matchAll(/[。！？!?]/g)].length <= 4 && plain.length <= 120,
+      short: [...plain.matchAll(/[。！？!?]/g)].length <= maxSentences && plain.length <= maxChars,
       notEmpty: plain.trim().length > 0,
       startsJapanese: /^[぀-ヿ一-鿿{「（]/u.test(text.trim()),
       ...(c.genki && c.genki < 6 ? { earlyGenkiGrammar: !BEYOND_EARLY_GENKI.test(plain) } : {}),
