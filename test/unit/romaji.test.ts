@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { romajiToKana } from '../../src/romaji.ts';
+import { romajiAtCaret, romajiToKana, romajiWordsToKana } from '../../src/romaji.ts';
 
 const check = (cases: Record<string, string>) => {
   for (const [input, expected] of Object.entries(cases)) assert.equal(romajiToKana(input), expected, input);
@@ -37,7 +37,8 @@ describe('romajiToKana', () => {
   test('ん from nn, n\', and n before a consonant or punctuation', () => {
     check({
       konnnichiha: 'こんにちは',
-      shinbunn: 'しんぶん',
+      'shinbunn.': 'しんぶん。',
+      kannji: 'かんじ',
       "kin'youbi": 'きんようび',
       kinyoubi: 'きにょうび',
       sanpo: 'さんぽ',
@@ -61,15 +62,38 @@ describe('romajiToKana', () => {
   test('CAPS give katakana', () => {
     check({
       'KO-HI-': 'コーヒー',
-      'RA-MENN': 'ラーメン',
+      'RA-MENN.': 'ラーメン。',
       PATHI: 'パティ',
       PATI: 'パチ',
       TEREBI: 'テレビ',
-      Terebi: 'テれび', // each syllable takes the case of its first letter
+      toukyouTAWA: 'とうきょうタワ', // each syllable takes the case of its first letter
       'KONNPYU-TA-': 'コンピューター',
       SANNDOICCHI: 'サンドイッチ',
       KKA: 'ッカ',
     });
+  });
+
+  test('nn before a vowel or y is ん and an n-syllable, as learners spell it', () => {
+    check({ konnichiwa: 'こんにちわ', minna: 'みんな', onna: 'おんな', konnyaku: 'こんにゃく', 'KONNICHIWA': 'コンニチワ' });
+  });
+
+  test('a trailing nn waits for the next letter, unless final', () => {
+    assert.equal(romajiToKana('minn'), 'みnn');
+    assert.equal(romajiToKana('minn', true), 'みん');
+    assert.equal(romajiToKana('minna'), 'みんな');
+  });
+
+  test('a Capitalised word is hiragana, as English typists start a sentence', () => {
+    check({ Watashi: 'わたし', 'Watashi ha Samu desu.': 'わたし は さむ です。', Ii: 'いい', Arigatou: 'ありがとう', Terebi: 'てれび' });
+  });
+
+  test('a capital vowel starting a word waits to see whether the word is Capitalised or in CAPS', () => {
+    assert.equal(romajiToKana('A'), 'A');
+    assert.equal(romajiToKana('A', true), 'ア');
+    assert.equal(romajiToKana('Ar'), 'あr');
+    assert.equal(romajiToKana('AI'), 'アイ');
+    assert.equal(romajiToKana('AISU'), 'アイス');
+    assert.equal(romajiToKana('hai, A'), 'はい、 A');
   });
 
   test('a mix of katakana and hiragana words', () => {
@@ -108,7 +132,7 @@ describe('romajiToKana', () => {
   });
 
   test('typing one key at a time ends where typing it all at once does', () => {
-    for (const word of ['konnnichiha', 'gakkou', 'kyoushitsu', 'KO-HI-', 'shinnbunn']) {
+    for (const word of ['konnnichiha', 'gakkou', 'kyoushitsu', 'KO-HI-', 'shinnbunn', 'konnichiwa', 'minna', 'Watashi', 'Arigatou', 'AISU', 'Ii']) {
       let text = '';
       for (const ch of word) text = romajiToKana(text + ch);
       assert.equal(text, romajiToKana(word), word);
@@ -126,5 +150,34 @@ describe('romajiToKana', () => {
   test('empty input', () => {
     assert.equal(romajiToKana(''), '');
     assert.equal(romajiToKana('', true), '');
+  });
+});
+
+describe('romajiWordsToKana (pasted text, and on send)', () => {
+  test('converts each word that is all romaji, with a trailing n as ん', () => {
+    assert.equal(romajiWordsToKana('arigatou gozaimasu!'), 'ありがとう ございます！');
+    assert.equal(romajiWordsToKana('nihon\nhon'), 'にほん\nほん');
+  });
+
+  test('leaves English that would not convert as it is', () => {
+    assert.equal(romajiWordsToKana('Netflix wo mimashita'), 'Netflix を みました');
+    assert.equal(romajiWordsToKana('www lol'), 'www lol');
+  });
+
+  test('leaves text already in kana or kanji alone', () => {
+    assert.equal(romajiWordsToKana('コーヒーをください。'), 'コーヒーをください。');
+    assert.equal(romajiWordsToKana('ほn'), 'ほん');
+  });
+});
+
+describe('romajiAtCaret (typing)', () => {
+  test('converts the word being typed, and a space just typed settles its trailing n', () => {
+    assert.equal(romajiAtCaret('はい hon'), 'はい ほn');
+    assert.equal(romajiAtCaret('はい hon '), 'はい ほん ');
+  });
+
+  test('leaves earlier words as they are, so pasted English stays English', () => {
+    assert.equal(romajiAtCaret('Netflix mita'), 'Netflix みた');
+    assert.equal(romajiAtCaret('Netflix\nmita'), 'Netflix\nみた');
   });
 });

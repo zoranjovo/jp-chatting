@@ -1,8 +1,23 @@
-import { useImperativeHandle, useLayoutEffect, useRef, type ChangeEvent, type KeyboardEvent, type Ref } from 'react';
+import { useImperativeHandle, useLayoutEffect, useReducer, useRef, type ChangeEvent, type KeyboardEvent, type Ref } from 'react';
 import { prependDraft, useDraft } from '../drafts.ts';
 import { useT } from '../i18n.tsx';
-import { romajiToKana } from '../romaji.ts';
+import { romajiAtCaret, romajiWordsToKana } from '../romaji.ts';
 import { useSettings } from '../settings.tsx';
+
+/**
+ * The あ/A switch, per chat, for this page load. Settings has the default; switching to A for one English
+ * question used to switch every chat, and stay that way until noticed.
+ */
+const romajiInChat = new Map<string, boolean>();
+
+/** Where `next` differs from `prev`: the text put in place of `prev.slice(start, prevEnd)`. */
+function changedSpan(prev: string, next: string): { start: number; prevEnd: number; inserted: string } {
+  let start = 0;
+  while (start < prev.length && start < next.length && prev[start] === next[start]) start += 1;
+  let tail = 0;
+  while (tail < prev.length - start && tail < next.length - start && prev[prev.length - 1 - tail] === next[next.length - 1 - tail]) tail += 1;
+  return { start, prevEnd: prev.length - tail, inserted: next.slice(start, next.length - tail) };
+}
 
 export interface ComposerHandle {
   /** Focuses the box with the caret at `at`, e.g. at the end of a rewound message now at its top. */
@@ -23,12 +38,13 @@ export function Composer({
   handle?: Ref<ComposerHandle>;
 }) {
   const t = useT();
-  const { settings, update } = useSettings();
+  const { settings } = useSettings();
   // The chat's own draft, read by id, so the text can never belong to another chat.
   const [text, setText] = useDraft(chatId);
   const ref = useRef<HTMLTextAreaElement>(null);
   const caret = useRef<number | null>(null);
-  const romaji = settings.romajiInput;
+  const [, rerender] = useReducer((n: number) => n + 1, 0);
+  const romaji = romajiInChat.get(chatId) ?? settings.romajiInput;
 
   useImperativeHandle(handle, () => ({
     focusAt(at) {
@@ -57,14 +73,21 @@ export function Composer({
     const value = e.target.value;
     // Leave a real IME alone mid-composition.
     if (!romaji || (e.nativeEvent as InputEvent).isComposing) return setText(value);
+    const { start, inserted } = changedSpan(text, value);
+    if (inserted.length > 1) {
+      // Arrived at once (pasted, dropped, a keyboard's suggestion): each word converted if it is all romaji.
+      const kana = romajiWordsToKana(inserted);
+      caret.current = start + kana.length;
+      return setText(value.slice(0, start) + kana + value.slice(start + inserted.length));
+    }
     const at = e.target.selectionStart ?? value.length;
-    const before = romajiToKana(value.slice(0, at));
+    const before = romajiAtCaret(value.slice(0, at));
     caret.current = before.length;
     setText(before + value.slice(at));
   };
 
   const send = async () => {
-    const out = (romaji ? romajiToKana(text, true) : text).trim();
+    const out = (romaji ? romajiWordsToKana(text) : text).trim();
     if (!out || disabled) return;
     setText('');
     if (!(await onSend(out))) prependDraft(chatId, out);
@@ -82,7 +105,10 @@ export function Composer({
       <button
         type="button"
         className={`romaji-toggle ${romaji ? 'on' : ''}`}
-        onClick={() => update({ romajiInput: !romaji })}
+        onClick={() => {
+          romajiInChat.set(chatId, !romaji);
+          rerender();
+        }}
         // Named by the glyph it shows then what it does, so a voice command for what is on screen works;
         // aria-pressed carries the state. No title: it would only say the name again as a description.
         aria-pressed={romaji}
