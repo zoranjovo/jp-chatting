@@ -5,6 +5,7 @@ import { ChatView } from './components/ChatView.tsx';
 import { ChatSettingsDialog, type ChatPatch } from './components/ChatSettingsDialog.tsx';
 import { NewChatDialog } from './components/NewChatDialog.tsx';
 import { SettingsDialog } from './components/SettingsDialog.tsx';
+import { BreakdownIcon, CheckIcon } from './components/Icons.tsx';
 import { SetupNotice } from './components/SetupNotice.tsx';
 import { getDraft, replaceDraft, seedDraft, setDraft, setDraftSaver, takeDraft } from './drafts.ts';
 import { Sidebar } from './components/Sidebar.tsx';
@@ -372,7 +373,19 @@ function Shell({ loadError }: { loadError: string | null }) {
               会話
             </div>
             <h2>{t.emptyTitle}</h2>
-            <p>{t.emptyBody}</p>
+            {/* The buttons are icons on the messages, and touch screens show no tooltips: show each icon with its name. */}
+            <p>
+              {t.emptyBody(
+                <span className="inline-action">
+                  <BreakdownIcon />
+                  {t.breakdown}
+                </span>,
+                <span className="inline-action">
+                  <CheckIcon />
+                  {t.check}
+                </span>,
+              )}
+            </p>
             <SetupNotice onOpenSettings={() => setDialog('settings')} />
             <button type="button" className="primary" onClick={() => setDialog('new')}>
               + {t.newChat}

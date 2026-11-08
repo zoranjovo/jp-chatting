@@ -6,6 +6,14 @@ test('the empty state invites starting a chat', async ({ app }) => {
   await expect(app.getByText('No chats yet.')).toBeVisible();
 });
 
+test('the welcome text shows the Breakdown and Check buttons as they look on a message, icon and name', async ({ app }) => {
+  const body = app.locator('.empty > p');
+  await expect(body).not.toContainText('Tap');
+  const actions = body.locator('.inline-action');
+  await expect(actions).toHaveText(['Breakdown', 'Check']);
+  await expect(actions.locator('svg')).toHaveCount(2);
+});
+
 test('a new chat with a topic gets an opener from the partner', async ({ app, request }) => {
   await app.getByRole('button', { name: '+ New chat' }).first().click();
   const dialog = app.getByRole('dialog');
