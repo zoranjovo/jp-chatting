@@ -30,13 +30,16 @@ export async function listEndpointModels(config: EndpointConfig): Promise<string
   return (body.data ?? []).map((m) => m.id).filter((id): id is string => !!id).sort();
 }
 
-async function post(config: EndpointConfig, body: Record<string, unknown>): Promise<Response> {
+/** How long one request may take, and a reply in all (generateReply). */
+export const ENDPOINT_TIMEOUT_MS = 300_000;
+
+async function post(config: EndpointConfig, body: Record<string, unknown>, timeoutMs = ENDPOINT_TIMEOUT_MS): Promise<Response> {
   try {
     return await fetch(`${base(config)}/chat/completions`, {
       method: 'POST',
       headers: headers(config),
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(300_000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (err) {
     throw new AiError(`could not reach ${base(config)}: ${(err as Error).message}`);
@@ -55,11 +58,11 @@ export async function callEndpoint(request: AiRequest, config: EndpointConfig): 
     body.response_format = { type: 'json_schema', json_schema: { name: 'answer', strict: true, schema: request.schema } };
   }
 
-  let res = await post(config, body);
+  let res = await post(config, body, request.timeoutMs);
   // Not every server takes json_schema; the prompt asks for JSON anyway.
   if (!res.ok && request.schema && res.status >= 400 && res.status < 500) {
     delete body.response_format;
-    res = await post(config, body);
+    res = await post(config, body, request.timeoutMs);
   }
   if (!res.ok) throw new AiError(`the endpoint answered ${res.status}: ${(await res.text()).slice(0, 300)}`);
 

@@ -1,4 +1,4 @@
-import type { Chat, ChatSummary, Message, ModelList, ModelTest, Politeness, ProviderKind, Settings } from '../shared/types.ts';
+import type { Chat, ChatSummary, Message, ModelList, ModelTest, Politeness, ProviderKind, ReplyStatus, Settings } from '../shared/types.ts';
 
 async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
   const res = await fetch(url, {
@@ -25,6 +25,7 @@ export const api = {
   deleteChat: (id: string) => request<{ ok: true }>('DELETE', `/api/chats/${id}`),
   send: (id: string, content: string) => request<Chat>('POST', `/api/chats/${id}/messages`, { content }),
   reply: (id: string) => request<Chat>('POST', `/api/chats/${id}/reply`),
+  replyStatus: (id: string) => request<ReplyStatus>('GET', `/api/chats/${id}/reply`),
   saveDraft: (id: string, draft: string) => request<{ ok: true }>('PUT', `/api/chats/${id}/draft`, { draft }),
   /** `draft` is what is typed now, so the rewound text goes above it. */
   rewind: (id: string, messageId: string, draft: string) => request<Chat>('POST', `/api/chats/${id}/messages/${messageId}/rewind`, { draft }),

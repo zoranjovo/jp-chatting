@@ -9,6 +9,7 @@ import { Composer, type ComposerHandle } from './Composer.tsx';
 import { KnownKanjiProvider } from './JpText.tsx';
 import { MessageBubble } from './MessageBubble.tsx';
 import { SetupNotice } from './SetupNotice.tsx';
+import { TypingIndicator } from './TypingIndicator.tsx';
 
 /** How long an announcement stays in the status region: long enough to be read, then gone, so it isn't a stray copy. */
 const ANNOUNCE_MS = 5000;
@@ -129,15 +130,7 @@ export function ChatView({
                 hint={breakdownHint && m.id === firstTheirs}
               />
             ))}
-            {waiting && (
-              <div className="message theirs" aria-hidden>
-                <div className="bubble typing">
-                  <span />
-                  <span />
-                  <span />
-                </div>
-              </div>
-            )}
+            {waiting && <TypingIndicator chatId={chat.id} />}
             {error && (
               <div className="error" role="alert">
                 {t.errorPrefix} {error}

@@ -8,6 +8,8 @@ export interface AiRequest {
   turns: ChatTurn[];
   /** When set, the answer must be JSON matching this schema. */
   schema?: Record<string, unknown>;
+  /** In place of the provider's own time limit: what is left of a reply's budget. */
+  timeoutMs?: number;
 }
 
 /** Returns the reply text, or for a schema request, the parsed JSON. */

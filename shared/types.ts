@@ -142,6 +142,12 @@ export interface RewindUndo {
   pinned?: PinnedFeedback;
 }
 
+/** What a reply being written is doing: the first draft, a rewrite to fix what broke the rules, or a fresh draft. */
+export type ReplyStep = 'draft' | 'rewrite' | 'fresh';
+
+/** GET /api/chats/:id/reply: whether a reply is being written, and how far it has got. */
+export type ReplyStatus = { replying: false } | { replying: true; step: ReplyStep; elapsedMs: number };
+
 export interface Chat {
   id: string;
   title: string;
