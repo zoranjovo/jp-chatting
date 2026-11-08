@@ -153,7 +153,7 @@ describe('FeedbackView', () => {
   test('labels follow the UI language', () => {
     const html = render(<FeedbackView feedback={feedback} />, { wkLevel: 60, uiLanguage: 'ja' });
     assert.ok(html.includes('おしい！少し直しましょう'));
-    assert.ok(html.includes('言ったこと'));
+    assert.ok(html.includes('<dt>訳</dt>'));
   });
 });
 
