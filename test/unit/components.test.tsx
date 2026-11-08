@@ -510,7 +510,7 @@ describe('accessible names and states', () => {
     const props = { chats, asideRef: { current: null }, onSelect: () => {}, onNew: () => {}, onRename: () => {}, onDelete: async () => {}, onSettings: () => {} };
     const html = render(<Sidebar {...props} activeId="b" />);
     assert.equal(count(html, 'aria-current'), 1);
-    assert.match(html, /aria-current="page"><span class="chat-title jp">B</);
+    assert.match(html, /aria-current="page"><span class="chat-title jp" title="B">B</);
     assert.match(html, /role="radiogroup" aria-label="Interface language"/);
     assert.match(html, /<label class="active"><input type="radio" name="ui-language" checked=""\/>EN<\/label>/);
     assert.match(html, /<label class=""><input type="radio" name="ui-language"\/>日本語<\/label>/);

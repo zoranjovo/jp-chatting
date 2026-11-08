@@ -108,7 +108,7 @@ test('furigana in the learner\'s feedback uses the panel\'s colour, not the dark
 
   // The panel uses --muted in each scheme, like the partner's bubble; the learner's dark bubble keeps its light ink.
   let [panelRt, bubbleRt, partnerRt] = await colours();
-  expect(panelRt).toBe('rgb(111, 106, 98)');
+  expect(panelRt).toBe('rgb(103, 98, 90)');
   expect(partnerRt).toBe(panelRt);
   expect(bubbleRt).not.toBe(panelRt);
 
