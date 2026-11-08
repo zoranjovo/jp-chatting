@@ -40,11 +40,15 @@ async function main() {
     return;
   }
 
-  // A mismatch fails even under --if-missing: nothing from the download is used.
+  // Nothing from a mismatched download is used. Under --if-missing it doesn't fail the install, as when offline:
+  // a captive portal or proxy answering with its own page is far likelier than tampering.
   const hash = createHash('sha256').update(bytes).digest('hex');
   if (hash !== SOURCE_SHA256) {
-    console.error(`[kanji] the downloaded kanji data has SHA-256 ${hash}, expected ${SOURCE_SHA256}. Not using it.`);
-    process.exitCode = 1;
+    console.warn(
+      `[kanji] the downloaded kanji data has SHA-256 ${hash}, expected ${SOURCE_SHA256}, so it was not used. ` +
+        'A proxy or Wi-Fi login page can cause this: run `pnpm kanji` again on a normal connection.',
+    );
+    process.exitCode = process.argv.includes('--if-missing') ? 0 : 1;
     return;
   }
   const raw = JSON.parse(bytes.toString('utf8')) as Record<string, SourceKanji>;
