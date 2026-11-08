@@ -41,6 +41,13 @@ describe('JpText', () => {
     assert.ok(html.includes('へ'));
   });
 
+  test('a word marked a kanji at a time is one ruby, so its kanji stay together', () => {
+    const html = render(<JpText text="{今|こん}{週|しゅう}の{週|しゅう}{末|まつ}" />, { wkLevel: 60 });
+    assert.equal(count(html, '<ruby>'), 2);
+    assert.match(html, /<rt>こんしゅう<\/rt>/);
+    assert.match(html, /<rt>しゅうまつ<\/rt>/);
+  });
+
   test('drops the readings when furigana is off', () => {
     const html = render(<JpText text="{日本|にほん}へ" />, { wkLevel: 60, furigana: false });
     assert.equal(count(html, '<ruby>'), 0);

@@ -14,6 +14,23 @@ import { useSettings } from '../settings.tsx';
 
 const MARKUP = /\{([^|{}]+)\|([^{}]*)\}/g;
 
+/**
+ * The furigana groups in the text, where `at`..`end` is the markup. Groups with nothing between them become
+ * one: models often mark a word a kanji at a time ({今|こん}{週|しゅう}), and a ruby per kanji pushes the
+ * kanji apart wherever a reading is wider than its kanji (今 週).
+ */
+export function rubyGroups(text: string): { at: number; end: number; base: string; reading: string }[] {
+  const out: { at: number; end: number; base: string; reading: string }[] = [];
+  for (const match of text.matchAll(MARKUP)) {
+    const at = match.index ?? 0;
+    const [whole, base, reading] = match;
+    const prev = out.at(-1);
+    if (prev && prev.end === at) Object.assign(prev, { end: at + whole.length, base: prev.base + base, reading: prev.reading + reading });
+    else out.push({ at, end: at + whole.length, base, reading });
+  }
+  return out;
+}
+
 /** The WaniKani level the surrounding message was written under; unset means the current setting. */
 const WrittenAtLevel = createContext<number | undefined>(undefined);
 export const WrittenAtLevelProvider = WrittenAtLevel.Provider;
@@ -56,10 +73,8 @@ export function JpText({ text, className = 'jp', highlight = true }: { text: str
   const mark = (s: string) => marked(s, level, known, overTitle);
   const parts: ReactNode[] = [];
   let last = 0;
-  for (const match of text.matchAll(MARKUP)) {
-    const at = match.index ?? 0;
+  for (const { at, end, base, reading } of rubyGroups(text)) {
     if (at > last) parts.push(<Fragment key={`t${last}`}>{mark(text.slice(last, at))}</Fragment>);
-    const [, base, reading] = match;
     parts.push(
       settings.furigana || kanjiAboveLevel(base, settings.wkLevel, known).length > 0 ? (
         <ruby key={`r${at}`}>
@@ -72,7 +87,7 @@ export function JpText({ text, className = 'jp', highlight = true }: { text: str
         <Fragment key={`r${at}`}>{mark(base)}</Fragment>
       ),
     );
-    last = at + match[0].length;
+    last = end;
   }
   if (last < text.length) parts.push(<Fragment key={`t${last}`}>{mark(text.slice(last))}</Fragment>);
   return <span className={className || undefined}>{parts}</span>;
