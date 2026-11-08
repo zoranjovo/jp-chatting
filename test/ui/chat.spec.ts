@@ -146,6 +146,22 @@ test('a reply still being written when the page reloads shows up without another
   expect((await mockCalls(request)).filter((c) => c.kind === 'chat')).toHaveLength(2);
 });
 
+test('a slow reply shows how long it has taken and what it is doing', async ({ app, request }) => {
+  await app.clock.install();
+  await app.reload();
+  await startChat(app);
+  await mockControl(request, { delayMs: 4000 });
+  await composer(app).fill('きこえますか');
+  await composer(app).press('Enter');
+  await expect(app.locator('.typing')).toBeVisible();
+  const progress = app.locator('.typing-progress');
+  await expect(progress).toHaveCount(0);
+  await app.clock.fastForward(12_000);
+  await expect(progress).toHaveText(/^Writing · 0:1\d$/);
+  await expect(theirs(app)).toHaveCount(2, { timeout: 8000 });
+  await expect(app.locator('.typing')).toHaveCount(0);
+});
+
 test('after a failed reply and a reload, the reply can still be asked for', async ({ app, request }) => {
   await startChat(app);
   await mockControl(request, { fail: true });

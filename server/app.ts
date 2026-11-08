@@ -7,7 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { contextOf, settingsFor } from '../shared/context.ts';
 import { kanjiKnownIn, stripFurigana } from '../shared/kanji.ts';
-import type { Chat, Message, ModelTest, Politeness, ProviderKind, Settings } from '../shared/types.ts';
+import type { Chat, Message, ModelTest, Politeness, ProviderKind, ReplyStatus, ReplyStep, Settings } from '../shared/types.ts';
 import { AiError, callAi as realCallAi, listModels as realListModels, type AiRequest } from './ai/index.ts';
 import { generateBreakdown, generateFeedback, generateReply } from './generate.ts';
 import { testRequest } from './prompts.ts';
@@ -24,6 +24,12 @@ export interface AppDeps {
 
 class NotFound extends Error {}
 class BadRequest extends Error {}
+
+/** A reply being written: its current step, and when it started. */
+interface ReplyProgress {
+  step: ReplyStep;
+  startedAt: number;
+}
 
 const asPoliteness = (v: unknown): Politeness | undefined => (v === 'polite' || v === 'casual' ? v : undefined);
 
@@ -139,7 +145,7 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
    * Another request to answer the same message under the same settings waits for it instead of starting another;
    * one under new settings (say, after switching away from a model that hangs) starts afresh.
    */
-  const replies = new Map<string, { answering: string | undefined; settings: string; reply: Promise<Chat> }>();
+  const replies = new Map<string, { answering: string | undefined; settings: string; reply: Promise<Chat>; progress: ReplyProgress }>();
 
   app.get(
     '/api/chats/:id',
@@ -234,9 +240,13 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
     }),
   );
 
-  async function writeReply(chat: Chat, settings: Settings): Promise<Chat> {
+  async function writeReply(chat: Chat, settings: Settings, progress: ReplyProgress): Promise<Chat> {
     const answering = chat.messages.at(-1)?.id;
-    const content = await generateReply(deps.callAi, settings, chat);
+    const content = await generateReply(deps.callAi, settings, chat, {
+      onStep: (step) => {
+        progress.step = step;
+      },
+    });
     const message: Message = { id: store.newId(), role: 'assistant', content, createdAt: store.now(), context: contextOf(settings, chat.politeness) };
     return updateChat(chat.id, (chat) => {
       // Rewound, or answered by another reply, while this one was being written: it answers a history that is gone.
@@ -246,6 +256,16 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
       return 'conversation';
     });
   }
+
+  /** How far a reply being written has got, for the typing indicator. */
+  app.get(
+    '/api/chats/:id/reply',
+    route(async (req, res) => {
+      const progress = replies.get(String(req.params.id))?.progress;
+      const status: ReplyStatus = progress ? { replying: true, step: progress.step, elapsedMs: Date.now() - progress.startedAt } : { replying: false };
+      res.json(status);
+    }),
+  );
 
   /**
    * The partner's next message -- the opener when the chat is empty. If one is already being written
@@ -265,10 +285,11 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
       const key = JSON.stringify(settings);
       let pending = replies.get(id) ?? inFlight;
       if (!pending || pending.answering !== answering || pending.settings !== key) {
-        const reply: Promise<Chat> = writeReply(chat, settings).finally(() => {
+        const progress: ReplyProgress = { step: 'draft', startedAt: Date.now() };
+        const reply: Promise<Chat> = writeReply(chat, settings, progress).finally(() => {
           if (replies.get(id)?.reply === reply) replies.delete(id);
         });
-        pending = { answering, settings: key, reply };
+        pending = { answering, settings: key, reply, progress };
         replies.set(id, pending);
       }
       res.json(await pending.reply);

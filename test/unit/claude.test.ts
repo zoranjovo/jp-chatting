@@ -229,6 +229,12 @@ describe('callClaude', () => {
     await assert.rejects(callClaude(textRequest, { ...config, timeoutMs: 50 }, fake.spawn), /timed out/);
     assert.equal(fake.runs[0].killed, true);
   });
+
+  test("a request with its own time limit (the rest of a reply's time) is killed at that, not the setting", async () => {
+    const fake = fakeSpawn({ events: [INIT_OK], hang: true });
+    await assert.rejects(callClaude({ ...textRequest, timeoutMs: 50 }, { ...config, timeoutMs: 60_000 }, fake.spawn), /timed out after 0s/);
+    assert.equal(fake.runs[0].killed, true);
+  });
 });
 
 describe('CLAUDE_MODELS', () => {

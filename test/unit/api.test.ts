@@ -534,6 +534,26 @@ describe('reply clean-up', () => {
     assert.equal(res.body.messages[0].content, 'はなします');
   });
 
+  test('how far a reply being written has got can be asked for, and nothing is being written once it lands', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    answers.chat = async () => {
+      await gate;
+      return 'こんにちは';
+    };
+    const chat = await newChat();
+    assert.deepEqual((await api('GET', `/api/chats/${chat.id}/reply`)).body, { replying: false });
+    const pending = reply(chat.id);
+    await new Promise((r) => setTimeout(r, 50));
+    const status = (await api('GET', `/api/chats/${chat.id}/reply`)).body;
+    assert.equal(status.replying, true);
+    assert.equal(status.step, 'draft');
+    assert.ok(status.elapsedMs >= 0);
+    release();
+    await pending;
+    assert.deepEqual((await api('GET', `/api/chats/${chat.id}/reply`)).body, { replying: false });
+  });
+
   test('if nothing comes back clean, the reply with the fewest problems is kept', async () => {
     let n = 0;
     answers.chat = () => (n++ === 0 ? '話して待つ' : '話す');

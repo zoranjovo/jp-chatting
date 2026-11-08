@@ -121,10 +121,11 @@ export function callClaude(request: AiRequest, config: ClaudeConfig, spawnProces
       windowsHide: true,
     });
 
+    const timeoutMs = request.timeoutMs ?? config.timeoutMs;
     const timer = setTimeout(() => {
-      failure = `timed out after ${Math.round(config.timeoutMs / 1000)}s`;
+      failure = `timed out after ${Math.round(timeoutMs / 1000)}s`;
       child.kill();
-    }, config.timeoutMs);
+    }, timeoutMs);
 
     const done = () => {
       if (settled) return;

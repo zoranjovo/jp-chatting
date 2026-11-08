@@ -58,6 +58,8 @@ const en = {
   send: 'Send',
   retryReply: 'Get a reply',
   errorPrefix: 'Something went wrong:',
+  /** Beside a slow reply's time so far, by ReplyStep. */
+  replyStep: { draft: 'Writing', rewrite: 'Rewriting to fix it', fresh: 'Writing it again' },
 
   breakdown: 'Breakdown',
   check: 'Check',
@@ -201,6 +203,7 @@ const ja: Strings = {
   send: '送信',
   retryReply: '返信をもらう',
   errorPrefix: 'エラーが発生しました：',
+  replyStep: { draft: '作成中', rewrite: '修正中', fresh: '書き直し中' },
 
   breakdown: '解説',
   check: 'チェック',

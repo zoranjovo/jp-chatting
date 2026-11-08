@@ -520,6 +520,7 @@ ruby rt {
 
 .typing {
   display: flex;
+  align-items: center;
   gap: 5px;
   padding: 16px 18px;
 }
@@ -538,6 +539,14 @@ ruby rt {
 
 .typing span:nth-child(3) {
   animation-delay: 0.3s;
+}
+
+.typing-progress {
+  margin-left: 6px;
+  font-size: 13px;
+  font-style: normal;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
 @keyframes blink {
