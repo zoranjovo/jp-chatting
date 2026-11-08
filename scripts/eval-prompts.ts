@@ -267,8 +267,11 @@ export interface Result {
   checks: Record<string, boolean>;
 }
 
-/** Feedback that explains spelling by the kanji limit, which it never should. */
-const LIMIT_TALK = /kanji (limit|level)|WaniKani|(written|write|spelled|spell) (it |this |that )?(in|with) (hiragana|kana)|in (hiragana|kana) (here )?because/i;
+/**
+ * Feedback that explains spelling by the kanji limit, which it never should. Not a bare "written in hiragana":
+ * explanations say that of particles and okurigana all the time.
+ */
+export const LIMIT_TALK = /kanji (limit|level)|WaniKani|(only|just) (written|spelled) in (hiragana|kana)|in (hiragana|kana) (here )?because/i;
 
 function scoreReply(c: ReplyCase, text: string): Pick<Result, 'problems' | 'checks'> {
   const problems = replyProblems(text, c.level, kanjiTypedIn(c.messages));

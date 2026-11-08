@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { kanjiTypedIn, stripFurigana } from '../../shared/kanji.ts';
+import { kanjiKnownIn, stripFurigana } from '../../shared/kanji.ts';
 import type { Chat, Message } from '../../shared/types.ts';
 import { AnnounceContext } from '../announce.ts';
 import { useT } from '../i18n.tsx';
@@ -105,10 +105,7 @@ export function ChatView({
   }, [focusComposer, onComposerFocused]);
 
   // Kanji the learner typed anywhere in this chat (the rewound message pinned above the composer included): known, so never marked.
-  const knownKanji = useMemo(
-    () => kanjiTypedIn(chat.pinned ? [...chat.messages, { role: 'user', content: chat.pinned.content }] : chat.messages),
-    [chat.messages, chat.pinned],
-  );
+  const knownKanji = useMemo(() => kanjiKnownIn({ messages: chat.messages, pinned: chat.pinned }), [chat.messages, chat.pinned]);
 
   return (
     <AnnounceContext.Provider value={announce}>

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import rows from '../../shared/wanikani-kanji.json' with { type: 'json' };
-import { allowedKanji, isAllowed, isKanji, kanjiAboveLevel, kanjiInfo, kanjiTypedIn, MAX_WK_LEVEL, parseWkLevel, stripFurigana } from '../../shared/kanji.ts';
+import { allowedKanji, isAllowed, isKanji, kanjiAboveLevel, kanjiInfo, kanjiKnownIn, kanjiTypedIn, MAX_WK_LEVEL, parseWkLevel, stripFurigana } from '../../shared/kanji.ts';
 
 describe('the bundled WaniKani list', () => {
   test('covers all 60 levels with about 2,000 kanji', () => {
@@ -129,6 +129,14 @@ describe('kanjiTypedIn', () => {
   test('furigana markup and 々 are not counted', () => {
     assert.equal(kanjiTypedIn([m('user', '{時々|ときどき}')]), '時');
     assert.equal(kanjiTypedIn([m('user', 'ひらがな'), m('assistant', '語')]), '');
+  });
+});
+
+describe('kanjiKnownIn', () => {
+  test('the kanji typed in the messages and in the pinned rewound message', () => {
+    const messages = [{ role: 'user', content: '串カツ' }];
+    assert.equal(kanjiKnownIn({ messages }), '串');
+    assert.equal(kanjiKnownIn({ messages, pinned: { content: '語彙' } }), '串語彙');
   });
 });
 
