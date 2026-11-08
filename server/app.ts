@@ -417,5 +417,3 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
 
   return app;
 }
-
-export const hasBuiltUi = () => fs.existsSync(DIST);

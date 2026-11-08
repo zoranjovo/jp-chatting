@@ -3,7 +3,7 @@
 
 import { createSocket } from 'node:dgram';
 import { networkInterfaces } from 'node:os';
-import { createApp, hasBuiltUi } from './app.ts';
+import { createApp } from './app.ts';
 import { migrateLegacy } from './store.ts';
 
 const PORT = Number(process.env.JP_CHATTING_PORT ?? 5174);
@@ -54,8 +54,7 @@ await migrateLegacy();
 const app = loopbackOnly ? createApp() : createApp({ lanHosts: wildcard ? lanAddresses : () => [urlHost] });
 
 app.listen(PORT, HOST, async () => {
-  const builtUi = hasBuiltUi() ? ' (serving the built UI too)' : '';
-  console.log(`jp-chatting API on http://${wildcard ? '127.0.0.1' : urlHost}:${PORT}${builtUi}`);
+  console.log(`jp-chatting API on http://${wildcard ? '127.0.0.1' : urlHost}:${PORT}`);
   if (!wildcard) return;
   const all = lanAddresses();
   const primary = await primaryAddress();
