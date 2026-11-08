@@ -1,7 +1,10 @@
 name: CI
 
+# Pushes run only on master; branches are checked through their PR. Triggering on
+# every push as well ran the same job twice for each push to a PR branch.
 on:
   push:
+    branches: [master]
   pull_request:
 
 permissions:
