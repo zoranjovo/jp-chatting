@@ -6,12 +6,15 @@
 //   pnpm kanji                 # rebuild
 //   tsx scripts/build-kanji.ts --if-missing   # what postinstall runs
 
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { hasMarkers, type KanjiRow, type SourceKanji, toRow } from './kanji-source.ts';
 
 /** Pinned so a rebuild gives the same levels every time. */
 const SOURCE = 'https://raw.githubusercontent.com/davidluzgouveia/kanji-data/00fd7079c3890f430759536f91aa5e854ec0ca4f/kanji.json';
+/** SHA-256 of that file. The commit pin already fixes the content; this checks it ourselves rather than trusting the host. */
+const SOURCE_SHA256 = '561b72ea9df703c58fae0c68585812e172aaa7611d2fcee6719d55fd2dfd4fa4';
 const OUT = path.join(import.meta.dirname, '..', 'shared', 'wanikani-kanji.json');
 
 /** Built, and not by a version of this script that kept the dataset's answer markers. */
@@ -26,16 +29,25 @@ function upToDate(): boolean {
 async function main() {
   if (process.argv.includes('--if-missing') && upToDate()) return;
 
-  let raw: Record<string, SourceKanji>;
+  let bytes: Buffer;
   try {
     const res = await fetch(SOURCE, { signal: AbortSignal.timeout(60_000) });
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-    raw = (await res.json()) as Record<string, SourceKanji>;
+    bytes = Buffer.from(await res.arrayBuffer());
   } catch (err) {
     console.warn(`[kanji] could not download the kanji data (${(err as Error).message}). Run \`pnpm kanji\` once you are online.`);
     process.exitCode = process.argv.includes('--if-missing') ? 0 : 1;
     return;
   }
+
+  // A mismatch fails even under --if-missing: nothing from the download is used.
+  const hash = createHash('sha256').update(bytes).digest('hex');
+  if (hash !== SOURCE_SHA256) {
+    console.error(`[kanji] the downloaded kanji data has SHA-256 ${hash}, expected ${SOURCE_SHA256}. Not using it.`);
+    process.exitCode = 1;
+    return;
+  }
+  const raw = JSON.parse(bytes.toString('utf8')) as Record<string, SourceKanji>;
 
   const rows = Object.entries(raw)
     .map(([kanji, k]) => toRow(kanji, k))
