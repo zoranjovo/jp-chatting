@@ -72,7 +72,10 @@ export function Sidebar({
                 onClick={() => onSelect(chat.id)}
                 aria-current={chat.id === activeId ? 'page' : undefined}
               >
-                <span className="chat-title jp">{chat.title || t.untitled}</span>
+                {/* The title is cut off with an ellipsis when long; the tooltip shows all of it. */}
+                <span className="chat-title jp" title={chat.title || t.untitled}>
+                  {chat.title || t.untitled}
+                </span>
                 <span className="chat-date">
                   {new Date(chat.updatedAt).toLocaleDateString(settings.uiLanguage === 'ja' ? 'ja-JP' : 'en-GB', {
                     month: 'short',

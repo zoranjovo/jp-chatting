@@ -4,7 +4,8 @@
   --surface: #fffdf9;
   --sidebar: #efeae1;
   --ink: #1f1d1a;
-  --muted: #6f6a62;
+  /* --muted, --ok and --warn keep 4.5:1 or more on the sidebar and on their soft backgrounds, for small text. */
+  --muted: #67625a;
   --line: #e2dcd1;
   --accent: #c8402c;
   --accent-ink: #ffffff;
@@ -12,9 +13,9 @@
   --mine: #23303f;
   --mine-ink: #f3f1ec;
   --theirs: #ffffff;
-  --ok: #2f7d4f;
+  --ok: #2a7148;
   --ok-soft: #e1f0e6;
-  --warn: #a06a12;
+  --warn: #8f5e0f;
   --warn-soft: #f6ead2;
   --bad: #b3261e;
   --bad-soft: #f8dedb;

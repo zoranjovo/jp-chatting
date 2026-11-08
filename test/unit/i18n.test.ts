@@ -48,6 +48,11 @@ describe('UI strings', () => {
     assert.match(ja.wkLevelHint(5, 166), /レベル1〜5の漢字166字/);
   });
 
+  test('at level 1 the hint names one level, not a range of one', () => {
+    assert.match(en.wkLevelHint(1, 18), /18 kanji from level 1\./);
+    assert.match(ja.wkLevelHint(1, 18), /相手はレベル1の漢字18字/);
+  });
+
   test('every effort and thinking value has its own label in both languages, and no API parameter name shows', () => {
     for (const dict of [en, ja]) {
       for (const e of CLAUDE_EFFORTS) assert.notEqual(dict.effortOption(e), e, `effort ${e}`);

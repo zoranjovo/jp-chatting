@@ -87,7 +87,7 @@ const en = {
   wkLevelLabel: 'WaniKani level',
   wkLevelNumber: 'Type a WaniKani level',
   wkLevelHint: (level: number, count: number) =>
-    level === 0 ? 'Kana only — no kanji.' : `Your partner may use the ${count} kanji from levels 1–${level}. Others are written in kana.`,
+    level === 0 ? 'Kana only — no kanji.' : `Your partner may use the ${count} kanji from ${level === 1 ? 'level 1' : `levels 1–${level}`}. Others are written in kana.`,
   furigana: 'Show furigana (readings over kanji)',
   romajiInput: 'Convert romaji to kana while typing',
   politeness: 'Partner’s speech style',
@@ -226,7 +226,7 @@ const ja: Strings = {
   wkLevelLabel: 'WaniKaniレベル',
   wkLevelNumber: 'WaniKaniレベルを入力',
   wkLevelHint: (level: number, count: number) =>
-    level === 0 ? 'かなのみ（漢字なし）。' : `相手はレベル1〜${level}の漢字${count}字を使えます。それ以外はかなで書きます。`,
+    level === 0 ? 'かなのみ（漢字なし）。' : `相手は${level === 1 ? 'レベル1' : `レベル1〜${level}`}の漢字${count}字を使えます。それ以外はかなで書きます。`,
   furigana: 'ふりがなを表示する',
   romajiInput: '入力中にローマ字をかなに変換する',
   politeness: '相手の話し方',
