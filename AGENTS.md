@@ -7,7 +7,8 @@ A local-only web app for an English speaker to practise Japanese conversation an
 | | |
 |---|---|
 | `pnpm dev` | API (tsx watch, port 5174) + Vite UI (port 5173, proxies `/api`) |
-| `pnpm build && pnpm start` | built UI served by the API on 5174 |
+| `pnpm build && pnpm start` | built UI served by the API on 5174 (loopback only) |
+| `pnpm start:lan` | same, but binds `0.0.0.0` so a phone on the LAN can reach `http://<pc-ip>:5174` |
 | `pnpm typecheck` | `tsc --noEmit` over everything, tests included (strict, plus no unused locals/parameters) |
 | `pnpm lint` | Biome, React hooks rules only, `src/` only — a few ms |
 | `pnpm test` | unit tests (`node:test` via tsx), ~1s |
@@ -129,6 +130,7 @@ Replies are sampled twice per scenario at the model's normal temperature, so exp
 ## Gotchas
 
 - Don't read `PORT` — preview tools set it to the Vite port. The API uses `JP_CHATTING_PORT`.
+- The API binds `127.0.0.1` by default. `server/index.ts` reads `--host` (set by `pnpm start:lan`) to bind `0.0.0.0` instead, or `JP_CHATTING_HOST` to pin a specific address; dev (Vite) stays loopback-only. There's no auth, so exposing to the LAN is deliberately opt-in — keep the loopback default.
 - The Claude desktop app's environment can't authenticate a child `claude -p`; for live Claude testing the standalone CLI must be signed in (`claude auth login` in a normal terminal).
 - `shared/wanikani-kanji.json` is **not committed** — keep it that way. `scripts/build-kanji.ts` builds it from davidluzgouveia/kanji-data (MIT, pinned commit); `postinstall` runs it when the file is missing, `pnpm kanji` rebuilds. Without it the app, typecheck and tests fail on the import. It comes from kanji-data; its levels reflect WaniKani when that dataset was compiled, so a few kanji may be a level off today. Some common kanji (e.g. 薔) aren't on WaniKani at all and are always "above level".
 - LM Studio keeps per-model settings in `~/.lmstudio/.internal/user-concrete-model-default-config/`. A chat template forced on from another model family garbles every prompt (on Qwen3 4B a Qwen 3.6 template made every answer come back empty), so check there first when a local model misbehaves.
