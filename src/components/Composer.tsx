@@ -1,7 +1,7 @@
 import { useImperativeHandle, useLayoutEffect, useReducer, useRef, type ChangeEvent, type KeyboardEvent, type Ref } from 'react';
 import { prependDraft, useDraft } from '../drafts.ts';
 import { useT } from '../i18n.tsx';
-import { romajiAtCaret, romajiWordsToKana } from '../romaji.ts';
+import { romajiAtCaret, romajiWordsToKana, withoutJapaneseSpaces } from '../romaji.ts';
 import { useSettings } from '../settings.tsx';
 
 /**
@@ -87,7 +87,8 @@ export function Composer({
   };
 
   const send = async () => {
-    const out = (romaji ? romajiWordsToKana(text) : text).trim();
+    // Romaji is typed a word at a time with spaces between; the message goes without them, as Japanese is written.
+    const out = (romaji ? withoutJapaneseSpaces(romajiWordsToKana(text)) : text).trim();
     if (!out || disabled) return;
     setText('');
     if (!(await onSend(out))) prependDraft(chatId, out);

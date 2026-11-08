@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { romajiAtCaret, romajiToKana, romajiWordsToKana } from '../../src/romaji.ts';
+import { romajiAtCaret, romajiToKana, romajiWordsToKana, withoutJapaneseSpaces } from '../../src/romaji.ts';
 
 const check = (cases: Record<string, string>) => {
   for (const [input, expected] of Object.entries(cases)) assert.equal(romajiToKana(input), expected, input);
@@ -167,6 +167,19 @@ describe('romajiWordsToKana (pasted text, and on send)', () => {
   test('leaves text already in kana or kanji alone', () => {
     assert.equal(romajiWordsToKana('コーヒーをください。'), 'コーヒーをください。');
     assert.equal(romajiWordsToKana('ほn'), 'ほん');
+  });
+});
+
+describe('withoutJapaneseSpaces', () => {
+  test('drops spaces between Japanese, punctuation included', () => {
+    assert.equal(withoutJapaneseSpaces('はい、 いい てんき です。 コーヒー を のみます'), 'はい、いいてんきです。コーヒーをのみます');
+    assert.equal(withoutJapaneseSpaces('日本 に 行きます　よ'), '日本に行きますよ');
+  });
+
+  test('keeps spaces next to anything else, and line breaks', () => {
+    assert.equal(withoutJapaneseSpaces('Netflix を みました'), 'Netflix をみました');
+    assert.equal(withoutJapaneseSpaces('3 じ に'), '3 じに');
+    assert.equal(withoutJapaneseSpaces('はい\nいいえ'), 'はい\nいいえ');
   });
 });
 
