@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { kanjiKnownIn, stripFurigana } from '../../shared/kanji.ts';
 import type { Chat, Message } from '../../shared/types.ts';
 import { AnnounceContext } from '../announce.ts';
+import { useBreakdownHint } from '../hints.ts';
 import { useT } from '../i18n.tsx';
 import { FeedbackView } from './Analysis.tsx';
 import { Composer, type ComposerHandle } from './Composer.tsx';
@@ -105,6 +106,10 @@ export function ChatView({
   }, [focusComposer, onComposerFocused]);
 
   // Kanji the learner typed anywhere in this chat (the rewound message pinned above the composer included): known, so never marked.
+  // The one-time pointer to Breakdown, on the partner's first message: in a chat, the button is only an icon.
+  const breakdownHint = useBreakdownHint();
+  const firstTheirs = chat.messages.find((m) => m.role === 'assistant')?.id;
+
   const knownKanji = useMemo(() => kanjiKnownIn({ messages: chat.messages, pinned: chat.pinned }), [chat.messages, chat.pinned]);
 
   return (
@@ -121,6 +126,7 @@ export function ChatView({
                 onUpdated={onMessageUpdated}
                 onRewind={m.role === 'user' ? () => rewind(m) : undefined}
                 rewindDisabled={waiting}
+                hint={breakdownHint && m.id === firstTheirs}
               />
             ))}
             {waiting && (

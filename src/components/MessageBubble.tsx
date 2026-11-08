@@ -2,6 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { Message } from '../../shared/types.ts';
 import { useAnnounce } from '../announce.ts';
 import { api } from '../api.ts';
+import { breakdownHintDone } from '../hints.ts';
 import { useT } from '../i18n.tsx';
 import { BreakdownView, FeedbackView } from './Analysis.tsx';
 import { BreakdownIcon, CheckIcon, RewindIcon } from './Icons.tsx';
@@ -18,6 +19,7 @@ export function MessageBubble({
   onUpdated,
   onRewind,
   rewindDisabled = false,
+  hint = false,
 }: {
   chatId: string;
   message: Message;
@@ -25,6 +27,8 @@ export function MessageBubble({
   /** Only on the learner's messages. */
   onRewind?: () => void;
   rewindDisabled?: boolean;
+  /** Show the one-time hint pointing at this message's Breakdown button. */
+  hint?: boolean;
 }) {
   const t = useT();
   const announce = useAnnounce();
@@ -59,6 +63,7 @@ export function MessageBubble({
   const analyze = async (refresh: boolean) => {
     setMounted(true);
     setOpen(true);
+    if (!mine) breakdownHintDone();
     if (analysis && !refresh) return;
     setBusy(true);
     setError(null);
@@ -120,6 +125,21 @@ export function MessageBubble({
             </Tooltip>
           </div>
         </div>
+        {hint && (
+          <div className="hint-callout" role="note">
+            <span>
+              {t.breakdownHint(
+                <span className="inline-action">
+                  <BreakdownIcon />
+                  {t.breakdown}
+                </span>,
+              )}
+            </span>
+            <button type="button" className="link-button" onClick={breakdownHintDone}>
+              {t.gotIt}
+            </button>
+          </div>
+        )}
         {mounted && (
           <div ref={wrap} className={`analysis-wrap ${shown ? 'open' : ''}`} inert={!open}>
             <div className="analysis-clip">

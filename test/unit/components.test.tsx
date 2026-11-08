@@ -424,6 +424,14 @@ describe('the welcome text', () => {
       assert.ok(!/Tap|タップ/.test(html), lang);
     }
   });
+
+  test('the Breakdown hint puts the button in place too, in both languages', () => {
+    for (const lang of ['en', 'ja'] as const) {
+      const html = renderToStaticMarkup(<>{STRINGS[lang].breakdownHint(<b>B</b>)}</>);
+      assert.match(html, /<b>B<\/b>/, lang);
+      assert.ok(!/Tap|タップ/.test(html), lang);
+    }
+  });
 });
 
 describe('message info', () => {

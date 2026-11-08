@@ -1175,6 +1175,28 @@ ruby rt {
   vertical-align: baseline;
 }
 
+/* The one-time pointer to Breakdown, tucked under the partner's first message. */
+.hint-callout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  max-width: min(520px, 92%);
+  margin-top: 8px;
+  padding: 8px 12px;
+  border: 1px dashed var(--accent);
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.hint-callout > span {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
 .empty > p {
   max-width: 460px;
   color: var(--muted);

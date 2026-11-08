@@ -91,6 +91,10 @@ export async function chatsOnDisk(request: APIRequestContext): Promise<Chat[]> {
 export const test = base.extend<{ app: Page }>({
   app: async ({ page, request }, use) => {
     await resetApp(request);
+    // The one-time Breakdown hint would sit under every first message; the tests for it clear this.
+    await page.addInitScript(() => {
+      if (!sessionStorage.getItem('keep-breakdown-hint')) localStorage.setItem('jp-chatting:breakdown-hint-seen', '1');
+    });
     await page.goto('/');
     await use(page);
   },
