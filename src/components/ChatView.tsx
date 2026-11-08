@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { stripFurigana } from '../../shared/kanji.ts';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { kanjiTypedIn, stripFurigana } from '../../shared/kanji.ts';
 import type { Chat, Message } from '../../shared/types.ts';
 import { AnnounceContext } from '../announce.ts';
 import { useT } from '../i18n.tsx';
 import { FeedbackView } from './Analysis.tsx';
 import { Composer, type ComposerHandle } from './Composer.tsx';
+import { KnownKanjiProvider } from './JpText.tsx';
 import { MessageBubble } from './MessageBubble.tsx';
 import { SetupNotice } from './SetupNotice.tsx';
 
@@ -103,86 +104,94 @@ export function ChatView({
     onComposerFocused?.();
   }, [focusComposer, onComposerFocused]);
 
+  // Kanji the learner typed anywhere in this chat (the rewound message pinned above the composer included): known, so never marked.
+  const knownKanji = useMemo(
+    () => kanjiTypedIn(chat.pinned ? [...chat.messages, { role: 'user', content: chat.pinned.content }] : chat.messages),
+    [chat.messages, chat.pinned],
+  );
+
   return (
     <AnnounceContext.Provider value={announce}>
-      <div className="chat">
-        <div className="messages">
-          {chat.topic && <div className="topic-banner">{chat.topic}</div>}
-          {chat.messages.map((m) => (
-            <MessageBubble
-              key={m.id}
-              chatId={chat.id}
-              message={m}
-              onUpdated={onMessageUpdated}
-              onRewind={m.role === 'user' ? () => rewind(m) : undefined}
-              rewindDisabled={waiting}
-            />
-          ))}
-          {waiting && (
-            <div className="message theirs" aria-hidden>
-              <div className="bubble typing">
-                <span />
-                <span />
-                <span />
+      <KnownKanjiProvider value={knownKanji}>
+        <div className="chat">
+          <div className="messages">
+            {chat.topic && <div className="topic-banner">{chat.topic}</div>}
+            {chat.messages.map((m) => (
+              <MessageBubble
+                key={m.id}
+                chatId={chat.id}
+                message={m}
+                onUpdated={onMessageUpdated}
+                onRewind={m.role === 'user' ? () => rewind(m) : undefined}
+                rewindDisabled={waiting}
+              />
+            ))}
+            {waiting && (
+              <div className="message theirs" aria-hidden>
+                <div className="bubble typing">
+                  <span />
+                  <span />
+                  <span />
+                </div>
               </div>
-            </div>
-          )}
-          {error && (
-            <div className="error" role="alert">
-              {t.errorPrefix} {error}
-            </div>
-          )}
-          {needsReply && <SetupNotice onOpenSettings={onOpenSettings} />}
-          {needsReply && (
-            <button
-              type="button"
-              className="secondary retry"
-              onClick={(e) => {
-                // The button goes away once the reply is asked for: keep the keyboard in the chat. Only from the
-                // keyboard (detail 0) -- a tap would pop up the phone's on-screen keyboard over the reply.
-                if (e.detail === 0) composer.current?.focus();
-                onRetry();
-              }}
-            >
-              {t.retryReply}
-            </button>
-          )}
-          <div ref={end} />
-        </div>
-        <div className="sr-only" role="status">
-          {waiting ? t.typing : announcement}
-        </div>
-        {(chat.pinned || undoable) && (
-          <div className="composer-extras">
-            {chat.pinned && (
-              <section className="analysis pinned" aria-label={t.pinnedTitle}>
-                <div className="pinned-head">
-                  <span>{t.pinnedTitle}</span>
-                  <button type="button" className="icon-button" onClick={onDismissPinned} aria-label={t.dismissPinned} title={t.dismissPinned}>
-                    ×
+            )}
+            {error && (
+              <div className="error" role="alert">
+                {t.errorPrefix} {error}
+              </div>
+            )}
+            {needsReply && <SetupNotice onOpenSettings={onOpenSettings} />}
+            {needsReply && (
+              <button
+                type="button"
+                className="secondary retry"
+                onClick={(e) => {
+                  // The button goes away once the reply is asked for: keep the keyboard in the chat. Only from the
+                  // keyboard (detail 0) -- a tap would pop up the phone's on-screen keyboard over the reply.
+                  if (e.detail === 0) composer.current?.focus();
+                  onRetry();
+                }}
+              >
+                {t.retryReply}
+              </button>
+            )}
+            <div ref={end} />
+          </div>
+          <div className="sr-only" role="status">
+            {waiting ? t.typing : announcement}
+          </div>
+          {(chat.pinned || undoable) && (
+            <div className="composer-extras">
+              {chat.pinned && (
+                <section className="analysis pinned" aria-label={t.pinnedTitle}>
+                  <div className="pinned-head">
+                    <span>{t.pinnedTitle}</span>
+                    <button type="button" className="icon-button" onClick={onDismissPinned} aria-label={t.dismissPinned} title={t.dismissPinned}>
+                      ×
+                    </button>
+                  </div>
+                  <FeedbackView feedback={chat.pinned.feedback} />
+                </section>
+              )}
+              {undoable && (
+                <div className="undo-toast">
+                  <span>{t.rewound(rewound)}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRewound(null);
+                      onUndoRewind();
+                    }}
+                  >
+                    {t.undo}
                   </button>
                 </div>
-                <FeedbackView feedback={chat.pinned.feedback} />
-              </section>
-            )}
-            {undoable && (
-              <div className="undo-toast">
-                <span>{t.rewound(rewound)}</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRewound(null);
-                    onUndoRewind();
-                  }}
-                >
-                  {t.undo}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-        <Composer chatId={chat.id} disabled={waiting} onSend={onSend} handle={composer} />
-      </div>
+              )}
+            </div>
+          )}
+          <Composer chatId={chat.id} disabled={waiting} onSend={onSend} handle={composer} />
+        </div>
+      </KnownKanjiProvider>
     </AnnounceContext.Provider>
   );
 }

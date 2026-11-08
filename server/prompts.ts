@@ -2,7 +2,7 @@
 // conversation going, break down its own messages, and give feedback on the
 // learner's.
 
-import { allowedKanji, kanjiInfo, stripFurigana } from '../shared/kanji.ts';
+import { allowedKanji, kanjiAboveLevel, kanjiInfo, stripFurigana } from '../shared/kanji.ts';
 import type { ReplyProblems } from '../shared/quality.ts';
 import { genkiBook, genkiGrammarThrough, MAX_GENKI_LESSON } from '../shared/genki.ts';
 import { JLPT_DESCRIPTION, type JlptLevel } from '../shared/jlpt.ts';
@@ -25,18 +25,25 @@ function kanjiByLevel(level: number): string {
 }
 
 /**
+ * `known`: kanji the learner has typed in the chat, which they know whatever their level.
  * `scope`, for an answer that is mostly English: which Japanese the rule covers and what it leaves alone,
  * stated in the rule itself so it never reads as covering everything.
  */
-function kanjiRule(level: number, scope?: { appliesTo: string; exempt: string }): string {
+function kanjiRule(level: number, known = '', scope?: { appliesTo: string; exempt?: string }): string {
   const where = scope ? ` in ${scope.appliesTo}` : ' at all';
-  const exempt = scope ? ` ${scope.exempt}` : '';
+  const exempt = scope?.exempt ? ` ${scope.exempt}` : '';
+  // Only the ones the level doesn't already cover, so the list stays short.
+  const typed = kanjiAboveLevel(known, level).join('');
   if (level <= 0) {
-    return `Kanji: the learner knows hiragana and katakana but no kanji yet. Do not use any kanji${where} -- write ${scope ? 'it' : 'everything'} in hiragana, and katakana for loanwords.${exempt}`;
+    if (!typed) {
+      return `Kanji: the learner knows hiragana and katakana but no kanji yet. Do not use any kanji${where} -- write ${scope ? 'it' : 'everything'} in hiragana, and katakana for loanwords.${exempt}`;
+    }
+    return `Kanji: the learner knows hiragana and katakana, and no kanji yet apart from these, which they have typed themselves in this chat: ${typed}
+Use no other kanji${where}. Any word that needs another kanji must be written in hiragana instead (katakana for loanwords).${exempt}`;
   }
   return `Kanji: the learner knows all hiragana and katakana, but only these kanji (WaniKani levels 1-${level}, one line per level):
-${kanjiByLevel(level)}
-Use no other kanji${where}. Any word that needs a kanji outside that list must be written in hiragana instead (katakana for loanwords). Check every kanji you write against the list; if you are unsure about one, write that word in hiragana.${exempt}`;
+${kanjiByLevel(level)}${typed ? `\nThey have also typed these kanji themselves in this chat, so they know them too: ${typed}` : ''}
+Use no other kanji${where}. Any word that needs a kanji outside ${typed ? 'those' : 'that list'} must be written in hiragana instead (katakana for loanwords). Check every kanji you write against the list; if you are unsure about one, write that word in hiragana.${exempt}`;
 }
 
 function styleRule(politeness: Politeness): string {
@@ -71,7 +78,8 @@ ${genkiGrammarThrough(lesson)}
 Build your messages mainly from this grammar, with vocabulary a Genki student at this point would know. This is a guide, not a hard limit: grammar from a later lesson is fine now and then when it is the natural way to say something, but keep it simple and don't lean on it -- if known grammar says it just as naturally, use that.${early}`;
 }
 
-export function conversationSystem(settings: Settings, chat: Pick<Chat, 'topic' | 'politeness'>): string {
+/** `known`: the kanji the learner has typed in this chat (kanjiTypedIn). */
+export function conversationSystem(settings: Settings, chat: Pick<Chat, 'topic' | 'politeness'>, known = ''): string {
   const topic = chat.topic;
   const genki = genkiRule(settings.genkiLesson, chat.politeness);
   const jlpt = jlptRule(settings.jlptLevel, genki !== '');
@@ -83,7 +91,7 @@ Rules:
 - ${styleRule(chat.politeness)}
 - Do not correct the learner's mistakes or explain grammar; a separate tool does that. Keep the conversation going naturally, guessing what they meant if needed.
 - ${topic.trim() ? `Topic or scenario for this chat, chosen by the learner: ${topic.trim()}. Stay in it (play a role if it calls for one).` : 'No topic was chosen: start with an everyday topic and follow wherever the learner takes it.'}
-- ${kanjiRule(settings.wkLevel)}${genki ? `\n- ${genki}` : ''}${jlpt ? `\n- ${jlpt}` : ''}
+- ${kanjiRule(settings.wkLevel, known)}${genki ? `\n- ${genki}` : ''}${jlpt ? `\n- ${jlpt}` : ''}
 - ${FURIGANA_RULE}
 - Your output is shown to the learner exactly as written, as your chat message. Write only the message itself: no name label, quotes, translation, romaji, English or notes. Never comment on your own writing -- if you notice a mistake, just write the corrected message.`;
 }
@@ -102,14 +110,14 @@ export function testRequest(): { system: string; turns: ChatTurn[] } {
   };
 }
 
-export function rewriteRequest(settings: Settings, text: string, problems: ReplyProblems): { system: string; turns: ChatTurn[] } {
+export function rewriteRequest(settings: Settings, text: string, problems: ReplyProblems, known = ''): { system: string; turns: ChatTurn[] } {
   const fixes = [
     problems.kanji.length > 0 && `- It uses kanji the learner does not know: ${problems.kanji.join(' ')} -- write those words in hiragana instead.`,
     problems.furigana.length > 0 && `- It has broken furigana markup: ${problems.furigana.join(' ')} -- readings must be hiragana, and kana-only words get no markup.`,
     problems.foreign.length > 0 && `- It contains English, romaji or a note that is not part of the message: ${problems.foreign.map((f) => `"${f}"`).join(', ')} -- remove it; keep only the Japanese message (if the note came with a corrected version, keep the corrected version).`,
   ].filter(Boolean);
   return {
-    system: `You edit Japanese text for a beginner. ${kanjiRule(settings.wkLevel)}\n${FURIGANA_RULE}\nOutput only the edited text -- no comments.`,
+    system: `You edit Japanese text for a beginner. ${kanjiRule(settings.wkLevel, known)}\n${FURIGANA_RULE}\nOutput only the edited text -- no comments.`,
     turns: [
       {
         role: 'user',
@@ -166,6 +174,7 @@ export function breakdownRequest(
   message: Message,
   levels: Pick<Settings, 'genkiLesson' | 'jlptLevel' | 'wkLevel'>,
   earlier: Message[] = [],
+  known = '',
 ): { system: string; turns: ChatTurn[] } {
   const { genkiLesson, jlptLevel, wkLevel } = levels;
   const transcript = transcriptOf(earlier);
@@ -181,7 +190,7 @@ ${transcript ? `
 The conversation before the message is given for context. Use it to explain what the message refers to -- names, things mentioned earlier, the question it answers -- but break down only the message itself.
 ` : ''}
 ${FURIGANA_RULE.replace('Furigana: give', 'In japanese and words.text, give')}
-${kanjiRule(wkLevel, {
+${kanjiRule(wkLevel, known, {
   appliesTo: 'any Japanese you add in the English parts (another form of a word, an example)',
   exempt: `japanese and words.text copy the message exactly, whatever it uses, and the English may name a word from the message${transcript ? ' or the conversation' : ''} as it is written there.`,
 })}
@@ -195,7 +204,13 @@ Answer with JSON only, matching the schema.`,
   };
 }
 
-export function feedbackRequest(settings: Settings, politeness: Politeness, message: Message, earlier: Message[] = []): { system: string; turns: ChatTurn[] } {
+export function feedbackRequest(
+  settings: Settings,
+  politeness: Politeness,
+  message: Message,
+  earlier: Message[] = [],
+  known = '',
+): { system: string; turns: ChatTurn[] } {
   const transcript = transcriptOf(earlier);
   return {
     system: `You are a kind but honest Japanese teacher. An English-speaking beginner is practising Japanese by chatting, and wants feedback on a message they wrote. They may have written in Japanese, in English, or a mix.
@@ -212,7 +227,9 @@ Give:
 The chat is in ${politeness === 'casual' ? 'casual plain form' : 'polite です/ます form'}; use that style in your corrections, and mention it only if their style is inconsistent.
 ${settings.jlptLevel > 0 ? `The learner is at about JLPT N${settings.jlptLevel}: pitch the corrected Japanese and your explanations at that level (a guide, not a limit).\n` : ''}${settings.genkiLesson > 0 ? `The learner studies with Genki and has covered lessons 1-${settings.genkiLesson}. Corrected Japanese should use grammar from those lessons where it can; if the natural fix needs later grammar, keep it and say in the explanation which Genki lesson teaches it.
 ${genkiSyllabus()}
-` : ''}${kanjiRule(settings.wkLevel)} This applies to corrected Japanese; quote the learner's own text as they wrote it.
+` : ''}Kanji in corrected Japanese: write it as natural Japanese, with whatever kanji its words need -- the furigana gives the reading. But keep the learner's own spelling: a word they wrote in kana stays in kana, and a word they wrote in kanji stays in kanji, unless that word is itself the mistake. When the English quotes their message or your correction, write it as it is there.
+${kanjiRule(settings.wkLevel, known, { appliesTo: 'any other Japanese you add in the English parts (another form of a word, an example, an alternative)' })}
+Never comment on kanji versus kana, on the learner's kanji level, or on why a word is spelled the way it is -- none of that is a mistake. A kanji they used correctly is fine whatever its level, so don't point it out; mention a kanji only when it is the wrong one for the word.
 ${FURIGANA_RULE.replace('Furigana: give', 'In corrected Japanese, give')}
 
 ${ENGLISH_RULE}

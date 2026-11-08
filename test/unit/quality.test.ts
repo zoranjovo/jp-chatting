@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { autoFix, badFurigana, dropKanaFurigana, foreignText, kanaForKanjiAboveLevel, problemCount, replyProblems, salvageFromForeign } from '../../shared/quality.ts';
+import { autoFix, badFurigana, dropKanaFurigana, foreignText, kanaForKanjiAboveLevel, problemCount, replyProblems, salvageFromForeign, tidyMarkup } from '../../shared/quality.ts';
 
 describe('badFurigana', () => {
   test('accepts hiragana readings on kanji', () => {
@@ -108,6 +108,16 @@ describe('kanaForKanjiAboveLevel and autoFix', () => {
 
   test('autoFix does both kinds of fix and trims', () => {
     assert.equal(autoFix('  {カフェ|cafe}でご{注文|ちゅうもん}は？ ', 10), 'カフェでごちゅうもんは？');
+  });
+
+  test('kanji the learner has typed are kept, and are no problem', () => {
+    assert.equal(autoFix('{串|くし}カツと{注文|ちゅうもん}', 10, '串'), '{串|くし}カツとちゅうもん');
+    assert.deepEqual(replyProblems('{串|くし}カツ', 10, '串').kanji, []);
+    assert.deepEqual(replyProblems('{串|くし}カツ', 10).kanji, ['串']);
+  });
+
+  test('tidyMarkup does the other fixes but spells nothing out', () => {
+    assert.equal(tidyMarkup(' <think>x</think>{カフェ|cafe}で{}ご{注文|ちゅうもん}は？ '), 'カフェでご{注文|ちゅうもん}は？');
   });
 });
 

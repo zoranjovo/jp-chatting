@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import rows from '../../shared/wanikani-kanji.json' with { type: 'json' };
-import { allowedKanji, isAllowed, isKanji, kanjiAboveLevel, kanjiInfo, MAX_WK_LEVEL, parseWkLevel, stripFurigana } from '../../shared/kanji.ts';
+import { allowedKanji, isAllowed, isKanji, kanjiAboveLevel, kanjiInfo, kanjiTypedIn, MAX_WK_LEVEL, parseWkLevel, stripFurigana } from '../../shared/kanji.ts';
 
 describe('the bundled WaniKani list', () => {
   test('covers all 60 levels with about 2,000 kanji', () => {
@@ -110,6 +110,25 @@ describe('kanjiAboveLevel', () => {
 
   test('at level 0 every kanji counts', () => {
     assert.deepEqual(kanjiAboveLevel('人', 0), ['人']);
+  });
+
+  test('kanji the learner has typed are known, whatever their level, even ones WaniKani lacks', () => {
+    assert.deepEqual(kanjiAboveLevel('{串|くし}カツと{日本語|にほんご}と薔', 1, '串語薔'), ['日', '本']);
+    assert.ok(isAllowed('串', 0, '串'));
+    assert.ok(!isAllowed('串', 60));
+  });
+});
+
+describe('kanjiTypedIn', () => {
+  const m = (role: string, content: string) => ({ role, content });
+
+  test('every distinct kanji in the learner\'s messages, in order, and none of the partner\'s', () => {
+    assert.equal(kanjiTypedIn([m('assistant', '{何|なに}を{食|た}べた？'), m('user', '串カツを食べた'), m('user', '串と語彙力')]), '串食語彙力');
+  });
+
+  test('furigana markup and 々 are not counted', () => {
+    assert.equal(kanjiTypedIn([m('user', '{時々|ときどき}')]), '時');
+    assert.equal(kanjiTypedIn([m('user', 'ひらがな'), m('assistant', '語')]), '');
   });
 });
 

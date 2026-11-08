@@ -380,6 +380,19 @@ describe('kanji level enforcement', () => {
     assert.equal((await reply(chat.id)).body.messages[0].content, 'はなします');
   });
 
+  test('kanji the learner has typed in the chat are kept, listed in the prompt, and need no rewrite', async () => {
+    await api('PUT', '/api/settings', { wkLevel: 1 });
+    const chat = await newChat();
+    await reply(chat.id);
+    await send(chat.id, '串カツが好きです');
+    calls.length = 0;
+    answers.chat = () => '{串|くし}カツ、いいですね！{好|す}きな{店|みせ}は？';
+    const res = await reply(chat.id);
+    assert.deepEqual(calls.map((c) => c.kind), ['chat']);
+    assert.match(calls[0].request.system, /so they know them too: 串好/);
+    assert.equal(res.body.messages.at(-1)!.content, '{串|くし}カツ、いいですね！{好|す}きなみせは？');
+  });
+
   test('a failed rewrite keeps the original reply', async () => {
     await api('PUT', '/api/settings', { wkLevel: 1 });
     answers.chat = () => '話します';
@@ -570,6 +583,34 @@ describe('reply clean-up', () => {
     const f = (await analyze(chat.id, mine.id)).body.feedback!;
     assert.equal(f.corrected, 'コーヒーをください');
     assert.equal(f.lines[0].corrected, 'コーヒーをください');
+  });
+
+  test('corrections keep kanji above the level, readings and all', async () => {
+    await api('PUT', '/api/settings', { wkLevel: 1 });
+    const chat = await newChat();
+    const sent = await send(chat.id, 'にほんごのクラスがすきです');
+    answers.feedback = () => ({
+      meaning: 'm', verdict: 'correct', corrected: '{日本語|にほんご}のクラスが{好|す}きです', summary: 's',
+      lines: [{ original: 'にほんごのクラスがすきです', corrected: '{日本語|にほんご}のクラス', translation: 't', explanation: 'e', ok: true }],
+    });
+    const f = (await analyze(chat.id, sent.body.messages[0].id)).body.feedback!;
+    assert.equal(f.corrected, '{日本語|にほんご}のクラスが{好|す}きです');
+    assert.equal(f.lines[0].corrected, '{日本語|にほんご}のクラス');
+  });
+
+  test('analysis is told the kanji the learner has typed anywhere in the chat', async () => {
+    await api('PUT', '/api/settings', { wkLevel: 1 });
+    const chat = await newChat();
+    await reply(chat.id);
+    await send(chat.id, '串カツ');
+    await reply(chat.id);
+    const sent = await send(chat.id, '語彙');
+    const [partner, mine] = sent.body.messages;
+    await analyze(chat.id, partner.id);
+    await analyze(chat.id, mine.id);
+    const [breakdown, feedback] = calls.filter((c) => c.kind === 'breakdown' || c.kind === 'feedback');
+    assert.match(breakdown.request.system, /so they know them too: 串語彙/);
+    assert.match(feedback.request.system, /so they know them too: 串語彙/);
   });
 });
 
