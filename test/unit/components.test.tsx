@@ -497,7 +497,7 @@ describe('ChatSettingsDialog', () => {
     assert.match(html, /value="Café"/);
     assert.match(html, /value="Ordering"/);
     assert.ok(html.includes('<label class="active"><input type="radio" checked=""/>Casual (plain form)'));
-    assert.match(html, /class="context-line chat-uses"[^>]*>Haiku 5\.5 · Casual · WK 8</);
+    assert.match(html, /class="context-line chat-uses"[^>]*>Haiku 5\.5 · WK 8</);
   });
 });
 
