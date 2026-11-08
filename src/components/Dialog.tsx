@@ -38,6 +38,9 @@ export function Dialog({
   useLayoutEffect(() => {
     const el = ref.current;
     el?.showModal();
+    // On a touch screen, focusing a text field pops the keyboard up over the dialog's buttons before the
+    // learner has seen it: focus the dialog itself, and let a tap on a field bring the keyboard.
+    if (window.matchMedia('(pointer: coarse)').matches) el?.focus();
     return () => {
       clearTimeout(timer.current);
       el?.close();
@@ -58,6 +61,7 @@ export function Dialog({
       ref={ref}
       className={`dialog ${small ? 'small' : ''} ${closing ? 'closing' : ''}`}
       aria-labelledby={titleId}
+      tabIndex={-1}
       aria-describedby={describedBy}
       onCancel={(e) => {
         e.preventDefault();

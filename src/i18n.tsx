@@ -55,6 +55,9 @@ const en = {
   composerLabel: 'Message',
   composerPlaceholder: 'Write in Japanese… (Enter to send, Shift+Enter for a new line)',
   composerPlaceholderRomaji: 'Type romaji — it turns into kana (CAPS for katakana)…',
+  /** On narrow screens, where the long ones wrap to a second line. */
+  composerPlaceholderShort: 'Write in Japanese…',
+  composerPlaceholderRomajiShort: 'Type romaji…',
   send: 'Send',
   retryReply: 'Get a reply',
   errorPrefix: 'Something went wrong:',
@@ -198,6 +201,8 @@ const ja: Strings = {
   composerLabel: 'メッセージ',
   composerPlaceholder: '日本語で書いてください…（Enterで送信、Shift+Enterで改行）',
   composerPlaceholderRomaji: 'ローマ字で入力するとかなになります（大文字はカタカナ）…',
+  composerPlaceholderShort: '日本語で入力…',
+  composerPlaceholderRomajiShort: 'ローマ字で入力…',
   send: '送信',
   retryReply: '返信をもらう',
   errorPrefix: 'エラーが発生しました：',
