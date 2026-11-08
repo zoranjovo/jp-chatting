@@ -215,6 +215,29 @@ describe('glossSegments', () => {
   test('a kanji word without furigana gets its reading as markup', () => {
     assert.deepEqual(texts(glossSegments(line('元気', [['元気', 'well']], 'げんき'))), ['{元気|げんき}']);
   });
+
+  test('an opening bracket goes with the word it opens; a closing one with the word it closes', () => {
+    const words: [string, string][] = [['しんせかい', 'Shinsekai'], ['の', 'of'], ['だるま', 'Daruma'], ['が', 'subject']];
+    assert.deepEqual(texts(glossSegments(line('しんせかいの「だるま」が', words))), ['しんせかい', 'の', '「だるま」', 'が']);
+    // Listed as words of their own, too.
+    const listed: [string, string][] = [['の', 'of'], ['「', ''], ['だるま', 'Daruma'], ['」', '']];
+    assert.deepEqual(texts(glossSegments(line('の「だるま」', listed))), ['の', '「だるま」']);
+  });
+
+  test('an opening bracket with nothing after it still shows', () => {
+    assert.deepEqual(texts(glossSegments(line('はい「', [['はい', 'yes']]))), ['はい', '「']);
+  });
+});
+
+describe('breakdown glosses', () => {
+  test('render the markdown models put in them', () => {
+    const breakdown: Breakdown = {
+      lines: [{ japanese: 'だるま', translation: 't', explanation: '', words: [{ text: 'だるま', reading: 'だるま', meaning: '(Daruma *in* Shinsekai)' }] }],
+    };
+    const html = render(<BreakdownView breakdown={breakdown} />);
+    assert.match(html, /<em><span>in<\/span><\/em>/);
+    assert.ok(!html.includes('*in*'));
+  });
 });
 
 describe('the learner\'s own text', () => {

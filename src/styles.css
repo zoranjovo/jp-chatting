@@ -885,6 +885,8 @@ ruby rt {
   max-width: 6.5em;
   text-align: center;
   margin-top: 2px;
+  /* A long gloss ("contrast/emphasis particle") wraps inside its word instead of running into the next. */
+  overflow-wrap: anywhere;
 }
 
 .feedback {

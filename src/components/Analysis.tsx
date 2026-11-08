@@ -26,11 +26,23 @@ interface Segment {
 export function glossSegments(line: Line): Segment[] {
   const sentence = stripFurigana(line.japanese);
   const out: Segment[] = [];
-  // Punctuation joins the word before it, so the sentence stays together.
+  // An opening bracket waits to go on the front of the word after it.
+  let opening = '';
+  const push = (segment: Segment) => {
+    out.push({ ...segment, text: opening + segment.text });
+    opening = '';
+  };
+  // Punctuation joins the word before it, so the sentence stays together -- except an opening bracket,
+  // which belongs to the word it opens (「だるま」, not の「 だるま」).
   const gap = (text: string) => {
     const prev = out.at(-1);
-    if (prev && PUNCTUATION.test(text)) prev.text += text;
-    else out.push({ text });
+    if (!PUNCTUATION.test(text)) return push({ text });
+    const [, closing, open] = /^(.*?)([「『（(]*)$/su.exec(text) ?? [, text, ''];
+    if (closing) {
+      if (prev && !opening) prev.text += closing;
+      else push({ text: closing });
+    }
+    opening += open;
   };
   let pos = 0;
   for (const w of line.words) {
@@ -42,12 +54,13 @@ export function glossSegments(line: Line): Segment[] {
       gap(plain);
     } else {
       const needsReading = w.text === plain && [...plain].some(isKanji) && /^[ぁ-ゖー]+$/u.test(w.reading) && w.reading !== plain;
-      out.push({ text: needsReading ? `{${plain}|${w.reading}}` : w.text, meaning: w.meaning });
+      push({ text: needsReading ? `{${plain}|${w.reading}}` : w.text, meaning: w.meaning });
     }
     pos = at + plain.length;
   }
   if (pos === 0) return [{ text: line.japanese }];
   if (pos < sentence.length) gap(sentence.slice(pos));
+  if (opening) push({ text: '' });
   return out;
 }
 
@@ -76,7 +89,9 @@ export function BreakdownView({ breakdown }: { breakdown: Breakdown }) {
                     <span className="gloss-jp">
                       <JpText text={s.text} />
                     </span>
-                    <span className="gloss-en">{s.meaning}</span>
+                    <span className="gloss-en">
+                      <RichText text={s.meaning} />
+                    </span>
                   </span>
                 ) : (
                   <span key={j} className="gloss gloss-plain">
