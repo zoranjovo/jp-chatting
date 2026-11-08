@@ -30,8 +30,8 @@ test('editing in the middle keeps the caret where the user is typing', async ({ 
   await expect(composer(app)).toHaveValue('ね あおはよう');
 });
 
-test('with romaji input off, text is left as typed, and the choice is remembered', async ({ app }) => {
-  await startChat(app);
+test('with romaji input off, text is left as typed, in that chat only', async ({ app, request }) => {
+  await startChat(app, 'First');
   const toggle = app.locator('.romaji-toggle');
   await expect(toggle).toHaveAttribute('aria-pressed', 'true');
   await toggle.click();
@@ -40,8 +40,30 @@ test('with romaji input off, text is left as typed, and the choice is remembered
   await composer(app).pressSequentially('hello');
   await expect(composer(app)).toHaveValue('hello');
 
-  await app.reload();
+  // Another chat starts from the setting; the first keeps its own choice.
+  await startChat(app, 'Second');
+  await expect(app.locator('.romaji-toggle')).toHaveAttribute('aria-pressed', 'true');
+  await app.locator('.chat-item', { hasText: 'First' }).locator('.chat-item-main').click();
+  await expect(app.locator('h1')).toHaveText('First');
   await expect(app.locator('.romaji-toggle')).toHaveAttribute('aria-pressed', 'false');
+  // The switch doesn't change the setting.
+  expect((await (await request.get('/api/settings')).json()).romajiInput).toBe(true);
+});
+
+test('a Capitalised word is hiragana, and learner spellings of nn work', async ({ app }) => {
+  await startChat(app);
+  await composer(app).pressSequentially('Konnichiwa, minna. Arigatou!');
+  await expect(composer(app)).toHaveValue('こんにちわ、 みんな。 ありがとう！');
+});
+
+test('pasted English stays English, and typing after it leaves it alone', async ({ app }) => {
+  await startChat(app);
+  await composer(app).fill('Netflix wo');
+  await expect(composer(app)).toHaveValue('Netflix を');
+  await composer(app).pressSequentially(' mimashita');
+  await expect(composer(app)).toHaveValue('Netflix を みました');
+  await composer(app).press('Enter');
+  await expect(mine(app).first()).toContainText('Netflix');
 });
 
 test('the message box and the romaji switch have names of their own, and the switch says whether it is on', async ({ app }) => {
