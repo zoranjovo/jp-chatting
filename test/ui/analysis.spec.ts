@@ -232,3 +232,34 @@ test('Redo from the keyboard keeps focus on it while the new analysis is written
   await expect(message.locator('.analysis-line')).toHaveCount(2);
   await expect(redo).toBeFocused();
 });
+
+test.describe('the one-time Breakdown hint', () => {
+  test.beforeEach(async ({ app }) => {
+    // The fixture marks the hint as seen; this brings it back.
+    await app.evaluate(() => {
+      sessionStorage.setItem('keep-breakdown-hint', '1');
+      localStorage.removeItem('jp-chatting:breakdown-hint-seen');
+    });
+    await app.reload();
+  });
+
+  test('points at Breakdown under the partner\'s first message until Breakdown is used', async ({ app }) => {
+    await startChat(app);
+    const hint = app.locator('.hint-callout');
+    await expect(hint).toHaveCount(1);
+    await expect(theirs(app).first().locator('.hint-callout')).toContainText('Breakdown');
+    await theirs(app).first().getByRole('button', { name: 'Breakdown' }).click();
+    await expect(hint).toHaveCount(0);
+    await app.reload();
+    await expect(theirs(app).first()).toBeVisible();
+    await expect(hint).toHaveCount(0);
+  });
+
+  test('goes for good once closed', async ({ app }) => {
+    await startChat(app, 'First');
+    await app.getByRole('button', { name: 'Got it' }).click();
+    await expect(app.locator('.hint-callout')).toHaveCount(0);
+    await startChat(app, 'Second');
+    await expect(app.locator('.hint-callout')).toHaveCount(0);
+  });
+});

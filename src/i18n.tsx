@@ -46,6 +46,10 @@ const en = {
     </>
   ),
 
+  /** Under the partner's first message until Breakdown has been used once; `breakdown` is the button as it looks. */
+  breakdownHint: (breakdown: ReactNode) => <>Not sure what it says? Use {breakdown} on their messages for a line-by-line translation.</>,
+  gotIt: 'Got it',
+
   you: 'You',
   partner: 'Partner',
   typing: 'Typing…',
@@ -188,6 +192,8 @@ const ja: Strings = {
       新しいチャットを始めると、相手が最初のメッセージを送ります。相手のメッセージの{breakdown}で一行ずつの翻訳を、自分のメッセージの{check}で添削を見られます。
     </>
   ),
+  breakdownHint: (breakdown: ReactNode) => <>意味が分からないときは、相手のメッセージの{breakdown}で一行ずつの翻訳を見られます。</>,
+  gotIt: 'わかりました',
 
   you: 'あなた',
   partner: '相手',
