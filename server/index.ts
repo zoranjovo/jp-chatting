@@ -3,7 +3,7 @@
 
 import { createSocket } from 'node:dgram';
 import { networkInterfaces } from 'node:os';
-import { createApp } from './app.ts';
+import { createApp, hasBuiltUi } from './app.ts';
 import { migrateLegacy } from './store.ts';
 
 const PORT = Number(process.env.JP_CHATTING_PORT ?? 5174);
@@ -55,6 +55,7 @@ const app = loopbackOnly ? createApp() : createApp({ lanHosts: wildcard ? lanAdd
 
 app.listen(PORT, HOST, async () => {
   console.log(`jp-chatting API on http://${wildcard ? '127.0.0.1' : urlHost}:${PORT}`);
+  if (!hasBuiltUi()) console.log('  No built UI found: run `pnpm build` first. Only the API is running.');
   if (!wildcard) return;
   const all = lanAddresses();
   const primary = await primaryAddress();
