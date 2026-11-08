@@ -1,9 +1,10 @@
-// The narrow-screen layout, where the sidebar is a drawer behind the menu button.
+// The narrow-screen layout, where the sidebar is a drawer behind the menu button. Short screens get it too:
+// a phone on its side is wide, but with the keyboard up a docked sidebar leaves no room for the chat.
 
 import { useSyncExternalStore } from 'react';
 
 /** The same query as the @media rule in styles.css; a unit test keeps the two in step. */
-export const NARROW = '(max-width: 760px)';
+export const NARROW = '(max-width: 760px), (max-height: 500px)';
 
 export function useMediaQuery(query: string): boolean {
   return useSyncExternalStore(

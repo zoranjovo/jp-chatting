@@ -21,6 +21,33 @@ test('a new chat can be started from the top bar without opening the menu', asyn
   await expect(app.locator('.sidebar')).not.toBeInViewport();
 });
 
+test('a phone on its side gets the menu too, so the chat has the whole width', async ({ app }) => {
+  await app.setViewportSize({ width: 844, height: 390 });
+  await startChat(app, 'Sideways');
+  await expect(app.locator('.sidebar')).not.toBeInViewport();
+  await expect(app.getByRole('button', { name: 'Menu' })).toBeVisible();
+});
+
+test('Settings opened from the menu closes the menu, and focus comes back to the menu button', async ({ app }) => {
+  const menu = app.getByRole('button', { name: 'Menu' });
+  await menu.click();
+  await app.locator('.sidebar').getByRole('button', { name: 'Settings' }).click();
+  await expect(app.getByRole('dialog')).toBeVisible();
+  await expect(menu).toHaveAttribute('aria-expanded', 'false');
+  await app.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
+  await expect(app.getByRole('dialog')).toHaveCount(0);
+  await expect(app.locator('.sidebar')).not.toBeInViewport();
+  await expect(menu).toBeFocused();
+});
+
+test('the composer placeholder fits on one line on a phone', async ({ app }) => {
+  await startChat(app);
+  // Romaji input is on by default.
+  await expect(composer(app)).toHaveAttribute('placeholder', 'Type romaji…');
+  const { height, line } = await composer(app).evaluate((el) => ({ height: el.scrollHeight, line: parseFloat(getComputedStyle(el).lineHeight) }));
+  expect(height).toBeLessThan(line * 2);
+});
+
 test('tapping outside closes the menu', async ({ app }) => {
   await app.getByRole('button', { name: 'Menu' }).click();
   await expect(app.locator('.sidebar')).toBeInViewport();
@@ -192,5 +219,13 @@ test.describe('on a touch screen', () => {
     }
     expect(small).toEqual([]);
     expect(await targets.count()).toBeGreaterThan(8);
+  });
+
+  test('a dialog opens without focusing a text field, so the keyboard stays down until a field is tapped', async ({ app }) => {
+    await app.locator('.topbar').getByRole('button', { name: 'New chat' }).click();
+    const dialog = app.getByRole('dialog');
+    await expect(dialog).toBeFocused();
+    await dialog.getByRole('textbox').tap();
+    await expect(dialog.getByRole('textbox')).toBeFocused();
   });
 });

@@ -2,6 +2,7 @@ import { useImperativeHandle, useLayoutEffect, useReducer, useRef, type ChangeEv
 import { prependDraft, useDraft } from '../drafts.ts';
 import { useT } from '../i18n.tsx';
 import { romajiAtCaret, romajiWordsToKana, withoutJapaneseSpaces } from '../romaji.ts';
+import { NARROW, useMediaQuery } from '../layout.ts';
 import { useSettings } from '../settings.tsx';
 
 /**
@@ -38,6 +39,7 @@ export function Composer({
   handle?: Ref<ComposerHandle>;
 }) {
   const t = useT();
+  const narrow = useMediaQuery(NARROW);
   const { settings } = useSettings();
   // The chat's own draft, read by id, so the text can never belong to another chat.
   const [text, setText] = useDraft(chatId);
@@ -123,7 +125,11 @@ export function Composer({
         value={text}
         onChange={onChange}
         onKeyDown={onKeyDown}
-        placeholder={romaji ? t.composerPlaceholderRomaji : t.composerPlaceholder}
+        placeholder={
+          narrow
+            ? romaji ? t.composerPlaceholderRomajiShort : t.composerPlaceholderShort
+            : romaji ? t.composerPlaceholderRomaji : t.composerPlaceholder
+        }
         aria-label={t.composerLabel}
         lang="ja"
         autoCapitalize="off"

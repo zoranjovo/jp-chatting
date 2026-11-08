@@ -98,6 +98,17 @@ function Shell({ loadError }: { loadError: string | null }) {
     return () => document.removeEventListener('keydown', onKey);
   }, [drawer, dialog]);
 
+  // A dialog opened from the menu hands focus back, on closing, to a button that went with the menu: put it
+  // on the menu button. After the commit, so the dialog has closed and the browser has moved focus.
+  const hadDialog = useRef(false);
+  useEffect(() => {
+    if (hadDialog.current && !dialog && narrow && !navOpen) {
+      const at = document.activeElement;
+      if (!at || at === document.body || sidebar.current?.contains(at)) menuButton.current?.focus();
+    }
+    hadDialog.current = dialog !== null;
+  }, [dialog, narrow, navOpen]);
+
   const refreshList = useCallback(() => api.chats().then(setChats).catch(() => {}), []);
 
   /** The newest copy of each chat the server has sent, so a slow load can tell a reply landed meanwhile. */
@@ -303,6 +314,12 @@ function Shell({ loadError }: { loadError: string | null }) {
     await refreshList();
   };
 
+  /** Closing the menu in the same commit lets the dialog take over its history entry (back.ts). */
+  const fromMenu = (d: 'new' | 'settings') => {
+    setNavOpen(false);
+    setDialog(d);
+  };
+
   const messageUpdated = (m: Message) =>
     setChat((c) => (c ? { ...c, messages: c.messages.map((x) => (x.id === m.id ? m : x)) } : c));
 
@@ -315,10 +332,11 @@ function Shell({ loadError }: { loadError: string | null }) {
         chats={chats}
         activeId={chat?.id ?? null}
         onSelect={select}
-        onNew={() => setDialog('new')}
+        // New chat and Settings take over from the menu: left open under them, it would still be there after saving.
+        onNew={() => fromMenu('new')}
         onRename={rename}
         onDelete={remove}
-        onSettings={() => setDialog('settings')}
+        onSettings={() => fromMenu('settings')}
       />
       <div className="scrim" onClick={() => setNavOpen(false)} />
       <main className="main" inert={drawer}>
