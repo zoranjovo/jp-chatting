@@ -4,6 +4,7 @@ import { useAnnounce } from '../announce.ts';
 import { api } from '../api.ts';
 import { breakdownHintDone } from '../hints.ts';
 import { useT } from '../i18n.tsx';
+import { isAnalysisOpen, setAnalysisOpen } from '../openAnalyses.ts';
 import { BreakdownView, FeedbackView } from './Analysis.tsx';
 import { BreakdownIcon, CheckIcon, RewindIcon } from './Icons.tsx';
 import { MessageInfo } from './MessageInfo.tsx';
@@ -32,10 +33,11 @@ export function MessageBubble({
 }) {
   const t = useT();
   const announce = useAnnounce();
-  const [open, setOpen] = useState(false);
+  // Open if it was open when the learner left this chat, or before a reload.
+  const [open, setOpenState] = useState(() => isAnalysisOpen(message.id));
   // The panel stays mounted once opened, so closing can animate; `shown` is set
   // just after `open` so the opening transition starts from collapsed.
-  const [mounted, setMounted] = useState(false);
+  const [mounted, setMounted] = useState(open);
   const [shown, setShown] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +45,12 @@ export function MessageBubble({
   const panel = useRef<HTMLDivElement>(null);
   const mine = message.role === 'user';
   const analysis = mine ? message.feedback : message.breakdown;
+  /** Opened here, not put back from before: only then is it scrolled into view. */
+  const opened = useRef(false);
+  const setOpen = (next: boolean) => {
+    setOpenState(next);
+    setAnalysisOpen(message.id, next);
+  };
   const label = mine ? t.check : t.breakdown;
   const rewindHint = useId();
 
@@ -55,12 +63,13 @@ export function MessageBubble({
 
   // Once it has opened, or its content has arrived, bring the panel into view if it ended up off screen.
   useEffect(() => {
-    if (!shown || busy) return;
+    if (!shown || busy || !opened.current) return;
     const timer = setTimeout(() => panel.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), SLIDE_MS);
     return () => clearTimeout(timer);
   }, [shown, busy]);
 
-  const analyze = async (refresh: boolean) => {
+  const analyze = async (refresh: boolean, reopened = false) => {
+    opened.current = !reopened;
     setMounted(true);
     setOpen(true);
     if (!mine) breakdownHintDone();
@@ -77,6 +86,12 @@ export function MessageBubble({
       setBusy(false);
     }
   };
+
+  // Put back open while its analysis was still being written: ask again, which waits for the same one on the server.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only on mount
+  useEffect(() => {
+    if (open && !analysis) analyze(false, true);
+  }, []);
 
   return (
     <WrittenAtLevelProvider value={message.context?.wkLevel}>
@@ -112,10 +127,19 @@ export function MessageBubble({
                 </span>
               </Tooltip>
             )}
-            <Tooltip label={<strong>{open ? t.hide : label}</strong>}>
+            <Tooltip
+              label={
+                <>
+                  <strong>{open ? t.hide : label}</strong>
+                  {analysis && !open && <span className="tooltip-hint">{t.analysisSaved}</span>}
+                </>
+              }
+            >
               <button
                 type="button"
-                className={`icon-button ${open ? 'active' : ''}`}
+                // The dot: this message already has its analysis, so opening it is instant.
+                className={`icon-button ${open ? 'active' : ''} ${analysis && !open ? 'has-analysis' : ''}`}
+                aria-description={analysis && !open ? t.analysisSaved : undefined}
                 onClick={() => (open ? setOpen(false) : analyze(false))}
                 aria-expanded={open}
                 aria-label={open ? t.hide : label}

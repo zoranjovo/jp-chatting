@@ -442,6 +442,23 @@ describe('analysis', () => {
     assert.match(request.system, /JLPT N2/);
   });
 
+  test('asking again while a breakdown is being written waits for it rather than asking the model twice', async () => {
+    const { chat, partner } = await chatWithBoth();
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    answers.breakdown = async () => {
+      await gate;
+      return DEFAULT_ANSWERS.breakdown({} as AiRequest);
+    };
+    const first = analyze(chat.id, partner.id);
+    const second = analyze(chat.id, partner.id);
+    await new Promise((r) => setTimeout(r, 50));
+    release();
+    const [a, b] = await Promise.all([first, second]);
+    assert.equal(calls.filter((c) => c.kind === 'breakdown').length, 1);
+    assert.deepEqual(a.body.breakdown, b.body.breakdown);
+  });
+
   test('refresh asks again', async () => {
     const { chat, partner } = await chatWithBoth();
     await analyze(chat.id, partner.id);

@@ -601,3 +601,20 @@ test('rewind waits while a reply is on its way', async ({ app, request }) => {
   await expect(app.locator('.typing')).toHaveCount(0);
   await expect(mine(app).first().getByRole('button', { name: /Rewind/ })).toBeEnabled();
 });
+
+test('the chat list shows a reply on its way in another chat, then that it arrived until the chat is opened', async ({ app, request }) => {
+  await startChat(app, 'First');
+  await mockControl(request, { delayMs: 2000 });
+  await composer(app).fill('きこえますか');
+  await composer(app).press('Enter');
+  await expect(app.locator('.typing')).toBeVisible();
+  await mockControl(request, { delayMs: 0 });
+  await startChat(app, 'Second');
+  const first = app.locator('.chat-item', { hasText: 'First' });
+  await expect(first.locator('.chat-typing')).toBeVisible();
+  await expect(first.locator('.chat-unread')).toBeVisible({ timeout: 8000 });
+  await expect(first.locator('.chat-typing')).toHaveCount(0);
+  await first.locator('.chat-item-main').click();
+  await expect(theirs(app)).toHaveCount(2);
+  await expect(first.locator('.chat-unread')).toHaveCount(0);
+});

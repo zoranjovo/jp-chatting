@@ -59,6 +59,8 @@ function Shell({ loadError }: { loadError: string | null }) {
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [chat, setChat] = useState<Chat | null>(null);
   const [waiting, setWaiting] = useState<Set<string>>(new Set());
+  /** Chats whose reply arrived while the learner was in another one, until they open it. */
+  const [unread, setUnread] = useState<Set<string>>(new Set());
   const [errors, setErrors] = useState<Record<string, string | null>>({});
   const [dialog, setDialog] = useState<'new' | 'settings' | 'chat' | null>(null);
   const [navOpen, setNavOpen] = useState(false);
@@ -159,6 +161,7 @@ function Shell({ loadError }: { loadError: string | null }) {
     setErrors((e) => ({ ...e, [id]: null }));
     try {
       show(await api.reply(id));
+      if (activeId.current !== id) setUnread((u) => new Set(u).add(id));
     } catch (err) {
       setErrors((e) => ({ ...e, [id]: (err as Error).message }));
     } finally {
@@ -187,6 +190,12 @@ function Shell({ loadError }: { loadError: string | null }) {
     if (selecting.current !== id) return;
     selecting.current = null;
     activeId.current = id;
+    setUnread((u) => {
+      if (!u.has(id)) return u;
+      const next = new Set(u);
+      next.delete(id);
+      return next;
+    });
     showInUrl(id, replace);
     // A reply landed while this was loading: it is newer than what was read.
     const newer = latest.current.get(id);
@@ -331,6 +340,8 @@ function Shell({ loadError }: { loadError: string | null }) {
         asideRef={sidebar}
         chats={chats}
         activeId={chat?.id ?? null}
+        waiting={waiting}
+        unread={unread}
         onSelect={select}
         // New chat and Settings take over from the menu: left open under them, it would still be there after saving.
         onNew={() => fromMenu('new')}

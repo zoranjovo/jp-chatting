@@ -53,6 +53,9 @@ const en = {
   you: 'You',
   partner: 'Partner',
   typing: 'Typing…',
+  newReply: 'New reply',
+  /** On Breakdown and Check when the message already has one. */
+  analysisSaved: 'Ready: opens at once',
   partnerSays: 'Your partner:',
   breakdownReady: 'Breakdown ready.',
   feedbackReady: 'Check ready.',
@@ -201,6 +204,8 @@ const ja: Strings = {
   you: 'あなた',
   partner: '相手',
   typing: '入力中…',
+  newReply: '新しい返信',
+  analysisSaved: '作成済み：すぐに開きます',
   partnerSays: '相手：',
   breakdownReady: '解説ができました。',
   feedbackReady: 'チェックができました。',
