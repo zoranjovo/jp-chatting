@@ -158,6 +158,27 @@ button[aria-disabled='true'] {
   color: var(--ink);
 }
 
+/* Breakdown or Check on a message that already has its analysis: a dot at the corner, so opening it is known to be instant. */
+.icon-button.has-analysis {
+  position: relative;
+}
+
+.icon-button.has-analysis::after {
+  content: '';
+  position: absolute;
+  top: var(--dot-inset, 0px);
+  right: var(--dot-inset, 0px);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--theirs);
+}
+
+.message.mine .icon-button.has-analysis::after {
+  box-shadow: 0 0 0 2px var(--mine);
+}
+
 .chip {
   border: 1px solid var(--line);
   background: transparent;
@@ -272,8 +293,39 @@ button[aria-disabled='true'] {
 }
 
 .chat-date {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 12px;
   color: var(--muted);
+}
+
+.chat-typing {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.chat-typing i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: blink 1.2s infinite ease-in-out;
+}
+
+.chat-typing i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.chat-typing i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.chat-unread {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
 }
 
 .chat-item-actions {
@@ -1471,6 +1523,7 @@ ruby rt {
     height: 44px;
     padding: 8px;
     background-clip: content-box;
+    --dot-inset: 8px;
   }
 
   .chat-item-actions {

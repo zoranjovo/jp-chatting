@@ -9,6 +9,8 @@ export function Sidebar({
   asideRef: aside,
   chats,
   activeId,
+  waiting,
+  unread,
   onSelect,
   onNew,
   onRename,
@@ -20,6 +22,10 @@ export function Sidebar({
   asideRef: RefObject<HTMLElement | null>;
   chats: ChatSummary[];
   activeId: string | null;
+  /** Chats whose reply is being written. */
+  waiting: ReadonlySet<string>;
+  /** Chats whose reply arrived while the learner was in another one. */
+  unread: ReadonlySet<string>;
   onSelect: (id: string) => void;
   onNew: () => void;
   onRename: (id: string, title: string) => void;
@@ -81,6 +87,16 @@ export function Sidebar({
                     month: 'short',
                     day: 'numeric',
                   })}
+                  {/* A reply being written in this chat, or one that arrived while the learner was elsewhere. */}
+                  {waiting.has(chat.id) ? (
+                    <span className="chat-typing" role="img" aria-label={t.typing}>
+                      <i />
+                      <i />
+                      <i />
+                    </span>
+                  ) : (
+                    unread.has(chat.id) && <span className="chat-unread" role="img" aria-label={t.newReply} />
+                  )}
                 </span>
               </button>
               <div className="chat-item-actions">

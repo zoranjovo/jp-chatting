@@ -547,7 +547,7 @@ describe('accessible names and states', () => {
 
   test('the sidebar marks the open chat, and the language is one choice of two', () => {
     const chats: ChatSummary[] = ['a', 'b'].map((id) => ({ id, title: id.toUpperCase(), topic: '', createdAt: '', updatedAt: '2026-01-01T00:00:00Z' }));
-    const props = { chats, asideRef: { current: null }, onSelect: () => {}, onNew: () => {}, onRename: () => {}, onDelete: async () => {}, onSettings: () => {} };
+    const props = { chats, asideRef: { current: null }, onSelect: () => {}, onNew: () => {}, onRename: () => {}, onDelete: async () => {}, onSettings: () => {}, waiting: new Set<string>(), unread: new Set<string>() };
     const html = render(<Sidebar {...props} activeId="b" />);
     assert.equal(count(html, 'aria-current'), 1);
     assert.match(html, /aria-current="page"><span class="chat-title jp" title="B">B</);
@@ -555,6 +555,27 @@ describe('accessible names and states', () => {
     assert.match(html, /<label class="active"><input type="radio" name="ui-language" checked=""\/>EN<\/label>/);
     assert.match(html, /<label class=""><input type="radio" name="ui-language"\/>日本語<\/label>/);
     assert.match(render(<Sidebar {...props} activeId={null} />, { uiLanguage: 'ja' }), /<label class="active"><input type="radio" name="ui-language" checked=""\/>日本語/);
+  });
+
+  test('the sidebar shows which chats have a reply on its way, and which got one while the learner was elsewhere', () => {
+    const chats: ChatSummary[] = ['a', 'b', 'c'].map((id) => ({ id, title: id, topic: '', createdAt: '', updatedAt: '2026-01-01T00:00:00Z' }));
+    const html = render(
+      <Sidebar
+        chats={chats}
+        activeId="a"
+        waiting={new Set(['b'])}
+        unread={new Set(['c'])}
+        asideRef={{ current: null }}
+        onSelect={() => {}}
+        onNew={() => {}}
+        onRename={() => {}}
+        onDelete={async () => {}}
+        onSettings={() => {}}
+      />,
+    );
+    assert.equal(count(html, 'class="chat-typing" role="img" aria-label="Typing…"'), 1);
+    assert.equal(count(html, 'class="chat-unread" role="img" aria-label="New reply"'), 1);
+    assert.ok(html.indexOf('chat-typing') < html.indexOf('chat-unread'));
   });
 
   test('the WaniKani level is a group, its slider and number box named apart, with the hint as their description', () => {

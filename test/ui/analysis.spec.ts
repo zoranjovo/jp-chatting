@@ -37,6 +37,44 @@ test('screen readers hear when a breakdown is being written and when it is ready
   await expect(app.getByRole('status')).toHaveCount(1);
 });
 
+test('an open breakdown stays open after switching chats and after a reload', async ({ app }) => {
+  await startChat(app, 'First');
+  await theirs(app).first().getByRole('button', { name: 'Breakdown' }).click();
+  await expect(theirs(app).first().locator('.analysis-line')).toHaveCount(2);
+  await startChat(app, 'Second');
+  await app.locator('.chat-item', { hasText: 'First' }).locator('.chat-item-main').click();
+  await expect(theirs(app).first().getByRole('button', { name: 'Hide' })).toBeVisible();
+  await expect(theirs(app).first().locator('.analysis-line')).toHaveCount(2);
+  await app.reload();
+  await expect(theirs(app).first().getByRole('button', { name: 'Hide' })).toBeVisible();
+  await expect(theirs(app).first().locator('.analysis-line')).toHaveCount(2);
+});
+
+test('a breakdown still being written when the learner leaves is there, open, when they come back, from one model call', async ({ app, request }) => {
+  await startChat(app, 'First');
+  await startChat(app, 'Second');
+  await mockControl(request, { delayMs: 1500 });
+  await theirs(app).first().getByRole('button', { name: 'Breakdown' }).click();
+  await expect(theirs(app).first().locator('.analysis-busy')).toBeVisible();
+  await app.locator('.chat-item', { hasText: 'First' }).locator('.chat-item-main').click();
+  await expect(app.locator('h1')).toHaveText('First');
+  await app.locator('.chat-item', { hasText: 'Second' }).locator('.chat-item-main').click();
+  await expect(theirs(app).first().locator('.analysis-line')).toHaveCount(2);
+  expect((await mockCalls(request)).filter((c) => c.kind === 'breakdown')).toHaveLength(1);
+});
+
+test('a message whose analysis is saved shows a dot on its button while the panel is closed', async ({ app }) => {
+  await startChat(app);
+  const button = theirs(app).first().locator('.bubble-actions button').last();
+  await expect(button).not.toHaveClass(/has-analysis/);
+  await button.click();
+  await expect(theirs(app).first().locator('.analysis-line')).toHaveCount(2);
+  await expect(button).not.toHaveClass(/has-analysis/);
+  await button.click();
+  await expect(button).toHaveClass(/has-analysis/);
+  await expect(button).toHaveAttribute('aria-description', 'Ready: opens at once');
+});
+
 test('Breakdown is fetched once, then hidden and shown from the cache', async ({ app, request }) => {
   await startChat(app);
   const message = theirs(app).first();
@@ -56,7 +94,8 @@ test('a breakdown is saved and still there after a reload', async ({ app, reques
   await theirs(app).first().getByRole('button', { name: 'Breakdown' }).click();
   await expect(theirs(app).first().locator('.analysis-line')).toHaveCount(2);
   await app.reload();
-  await theirs(app).first().getByRole('button', { name: 'Breakdown' }).click();
+  // Still open after the reload, shown from what was saved.
+  await expect(theirs(app).first().getByRole('button', { name: 'Hide' })).toBeVisible();
   await expect(theirs(app).first().locator('.analysis-line')).toHaveCount(2);
   expect(await count(request, 'breakdown')).toBe(1);
   expect((await chatsOnDisk(request))[0].messages[0].breakdown?.lines).toHaveLength(2);

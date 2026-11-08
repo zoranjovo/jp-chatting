@@ -323,6 +323,9 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
     }),
   );
 
+  /** Analyses being written, by chat/message: asking again meanwhile (the page came back to an open panel) waits for the same one. */
+  const analysing = new Map<string, Promise<Partial<Message>>>();
+
   /** A breakdown of the partner's message, or feedback on the learner's. Cached on the message unless ?refresh=1. */
   app.post(
     '/api/chats/:id/messages/:mid/analyze',
@@ -336,18 +339,26 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
       const refresh = req.query.refresh === '1';
       if (!refresh && (message.breakdown || message.feedback)) return res.json(message);
 
-      // Under the settings the message was written with, so changing them since doesn't change the answer.
-      const settings = settingsFor(await store.getSettings(), message.context);
-      const earlier = chat.messages.slice(0, index);
-      // Anywhere in the chat, as the UI counts them: once typed, the learner knows it.
-      const known = kanjiKnownIn(chat);
-      let patch: Partial<Message>;
-      if (message.role === 'assistant') {
-        patch = { breakdown: await generateBreakdown(deps.callAi, settings, message, earlier, known) };
-      } else {
-        const politeness = message.context?.politeness ?? chat.politeness;
-        patch = { feedback: await generateFeedback(deps.callAi, settings, politeness, message, earlier, known) };
+      const key = `${id}/${mid}`;
+      let work = refresh ? undefined : analysing.get(key);
+      if (!work) {
+        work = (async (): Promise<Partial<Message>> => {
+          // Under the settings the message was written with, so changing them since doesn't change the answer.
+          const settings = settingsFor(await store.getSettings(), message.context);
+          const earlier = chat.messages.slice(0, index);
+          // Anywhere in the chat, as the UI counts them: once typed, the learner knows it.
+          const known = kanjiKnownIn(chat);
+          if (message.role === 'assistant') return { breakdown: await generateBreakdown(deps.callAi, settings, message, earlier, known) };
+          const politeness = message.context?.politeness ?? chat.politeness;
+          return { feedback: await generateFeedback(deps.callAi, settings, politeness, message, earlier, known) };
+        })();
+        if (!refresh) {
+          analysing.set(key, work);
+          const done = () => analysing.get(key) === work && analysing.delete(key);
+          work.then(done, done);
+        }
       }
+      const patch = await work;
       const saved = await updateChat(id, (c) => {
         const m = c.messages.find((x) => x.id === mid);
         if (!m) return 'none';
