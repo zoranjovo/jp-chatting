@@ -1,5 +1,5 @@
 import { devices, type Locator } from '@playwright/test';
-import { composer, expect, expectTooltipBeside, mine, startChat, test, theirs } from './fixtures.ts';
+import { MOCK_URL, composer, expect, expectTooltipBeside, mine, startChat, test, theirs } from './fixtures.ts';
 
 test.use({ viewport: devices['Pixel 7'].viewport, hasTouch: true });
 
@@ -246,6 +246,24 @@ test('a bubble keeps room between its lines for readings only when it shows some
   await expect(text).toBeVisible();
   await expect(text.locator('rt')).toHaveCount(0);
   expect(await ratio()).toBeCloseTo(1.7, 1);
+});
+
+test('on a small phone the dialogs show their buttons without scrolling, and the topic chips sit in one row', async ({ app, request }) => {
+  await app.setViewportSize({ width: 320, height: 568 });
+  // No model: the New chat dialog leads with the setup notice, as for a first-timer.
+  await request.put('/api/settings', { data: { endpoint: { baseUrl: `${MOCK_URL}/v1`, apiKey: '', model: '', reasoning: '' } } });
+  await app.reload();
+  await app.locator('.topbar-new').click();
+  const dialog = app.getByRole('dialog');
+  await expect(dialog.locator('.setup-notice')).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Start' })).toBeInViewport({ ratio: 1 });
+  const chips = await dialog.locator('.topic-examples .chip').evaluateAll((els) => els.map((el) => el.getBoundingClientRect().top));
+  expect(new Set(chips).size).toBe(1);
+  expect(await app.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+
+  await dialog.getByRole('button', { name: 'Open Settings' }).click();
+  await expect(dialog.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Save' })).toBeInViewport({ ratio: 1 });
 });
 
 test.describe('on a touch screen', () => {

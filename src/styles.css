@@ -1319,6 +1319,8 @@ ruby rt {
   color: var(--ink);
   width: min(560px, calc(100vw - 32px));
   max-height: calc(100vh - 48px);
+  /* dvh: on a phone 100vh is the height with the browser's toolbar hidden, so the foot of a tall dialog sat under it. */
+  max-height: calc(100dvh - 48px);
   box-shadow: 0 20px 60px rgb(0 0 0 / 25%);
 }
 
@@ -1574,11 +1576,17 @@ ruby rt {
   gap: 6px;
 }
 
+/* Stuck to the dialog's foot, over the end of the dialog body's padding, so a dialog taller than the screen
+   still shows its buttons: on a small phone Start was nearly two screens down the New chat dialog. */
 .dialog-actions {
+  position: sticky;
+  bottom: 0;
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 6px;
+  margin: 0 -24px -22px;
+  padding: 10px 24px 22px;
+  background: var(--surface);
 }
 
 /* --- narrow screens: the sidebar slides over --- */
@@ -1713,6 +1721,19 @@ ruby rt {
 
   .chat-item-actions {
     display: flex;
+  }
+
+  /* One row that scrolls sideways, not a column of five chips pushing the rest of the dialog down. */
+  .topic-examples {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin-inline: -24px;
+    padding-inline: 24px;
+    scrollbar-width: none;
+  }
+
+  .topic-examples .chip {
+    flex: none;
   }
 }
 

@@ -16,3 +16,9 @@ test('the drawer breakpoint in code is the one in styles.css', () => {
   const short = NARROW.match(/\(max-height: \d+px\)/)?.[0];
   assert.ok(short && queries.includes(short), `styles.css has no ${short} rules for short screens`);
 });
+
+test('the page asks to be resized for the on-screen keyboard', () => {
+  // Without it Android Chrome lays the keyboard over the page instead, and the short-screen rules never apply.
+  const html = fs.readFileSync(path.join(import.meta.dirname, '..', '..', 'index.html'), 'utf8');
+  assert.match(html, /<meta name="viewport" content="[^"]*interactive-widget=resizes-content/);
+});
