@@ -481,9 +481,15 @@ button[aria-disabled='true'] {
 
 .bubble-text {
   font-size: 17px;
-  line-height: 2;
+  line-height: 1.7;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/* Room between the lines for readings only where there are some: with furigana off, long replies stood
+   a quarter taller than they needed to. */
+.bubble-text:has(rt) {
+  line-height: 2;
 }
 
 .bubble-actions {
@@ -1744,5 +1750,19 @@ ruby rt {
 @media (max-height: 300px) {
   .main:has(.composer textarea:focus) .topbar {
     display: none;
+  }
+}
+
+/* Touch screens: text a phone held at arm's length can read. Fields at 16px, or iOS zooms the page into
+   every one that is tapped; the breakdown's word meanings and the feedback's line tags up from 10.5-11px. */
+@media (pointer: coarse) {
+  .field input:not([type='range']):not([type='radio']),
+  .field select {
+    font-size: 16px;
+  }
+
+  .gloss-en,
+  .line-tag {
+    font-size: 12px;
   }
 }
