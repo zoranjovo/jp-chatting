@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { kanjiKnownIn, stripFurigana } from '../../shared/kanji.ts';
 import type { Chat, Message } from '../../shared/types.ts';
+import type { UiError } from '../api.ts';
 import { AnnounceContext } from '../announce.ts';
 import { useBreakdownHint } from '../hints.ts';
 import { useT } from '../i18n.tsx';
 import { FeedbackView } from './Analysis.tsx';
+import { ErrorNote } from './ErrorNote.tsx';
 import { Composer, type ComposerHandle } from './Composer.tsx';
 import { KnownKanjiProvider } from './JpText.tsx';
 import { MessageBubble } from './MessageBubble.tsx';
@@ -32,7 +34,7 @@ export function ChatView({
 }: {
   chat: Chat;
   waiting: boolean;
-  error: string | null;
+  error: UiError | null;
   onSend: (text: string) => Promise<boolean>;
   onRetry: () => void;
   onMessageUpdated: (m: Message) => void;
@@ -154,11 +156,7 @@ export function ChatView({
               />
             ))}
             {waiting && <TypingIndicator chatId={chat.id} />}
-            {error && (
-              <div className="error" role="alert">
-                {t.errorPrefix} {error}
-              </div>
-            )}
+            {error && <ErrorNote error={error} />}
             {needsReply && <SetupNotice onOpenSettings={onOpenSettings} />}
             {needsReply && (
               <button

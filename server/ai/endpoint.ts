@@ -23,7 +23,7 @@ export async function listEndpointModels(config: EndpointConfig): Promise<string
   try {
     res = await fetch(`${base(config)}/models`, { headers: headers(config), signal: AbortSignal.timeout(10_000) });
   } catch (err) {
-    throw new AiError(`could not reach ${base(config)}: ${(err as Error).message}`);
+    throw new AiError(`could not reach ${base(config)}: ${(err as Error).message}`, true);
   }
   if (!res.ok) throw new AiError(`${base(config)}/models answered ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const body = (await res.json()) as { data?: { id?: string }[] };
@@ -42,7 +42,8 @@ async function post(config: EndpointConfig, body: Record<string, unknown>, timeo
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (err) {
-    throw new AiError(`could not reach ${base(config)}: ${(err as Error).message}`);
+    // A timeout reached the server, which was too slow; anything else never got there.
+    throw new AiError(`could not reach ${base(config)}: ${(err as Error).message}`, (err as Error).name !== 'TimeoutError');
   }
 }
 

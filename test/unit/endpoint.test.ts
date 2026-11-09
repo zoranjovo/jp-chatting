@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, describe, test } from 'node:test';
 import { callEndpoint, listEndpointModels } from '../../server/ai/endpoint.ts';
+import { AiError, callAi } from '../../server/ai/index.ts';
 import { DEFAULT_SETTINGS } from '../../shared/types.ts';
 import { chatCompletion, mockServer, type RecordedRequest } from './helpers.ts';
 
@@ -38,8 +39,18 @@ describe('listEndpointModels', () => {
     await assert.rejects(listEndpointModels(config()), /answered 401.*bad key/);
   });
 
-  test('reports an unreachable server', async () => {
-    await assert.rejects(listEndpointModels(config({ baseUrl: 'http://127.0.0.1:9/v1' })), /could not reach/);
+  test('reports an unreachable server, marked as never reached', async () => {
+    await assert.rejects(listEndpointModels(config({ baseUrl: 'http://127.0.0.1:9/v1' })), (err: AiError) => /could not reach/.test(err.message) && err.unreachable);
+  });
+
+  test('a call through callAi names the provider that failed', async () => {
+    const settings = { ...DEFAULT_SETTINGS, provider: 'endpoint' as const, endpoint: config({ baseUrl: 'http://127.0.0.1:9/v1' }) };
+    await assert.rejects(callAi({ system: 's', turns: [{ role: 'user', content: 'x' }] }, settings), (err: AiError) => err.provider === 'endpoint' && err.unreachable);
+  });
+
+  test('a server that answers with an error was reached', async () => {
+    next = () => ({ status: 500, body: { error: 'model crashed' } });
+    await assert.rejects(listEndpointModels(config()), (err: AiError) => /answered 500/.test(err.message) && !err.unreachable);
   });
 
   test('refuses an empty URL', async () => {

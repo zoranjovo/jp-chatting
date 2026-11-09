@@ -358,6 +358,16 @@ describe('conversation', () => {
     assert.match((res.body as unknown as { error: string }).error, /boom/);
     assert.equal((await api<Chat>('GET', `/api/chats/${chat.id}`)).body.messages.length, 0);
   });
+
+  test('a 502 says which provider failed and whether it could be reached, for the plain-words note', async () => {
+    answers.chat = () => {
+      throw Object.assign(new AiError('could not run "claude": spawn claude ENOENT', true), { provider: 'claude' });
+    };
+    const res = await reply((await newChat()).id);
+    assert.equal(res.status, 502);
+    assert.deepEqual((res.body as unknown as { ai: unknown }).ai, { provider: 'claude', unreachable: true });
+    answers.chat = DEFAULT_ANSWERS.chat;
+  });
 });
 
 describe('kanji level enforcement', () => {

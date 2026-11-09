@@ -412,7 +412,8 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
     const status = err instanceof NotFound ? 404 : err instanceof BadRequest ? 400 : err instanceof AiError ? 502 : 500;
     if (status === 500) console.error(err);
     else if (status === 502) console.warn(`[api] ${err.message}`);
-    res.status(status).json({ error: err.message });
+    // An AI failure says which provider failed and whether it could be reached, for the UI's plain-words note.
+    res.status(status).json(err instanceof AiError ? { error: err.message, ai: { provider: err.provider, unreachable: err.unreachable } } : { error: err.message });
   });
 
   return app;

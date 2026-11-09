@@ -11,6 +11,8 @@ import { ChatSettingsDialog } from '../../src/components/ChatSettingsDialog.tsx'
 import { Composer } from '../../src/components/Composer.tsx';
 import { ConfirmDialog } from '../../src/components/Dialog.tsx';
 import { ContextLine } from '../../src/components/ContextLine.tsx';
+import { ErrorNote } from '../../src/components/ErrorNote.tsx';
+import { ApiError, errorOf } from '../../src/api.ts';
 import { MessageBubble } from '../../src/components/MessageBubble.tsx';
 import { ContextDetails } from '../../src/components/MessageInfo.tsx';
 import { JpText, KnownKanjiProvider } from '../../src/components/JpText.tsx';
@@ -620,5 +622,37 @@ describe('accessible names and states', () => {
     }
     const genki = render(<SettingsDialog onClose={() => {}} />);
     assert.match(genki, /<label class="field-label" for="([^"]+)">Genki lesson<\/label><select id="\1" aria-describedby="[^"]+"/);
+  });
+});
+
+describe('ErrorNote', () => {
+  test('a model that could not be reached: plain words, a hint for the provider that was called, then the detail', () => {
+    const error = errorOf(new ApiError('could not reach http://localhost:1234/v1: fetch failed', 502, { provider: 'endpoint', unreachable: true }));
+    assert.equal(error.kind, 'model');
+    const endpoint = render(<ErrorNote error={error} />);
+    assert.match(endpoint, /<strong>Your partner’s AI didn’t answer\.<\/strong> Check that your model server \(LM Studio, Ollama…\) is running/);
+    assert.match(endpoint, /<span class="error-detail">could not reach http:\/\/localhost:1234\/v1: fetch failed<\/span>/);
+    // The provider the call used, not today's setting: an analysis runs under its message's.
+    const claude = errorOf(new ApiError('could not run "claude": spawn claude ENOENT', 502, { provider: 'claude', unreachable: true }));
+    assert.match(render(<ErrorNote error={claude} />, { provider: 'endpoint' }), /Claude CLI is installed and signed in/);
+  });
+
+  test('a model that answered but failed gets no check-it-is-running hint, only its detail', () => {
+    const error = errorOf(new ApiError('the model did not return valid JSON', 502, { provider: 'endpoint', unreachable: false }));
+    const html = render(<ErrorNote error={error} />);
+    assert.match(html, /<strong>Your partner’s AI ran into a problem\.<\/strong> Try again/);
+    assert.doesNotMatch(html, /Check that/);
+    assert.match(html, /the model did not return valid JSON/);
+  });
+
+  test('only a request that got no answer is the server out of reach; anything else keeps the plain prefix', () => {
+    const offline = errorOf(new ApiError('Failed to fetch', 0));
+    assert.equal(offline.kind, 'server');
+    assert.match(render(<ErrorNote error={offline} />), /<strong>Can’t reach the jp-chatting server\.<\/strong>/);
+    // A bug's TypeError is a bug, not the network.
+    assert.equal(errorOf(new TypeError('x is undefined')).kind, 'other');
+    const notFound = errorOf(new ApiError('chat not found', 404));
+    assert.equal(notFound.kind, 'other');
+    assert.equal(render(<ErrorNote error={notFound} />), '<div class="error" role="alert">Something went wrong: chat not found</div>');
   });
 });

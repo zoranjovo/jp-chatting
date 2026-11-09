@@ -69,6 +69,14 @@ const en = {
   send: 'Send',
   retryReply: 'Get a reply',
   errorPrefix: 'Something went wrong:',
+  /** A failed reply or analysis (ErrorNote): what happened, then what to try. The technical detail follows. */
+  modelFailed: 'Your partner’s AI didn’t answer.',
+  modelFailedEndpoint: 'Check that your model server (LM Studio, Ollama…) is running with the model loaded, then try again.',
+  modelFailedClaude: 'Check that the Claude CLI is installed and signed in (claude auth login), then try again.',
+  modelError: 'Your partner’s AI ran into a problem.',
+  modelErrorHint: 'Try again; the details below say what went wrong.',
+  serverUnreachable: 'Can’t reach the jp-chatting server.',
+  serverUnreachableHint: 'Check that it’s still running and this device is on its network, then try again.',
   /** Beside a slow reply's time so far, by ReplyStep. */
   replyStep: { draft: 'Writing', rewrite: 'Rewriting to fix it', fresh: 'Writing it again' },
 
@@ -226,6 +234,13 @@ const ja: Strings = {
   send: '送信',
   retryReply: '返信をもらう',
   errorPrefix: 'エラーが発生しました：',
+  modelFailed: 'AIから返事がありませんでした。',
+  modelFailedEndpoint: 'モデルのサーバー（LM Studio、Ollamaなど）が起動していて、モデルが読み込まれているか確認してから、もう一度お試しください。',
+  modelFailedClaude: 'Claude CLIがインストールされ、サインイン済み（claude auth login）か確認してから、もう一度お試しください。',
+  modelError: 'AIで問題が起きました。',
+  modelErrorHint: 'もう一度お試しください。原因は下に表示されています。',
+  serverUnreachable: 'jp-chattingのサーバーに接続できません。',
+  serverUnreachableHint: 'サーバーが起動していて、この端末が同じネットワークにあるか確認してから、もう一度お試しください。',
   replyStep: { draft: '作成中', rewrite: '修正中', fresh: '書き直し中' },
 
   breakdown: '解説',
