@@ -231,8 +231,27 @@ test.describe('on a touch screen', () => {
     await expect(mine(app)).toHaveCount(0);
     await app.getByRole('button', { name: 'Send' }).tap();
     await expect(mine(app)).toHaveCount(1);
+    // The box keeps focus, so the keyboard stays up for the next message.
+    await expect(composer(app)).toBeFocused();
     expect(await mine(app).locator('.bubble-text').evaluate((el) => el.textContent)).toBe('はい\nありがとう');
     await expect(theirs(app)).toHaveCount(2);
+  });
+
+  test('a tap on Send with the box unfocused leaves it unfocused, so no keyboard pops up over the reply', async ({ app }) => {
+    await startChat(app);
+    await composer(app).fill('はい');
+    await composer(app).blur();
+    await app.getByRole('button', { name: 'Send' }).tap();
+    await expect(mine(app)).toHaveCount(1);
+    await expect(composer(app)).not.toBeFocused();
+  });
+
+  test('on a wide touch screen the romaji placeholder keeps its katakana hint', async ({ app }) => {
+    await app.setViewportSize({ width: 1024, height: 768 });
+    await startChat(app);
+    await expect(composer(app)).toHaveAttribute('placeholder', /CAPS for katakana/);
+    await composer(app).evaluate((el) => el.closest('.composer')?.querySelector<HTMLButtonElement>('.romaji-toggle')?.click());
+    await expect(composer(app)).toHaveAttribute('placeholder', 'Write in Japanese…');
   });
 
   test('a hardware keyboard on a tablet still sends with Ctrl+Enter', async ({ app }) => {

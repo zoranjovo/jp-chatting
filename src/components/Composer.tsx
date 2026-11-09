@@ -129,11 +129,11 @@ export function Composer({
         value={text}
         onChange={onChange}
         onKeyDown={onKeyDown}
-        // The long placeholders explain Enter and Shift+Enter, which a touch keyboard doesn't do.
+        // The long plain placeholder explains Enter and Shift+Enter, which a touch keyboard doesn't do.
         placeholder={
-          narrow || touch
-            ? romaji ? t.composerPlaceholderRomajiShort : t.composerPlaceholderShort
-            : romaji ? t.composerPlaceholderRomaji : t.composerPlaceholder
+          romaji
+            ? narrow ? t.composerPlaceholderRomajiShort : t.composerPlaceholderRomaji
+            : narrow || touch ? t.composerPlaceholderShort : t.composerPlaceholder
         }
         aria-label={t.composerLabel}
         enterKeyHint={touch ? 'enter' : 'send'}
@@ -146,6 +146,11 @@ export function Composer({
       <button
         type="button"
         className="send"
+        // On a touch screen Send is the only way to send: keep the box focused so the keyboard stays up for
+        // the next message. Only when it was already: a tap on Send mustn't pop the keyboard up.
+        onMouseDown={(e) => {
+          if (touch && document.activeElement === ref.current) e.preventDefault();
+        }}
         onClick={(e) => {
           send();
           // Sending empties the box, which disables this button and would drop keyboard focus to the page.

@@ -63,7 +63,7 @@ const en = {
   composerLabel: 'Message',
   composerPlaceholder: 'Write in Japanese… (Enter to send, Shift+Enter for a new line)',
   composerPlaceholderRomaji: 'Type romaji — it turns into kana (CAPS for katakana)…',
-  /** On narrow screens, where the long ones wrap to a second line. */
+  /** On narrow screens, where the long ones wrap to a second line; the plain one on touch screens too, which have no Shift+Enter. */
   composerPlaceholderShort: 'Write in Japanese…',
   composerPlaceholderRomajiShort: 'Type romaji…',
   send: 'Send',
