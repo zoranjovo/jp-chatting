@@ -47,8 +47,9 @@ function Kanji({ ch, level, known, overTitle }: { ch: string; level: number | nu
     ? `${ch} — ${info.meaning} · ${t.wkLevel} ${info.level}${info.on ? `\n${info.on}` : ''}${info.kun ? `\n${info.kun}` : ''}`
     : `${ch} — ${t.notInWk}`;
   const over = level !== null && !isAllowed(ch, level, known);
+  // data-over says why it is marked, for KanjiDetails: a touch screen never shows the title.
   return (
-    <span className={over ? 'kanji over-level' : 'kanji'} title={over ? `${overTitle}\n${title}` : title}>
+    <span className={over ? 'kanji over-level' : 'kanji'} title={over ? `${overTitle}\n${title}` : title} data-over={over ? overTitle : undefined}>
       {ch}
     </span>
   );

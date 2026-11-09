@@ -564,6 +564,44 @@ ruby rt {
   cursor: help;
 }
 
+/* A kanji's details, on a tap on a touch screen (KanjiDetails). */
+.kanji-pop {
+  z-index: 20;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  width: max-content;
+  max-width: min(300px, calc(100vw - 32px));
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.kanji-pop-char {
+  font-size: 34px;
+  line-height: 1.1;
+}
+
+.kanji-pop-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.kanji-pop-text p {
+  margin: 0;
+}
+
+.kanji-pop-over {
+  color: var(--warn);
+  font-weight: 600;
+}
+
 .over-level {
   background: var(--over);
   border-radius: 3px;

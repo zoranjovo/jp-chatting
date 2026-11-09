@@ -634,3 +634,11 @@ test('the chat list shows a reply on its way in another chat, then that it arriv
   await expect(theirs(app)).toHaveCount(2);
   await expect(first.locator('.chat-unread')).toHaveCount(0);
 });
+
+test('with a mouse, a click on a kanji opens nothing: its details are the hover title', async ({ app }) => {
+  await startChat(app);
+  const drink = theirs(app).first().locator('.bubble-text .kanji', { hasText: '飲' });
+  await expect(drink).toHaveAttribute('title', /飲 — /);
+  await drink.click();
+  await expect(app.locator('.kanji-pop')).toHaveCount(0);
+});

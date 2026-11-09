@@ -3,6 +3,7 @@ import { DEFAULT_SETTINGS, type Chat, type ChatSummary, type Message, type Polit
 import { api } from './api.ts';
 import { ChatView } from './components/ChatView.tsx';
 import { ChatSettingsDialog, type ChatPatch } from './components/ChatSettingsDialog.tsx';
+import { KanjiDetails } from './components/KanjiDetails.tsx';
 import { NewChatDialog } from './components/NewChatDialog.tsx';
 import { SettingsDialog } from './components/SettingsDialog.tsx';
 import { BreakdownIcon, CheckIcon } from './components/Icons.tsx';
@@ -425,6 +426,7 @@ function Shell({ loadError }: { loadError: string | null }) {
       {dialog === 'new' && <NewChatDialog onStart={startChat} onClose={() => setDialog(null)} onOpenSettings={() => setDialog('settings')} />}
       {dialog === 'settings' && <SettingsDialog onClose={() => setDialog(null)} />}
       {dialog === 'chat' && chat && <ChatSettingsDialog chat={chat} onSave={saveChatSettings} onClose={() => setDialog(null)} />}
+      <KanjiDetails />
     </div>
   );
 }

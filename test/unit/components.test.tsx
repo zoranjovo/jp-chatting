@@ -59,7 +59,8 @@ describe('JpText', () => {
     // 人 is level 1, 語 is level 5+
     const html = render(<JpText text="人と語" />, { wkLevel: 1 });
     assert.equal(count(html, 'over-level'), 1);
-    assert.match(html, /class="kanji over-level" title="Above your WaniKani level[^"]*">語</);
+    assert.match(html, /class="kanji over-level" title="Above your WaniKani level[^"]*" data-over="Above your WaniKani level \(1\)">語</);
+    // Only a marked kanji says why, for the tap-to-see details on a touch screen.
     assert.match(html, /class="kanji" title="人 — [^"]*WaniKani level 1[^"]*">人</);
   });
 
