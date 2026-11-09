@@ -254,6 +254,30 @@ test.describe('on a touch screen', () => {
     await expect(composer(app)).toHaveAttribute('placeholder', 'Write in Japanese…');
   });
 
+  test('tapping a kanji shows its meaning, level and why it is marked; a tap elsewhere closes it', async ({ app, request }) => {
+    await request.put('/api/settings', { data: { wkLevel: 1 } });
+    await app.reload();
+    await startChat(app);
+    // The reply itself spells out a kanji above the level; the breakdown keeps it, marked.
+    await theirs(app).first().getByRole('button', { name: 'Breakdown' }).tap();
+    const text = theirs(app).first().locator('.analysis');
+    const drink = text.locator('.kanji', { hasText: '飲' }).first();
+    await expect(drink).toHaveClass(/over-level/);
+    await drink.tap();
+    const pop = app.locator('.kanji-pop');
+    await expect(pop).toBeVisible();
+    await expect(pop).toContainText('Above WaniKani level 1, the level this was written at');
+    await expect(pop).toContainText(/drink/i);
+    await expect(pop).toContainText(/WaniKani level \d+/);
+
+    await text.locator('.kanji', { hasText: '何' }).first().tap();
+    await expect(pop).toHaveCount(1);
+    await expect(pop).toContainText(/what/i);
+
+    await app.locator('.messages').tap({ position: { x: 10, y: 10 } });
+    await expect(pop).toHaveCount(0);
+  });
+
   test('a hardware keyboard on a tablet still sends with Ctrl+Enter', async ({ app }) => {
     await startChat(app);
     await composer(app).fill('はい');
