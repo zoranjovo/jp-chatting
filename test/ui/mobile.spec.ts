@@ -274,6 +274,10 @@ test.describe('on a touch screen', () => {
     await expect(pop).toHaveCount(1);
     await expect(pop).toContainText(/what/i);
 
+    // A press that starts a scroll (no click follows) leaves it open, to read the sentence under it.
+    await app.locator('.messages').dispatchEvent('pointerdown', { pointerType: 'touch', bubbles: true });
+    await app.locator('.messages').evaluate((list) => list.scrollBy(0, 20));
+    await expect(pop).toHaveCount(1);
     await app.locator('.messages').tap({ position: { x: 10, y: 10 } });
     await expect(pop).toHaveCount(0);
   });
