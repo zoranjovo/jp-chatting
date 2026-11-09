@@ -2,7 +2,7 @@ import { useImperativeHandle, useLayoutEffect, useReducer, useRef, type ChangeEv
 import { prependDraft, useDraft } from '../drafts.ts';
 import { useT } from '../i18n.tsx';
 import { romajiAtCaret, romajiWordsToKana, withoutJapaneseSpaces } from '../romaji.ts';
-import { NARROW, useMediaQuery } from '../layout.ts';
+import { NARROW, TOUCH, useMediaQuery } from '../layout.ts';
 import { useSettings } from '../settings.tsx';
 
 /**
@@ -40,6 +40,7 @@ export function Composer({
 }) {
   const t = useT();
   const narrow = useMediaQuery(NARROW);
+  const touch = useMediaQuery(TOUCH);
   const { settings } = useSettings();
   // The chat's own draft, read by id, so the text can never belong to another chat.
   const [text, setText] = useDraft(chatId);
@@ -97,7 +98,10 @@ export function Composer({
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+    if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+    // A touch keyboard has no Shift+Enter, so there Enter makes a new line and Send sends; a hardware
+    // keyboard on a tablet can still send with Ctrl/Cmd+Enter.
+    if (touch ? e.ctrlKey || e.metaKey : !e.shiftKey) {
       e.preventDefault();
       send();
     }
@@ -125,12 +129,14 @@ export function Composer({
         value={text}
         onChange={onChange}
         onKeyDown={onKeyDown}
+        // The long placeholders explain Enter and Shift+Enter, which a touch keyboard doesn't do.
         placeholder={
-          narrow
+          narrow || touch
             ? romaji ? t.composerPlaceholderRomajiShort : t.composerPlaceholderShort
             : romaji ? t.composerPlaceholderRomaji : t.composerPlaceholder
         }
         aria-label={t.composerLabel}
+        enterKeyHint={touch ? 'enter' : 'send'}
         lang="ja"
         autoCapitalize="off"
         autoCorrect="off"

@@ -206,7 +206,7 @@ test.describe('on a touch screen', () => {
     expect(await app.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true);
     await startChat(app, 'Phone chat');
     await composer(app).fill('はい');
-    await composer(app).press('Enter');
+    await app.getByRole('button', { name: 'Send' }).tap();
     await expect(theirs(app)).toHaveCount(2);
     await app.getByRole('button', { name: 'Menu' }).click();
     await expect(app.locator('.sidebar')).toBeInViewport();
@@ -219,6 +219,28 @@ test.describe('on a touch screen', () => {
     }
     expect(small).toEqual([]);
     expect(await targets.count()).toBeGreaterThan(8);
+  });
+
+  test('Enter on a touch keyboard starts a new line, and Send sends the lines as one message', async ({ app }) => {
+    await startChat(app);
+    await expect(composer(app)).toHaveAttribute('enterkeyhint', 'enter');
+    await composer(app).fill('はい');
+    await composer(app).press('Enter');
+    await composer(app).pressSequentially('arigatou');
+    await expect(composer(app)).toHaveValue('はい\nありがとう');
+    await expect(mine(app)).toHaveCount(0);
+    await app.getByRole('button', { name: 'Send' }).tap();
+    await expect(mine(app)).toHaveCount(1);
+    expect(await mine(app).locator('.bubble-text').evaluate((el) => el.textContent)).toBe('はい\nありがとう');
+    await expect(theirs(app)).toHaveCount(2);
+  });
+
+  test('a hardware keyboard on a tablet still sends with Ctrl+Enter', async ({ app }) => {
+    await startChat(app);
+    await composer(app).fill('はい');
+    await composer(app).press('Control+Enter');
+    await expect(mine(app)).toHaveCount(1);
+    await expect(composer(app)).toHaveValue('');
   });
 
   test('a dialog opens without focusing a text field, so the keyboard stays down until a field is tapped', async ({ app }) => {
