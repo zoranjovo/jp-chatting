@@ -6,6 +6,9 @@ import { useSyncExternalStore } from 'react';
 /** The same query as the @media rule in styles.css; a unit test keeps the two in step. */
 export const NARROW = '(max-width: 760px), (max-height: 500px)';
 
+/** A touch screen as the main pointer: a phone or tablet, whose keyboard has no Shift+Enter. */
+export const TOUCH = '(pointer: coarse)';
+
 export function useMediaQuery(query: string): boolean {
   return useSyncExternalStore(
     (onChange) => {
