@@ -199,6 +199,36 @@ test('on a phone, the action tooltips leave the message text uncovered too', asy
   }
 });
 
+for (const [width, height, topbar] of [
+  [360, 330, true],
+  [667, 200, false],
+] as const) {
+  test(`with the keyboard up at ${width}×${height}, a rewind and a long draft leave the composer whole and the chat in view`, async ({ app }) => {
+    await startChat(app);
+    await composer(app).fill('コーヒーがおねがいします。');
+    await app.getByRole('button', { name: 'Send' }).click();
+    await expect(theirs(app)).toHaveCount(2);
+    await mine(app).first().getByRole('button', { name: 'Check' }).click();
+    await expect(mine(app).first().locator('.verdict')).toBeVisible();
+    await mine(app).first().getByRole('button', { name: /Rewind/ }).click();
+    await expect(app.locator('.pinned')).toBeVisible();
+    await expect(app.locator('.undo-toast')).toBeVisible();
+    await composer(app).fill(['えきはどこですか', '', 'すみません', 'このちかくにえきはありますか', 'とおいですか', 'ありがとう'].join('\n'));
+    // The keyboard coming up, as a browser that resizes the page for it (#viewport) does.
+    await app.setViewportSize({ width, height });
+
+    const overflow = await app.evaluate(() => document.documentElement.scrollHeight - document.documentElement.clientHeight);
+    expect(overflow).toBeLessThanOrEqual(0);
+    await expect(app.getByRole('button', { name: 'Send' })).toBeInViewport({ ratio: 1 });
+    await expect(app.getByRole('button', { name: 'Undo' })).toBeInViewport({ ratio: 1 });
+    const box = (await app.locator('.composer').boundingBox())!;
+    expect(box.y + box.height).toBeLessThanOrEqual(height);
+    expect((await app.locator('.messages').boundingBox())!.height).toBeGreaterThanOrEqual(40);
+    if (topbar) await expect(app.locator('.topbar')).toBeVisible();
+    else await expect(app.locator('.topbar')).toBeHidden();
+  });
+}
+
 test.describe('on a touch screen', () => {
   test.use({ isMobile: true });
 

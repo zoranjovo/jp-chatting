@@ -1681,3 +1681,43 @@ ruby rt {
     display: flex;
   }
 }
+
+/* Short screens -- a phone on its side, or any phone with the keyboard up. The check pinned by a rewind,
+   the undo toast and a long draft each had their own height, and together they could take the whole
+   screen and more: the conversation went, and the page itself scrolled, cutting off the composer. Here
+   the pinned check and the toast share one capped scroller with Undo kept in view at its foot, and the
+   draft is capped too, so the composer always fits and the conversation keeps what is left. */
+@media (max-height: 500px) {
+  .composer-extras {
+    max-height: 30vh;
+    overflow-y: auto;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+
+  .pinned {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .undo-toast {
+    position: sticky;
+    bottom: 0;
+    padding-block: 4px;
+  }
+
+  .composer {
+    margin-bottom: 8px;
+  }
+
+  .composer textarea {
+    max-height: 22vh;
+  }
+}
+
+/* The keyboard up on a phone on its side leaves about 200px: the top bar goes until the keyboard does. */
+@media (max-height: 300px) {
+  .topbar {
+    display: none;
+  }
+}
