@@ -63,16 +63,18 @@ export function NewChatDialog({
 /** Polite / casual as a two-way switch. */
 export function StyleSwitch({ value, onChange }: { value: Politeness; onChange: (p: Politeness) => void }) {
   const t = useT();
-  const options: [Politeness, string][] = [
-    ['polite', t.polite],
-    ['casual', t.casual],
+  const options: [Politeness, string, string][] = [
+    ['polite', t.polite, t.politeShort],
+    ['casual', t.casual, t.casualShort],
   ];
   return (
-    <div className="segmented" role="radiogroup" aria-label={t.politeness}>
-      {options.map(([p, label]) => (
+    <div className="segmented style-switch" role="radiogroup" aria-label={t.politeness}>
+      {options.map(([p, label, short]) => (
         <label key={p} className={value === p ? 'active' : ''}>
           <input type="radio" checked={value === p} onChange={() => onChange(p)} />
-          {label}
+          {/* One shows, by the switch's width; the hidden one is out of the radio's name too. */}
+          <span className="style-long">{label}</span>
+          <span className="style-short">{short}</span>
         </label>
       ))}
     </div>

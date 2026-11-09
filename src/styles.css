@@ -344,6 +344,17 @@ button[aria-disabled='true'] {
   gap: 8px;
 }
 
+/* A phone on its side: the language switch and Settings side by side, or they take half the drawer's height. */
+@media (max-height: 500px) {
+  .sidebar-footer {
+    flex-direction: row;
+  }
+
+  .sidebar-footer > * {
+    flex: 1;
+  }
+}
+
 .lang-switch {
   display: flex;
   background: var(--bg);
@@ -876,6 +887,19 @@ ruby rt {
 
 .fix-row .line-jp {
   line-height: 1.8;
+}
+
+/* A narrow panel (a phone): each tag above its line, so the Japanese gets the panel's whole width rather
+   than what a label column leaves -- at 320px it wrapped every six or seven characters. */
+@container (max-width: 420px) {
+  .fix-rows {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0;
+  }
+
+  .fix-rows .fix-row + .line-tag {
+    margin-top: 8px;
+  }
 }
 
 .fix-row-yours .line-en {
@@ -1523,6 +1547,43 @@ ruby rt {
 
 .chat-settings-button + .topbar-new {
   margin-left: 0;
+}
+
+/* The top bar's width, so a small phone can give the title the chip's room. */
+.topbar {
+  container-type: inline-size;
+}
+
+/* On a small phone the chip is just its gear: with the speech style in it, a title got eight characters. */
+@container (max-width: 360px) {
+  .chat-settings-button > :first-child {
+    display: none;
+  }
+
+  .chat-settings-button {
+    justify-content: center;
+    min-width: 44px;
+    padding-inline: 0;
+  }
+}
+
+/* The speech-style switch: its short labels when the full ones would break mid-word (です/ま|す). */
+.style-switch {
+  container-type: inline-size;
+}
+
+.style-short {
+  display: none;
+}
+
+@container (max-width: 300px) {
+  .style-long {
+    display: none;
+  }
+
+  .style-short {
+    display: inline;
+  }
 }
 
 /* The ⓘ on the partner's messages and the popup it opens, below the bubble's actions. */

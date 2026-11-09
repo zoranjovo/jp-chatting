@@ -299,6 +299,40 @@ test('a tablet on its side keeps its docked sidebar when the keyboard makes the 
   await expect(app.getByRole('button', { name: 'Menu' })).toBeHidden();
 });
 
+test("at 320px the title gets the chip's room, the style switch keeps its labels whole, and feedback tags sit above their lines", async ({ app }) => {
+  await app.setViewportSize({ width: 320, height: 568 });
+  await startChat(app);
+  const chip = app.locator('.chat-settings-button');
+  await expect(chip.getByText('Polite')).toBeHidden();
+  expect((await chip.boundingBox())!.width).toBeLessThanOrEqual(46);
+
+  await composer(app).fill('コーヒーがおねがいします。');
+  await app.getByRole('button', { name: 'Send' }).click();
+  await expect(theirs(app)).toHaveCount(2);
+  const message = mine(app).first();
+  await message.getByRole('button', { name: 'Check' }).click();
+  const tag = (await message.locator('.line-tag.yours').boundingBox())!;
+  const line = (await message.locator('.fix-row-yours').boundingBox())!;
+  expect(tag.y + tag.height).toBeLessThanOrEqual(line.y + 1);
+
+  await app.locator('.topbar-new').click();
+  const dialog = app.getByRole('dialog');
+  // The short labels, each on one line, and the radios named by them.
+  await expect(dialog.getByRole('radio', { name: 'Polite', exact: true })).toBeChecked();
+  for (const label of await dialog.locator('.style-switch label').all()) {
+    const box = (await label.boundingBox())!;
+    const lineHeight = await label.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
+    expect(box.height).toBeLessThan(lineHeight * 2 + 12);
+  }
+});
+
+test("a phone on its side puts the drawer's language switch and Settings side by side", async ({ app }) => {
+  await app.setViewportSize({ width: 667, height: 375 });
+  await app.getByRole('button', { name: 'Menu' }).click();
+  const [lang, settings] = await Promise.all([app.locator('.sidebar .lang-switch').boundingBox(), app.locator('.sidebar-footer > button').boundingBox()]);
+  expect(Math.abs(lang!.y - settings!.y)).toBeLessThan(2);
+});
+
 test.describe('on a touch screen', () => {
   test.use({ isMobile: true });
 
