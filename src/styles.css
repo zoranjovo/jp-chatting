@@ -1715,9 +1715,11 @@ ruby rt {
   }
 }
 
-/* The keyboard up on a phone on its side leaves about 200px: the top bar goes until the keyboard does. */
+/* The keyboard up on a phone on its side leaves about 200px: the top bar goes while the composer has focus,
+   which on a phone is when the keyboard is up. Not on height alone: a short split-screen window with no
+   keyboard would lose the only way to the menu and New chat. */
 @media (max-height: 300px) {
-  .topbar {
+  .main:has(.composer textarea:focus) .topbar {
     display: none;
   }
 }

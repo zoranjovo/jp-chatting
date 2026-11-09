@@ -216,6 +216,7 @@ for (const [width, height, topbar] of [
     await composer(app).fill(['えきはどこですか', '', 'すみません', 'このちかくにえきはありますか', 'とおいですか', 'ありがとう'].join('\n'));
     // The keyboard coming up, as a browser that resizes the page for it (#viewport) does.
     await app.setViewportSize({ width, height });
+    await composer(app).focus();
 
     const overflow = await app.evaluate(() => document.documentElement.scrollHeight - document.documentElement.clientHeight);
     expect(overflow).toBeLessThanOrEqual(0);
@@ -225,7 +226,12 @@ for (const [width, height, topbar] of [
     expect(box.y + box.height).toBeLessThanOrEqual(height);
     expect((await app.locator('.messages').boundingBox())!.height).toBeGreaterThanOrEqual(40);
     if (topbar) await expect(app.locator('.topbar')).toBeVisible();
-    else await expect(app.locator('.topbar')).toBeHidden();
+    else {
+      await expect(app.locator('.topbar')).toBeHidden();
+      // Only while typing: a window this short without the keyboard keeps the menu and New chat.
+      await composer(app).blur();
+      await expect(app.locator('.topbar')).toBeVisible();
+    }
   });
 }
 
