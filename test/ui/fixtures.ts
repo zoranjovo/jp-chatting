@@ -36,14 +36,13 @@ export async function startChat(page: Page, topic = '') {
   const before = await page.locator('.chat-item').count();
   // The sidebar's button, or on a phone, where the sidebar is inert and slid off screen, the top bar's.
   // Chosen by inert, not position: just after a resize the sidebar is still sliding out and partly on screen.
-  const buttons = page.getByRole('button', { name: /New chat/ });
-  for (let i = 0; i < (await buttons.count()); i += 1) {
-    const button = buttons.nth(i);
-    if ((await button.isVisible()) && (await button.evaluate((el) => !el.closest('[inert]')))) {
-      await button.click();
-      break;
-    }
-  }
+  // One locator, so the click's retries re-check it: inert comes from React a frame after the layout changes.
+  await page
+    .getByRole('button', { name: /New chat/ })
+    .filter({ visible: true })
+    .locator('xpath=self::*[not(ancestor-or-self::*[@inert])]')
+    .first()
+    .click();
   const dialog = page.getByRole('dialog');
   if (topic) await dialog.getByRole('textbox').fill(topic);
   await dialog.getByRole('button', { name: 'Start' }).click();
