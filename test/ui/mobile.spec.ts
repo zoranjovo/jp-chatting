@@ -1,5 +1,5 @@
 import { devices, type Locator } from '@playwright/test';
-import { composer, expect, expectTooltipBeside, mine, startChat, test, theirs } from './fixtures.ts';
+import { MOCK_URL, composer, expect, expectTooltipBeside, mine, startChat, test, theirs } from './fixtures.ts';
 
 test.use({ viewport: devices['Pixel 7'].viewport, hasTouch: true });
 
@@ -246,6 +246,57 @@ test('a bubble keeps room between its lines for readings only when it shows some
   await expect(text).toBeVisible();
   await expect(text.locator('rt')).toHaveCount(0);
   expect(await ratio()).toBeCloseTo(1.7, 1);
+});
+
+test('on a small phone the dialogs show their buttons without scrolling, and the topic chips sit in one row', async ({ app, request }) => {
+  await app.setViewportSize({ width: 320, height: 568 });
+  // No model: the New chat dialog leads with the setup notice, as for a first-timer.
+  await request.put('/api/settings', { data: { endpoint: { baseUrl: `${MOCK_URL}/v1`, apiKey: '', model: '', reasoning: '' } } });
+  await app.reload();
+  await app.locator('.topbar-new').click();
+  const dialog = app.getByRole('dialog');
+  await expect(dialog.locator('.setup-notice')).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Start' })).toBeInViewport({ ratio: 1 });
+  const chips = await dialog.locator('.topic-examples .chip').evaluateAll((els) => els.map((el) => el.getBoundingClientRect().top));
+  expect(new Set(chips).size).toBe(1);
+  expect(await app.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+  // The dialog is in the top layer and scrolls by itself: the chip row's bleed mustn't widen it.
+  expect(await dialog.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
+
+  await dialog.getByRole('button', { name: 'Open Settings' }).click();
+  await expect(dialog.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Save' })).toBeInViewport({ ratio: 1 });
+});
+
+test('the keyboard coming up keeps the chat at its latest message, unless the learner had scrolled up', async ({ app }) => {
+  await startChat(app);
+  for (const text of ['はい', 'ありがとう', 'コーヒーをください', 'またね']) {
+    const before = await theirs(app).count();
+    await composer(app).fill(text);
+    await app.getByRole('button', { name: 'Send' }).click();
+    await expect(theirs(app)).toHaveCount(before + 1);
+  }
+  const list = app.locator('.messages');
+  // At the end: only the list's own bottom padding below what it shows.
+  const fromEnd = () => list.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight - parseFloat(getComputedStyle(el).paddingBottom));
+  await expect.poll(fromEnd).toBeLessThan(2);
+  // The page resized for the keyboard (interactive-widget=resizes-content).
+  await app.setViewportSize({ width: 412, height: 480 });
+  await expect.poll(fromEnd).toBeLessThan(2);
+  await expect(theirs(app).last()).toBeInViewport({ ratio: 1 });
+
+  await app.setViewportSize({ width: 412, height: 915 });
+  await list.evaluate((el) => el.scrollTo({ top: 0 }));
+  await app.setViewportSize({ width: 412, height: 480 });
+  expect(await list.evaluate((el) => el.scrollTop)).toBe(0);
+});
+
+test('a tablet on its side keeps its docked sidebar when the keyboard makes the page short', async ({ app }) => {
+  await app.setViewportSize({ width: 1280, height: 450 });
+  await startChat(app);
+  await expect(app.locator('.sidebar')).toBeInViewport();
+  await expect(app.locator('.sidebar')).not.toHaveAttribute('inert');
+  await expect(app.getByRole('button', { name: 'Menu' })).toBeHidden();
 });
 
 test.describe('on a touch screen', () => {

@@ -93,6 +93,29 @@ export function ChatView({
     }
   }, [last?.id]);
 
+  // Kept at the end when the list gets shorter -- the keyboard coming up resizes the page -- if it was at the end.
+  const list = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = list.current;
+    if (!el) return;
+    let atEnd = true;
+    let height = el.clientHeight;
+    const onScroll = () => {
+      const bottom = end.current?.getBoundingClientRect().bottom;
+      atEnd = bottom === undefined || bottom <= el.getBoundingClientRect().bottom + 2;
+    };
+    const resized = new ResizeObserver(() => {
+      if (el.clientHeight < height && atEnd) end.current?.scrollIntoView({ block: 'end' });
+      height = el.clientHeight;
+    });
+    el.addEventListener('scroll', onScroll, { passive: true });
+    resized.observe(el);
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      resized.disconnect();
+    };
+  }, []);
+
   // Straight to the end when the chat opens; smoothly for each new message.
   const opened = useRef(false);
   useEffect(() => {
@@ -117,7 +140,7 @@ export function ChatView({
     <AnnounceContext.Provider value={announce}>
       <KnownKanjiProvider value={knownKanji}>
         <div className="chat">
-          <div className="messages">
+          <div className="messages" ref={list}>
             {chat.topic && <div className="topic-banner">{chat.topic}</div>}
             {chat.messages.map((m) => (
               <MessageBubble
