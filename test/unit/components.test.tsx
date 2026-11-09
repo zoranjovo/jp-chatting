@@ -11,6 +11,8 @@ import { ChatSettingsDialog } from '../../src/components/ChatSettingsDialog.tsx'
 import { Composer } from '../../src/components/Composer.tsx';
 import { ConfirmDialog } from '../../src/components/Dialog.tsx';
 import { ContextLine } from '../../src/components/ContextLine.tsx';
+import { ErrorNote } from '../../src/components/ErrorNote.tsx';
+import { ApiError, errorOf } from '../../src/api.ts';
 import { MessageBubble } from '../../src/components/MessageBubble.tsx';
 import { ContextDetails } from '../../src/components/MessageInfo.tsx';
 import { JpText, KnownKanjiProvider } from '../../src/components/JpText.tsx';
@@ -620,5 +622,25 @@ describe('accessible names and states', () => {
     }
     const genki = render(<SettingsDialog onClose={() => {}} />);
     assert.match(genki, /<label class="field-label" for="([^"]+)">Genki lesson<\/label><select id="\1" aria-describedby="[^"]+"/);
+  });
+});
+
+describe('ErrorNote', () => {
+  test('a failed model call leads in plain words, with a hint for the provider, then the detail', () => {
+    const error = errorOf(new ApiError('the endpoint answered 500: {"error":"down"}', 502));
+    assert.equal(error.kind, 'model');
+    const endpoint = render(<ErrorNote error={error} />);
+    assert.match(endpoint, /<strong>Your partner’s AI didn’t answer\.<\/strong> Check that your model server \(LM Studio, Ollama…\) is running/);
+    assert.match(endpoint, /<span class="error-detail">the endpoint answered 500: \{&quot;error&quot;:&quot;down&quot;\}<\/span>/);
+    assert.match(render(<ErrorNote error={error} />, { provider: 'claude' }), /Claude CLI is installed and signed in/);
+  });
+
+  test('the app server out of reach says so; anything else keeps the plain prefix', () => {
+    const offline = errorOf(new TypeError('Failed to fetch'));
+    assert.equal(offline.kind, 'server');
+    assert.match(render(<ErrorNote error={offline} />), /<strong>Can’t reach the jp-chatting server\.<\/strong>/);
+    const notFound = errorOf(new ApiError('chat not found', 404));
+    assert.equal(notFound.kind, 'other');
+    assert.equal(render(<ErrorNote error={notFound} />), '<div class="error" role="alert">Something went wrong: chat not found</div>');
   });
 });

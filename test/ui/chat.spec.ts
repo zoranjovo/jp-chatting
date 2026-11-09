@@ -108,7 +108,10 @@ test('a failed reply shows the error and can be retried', async ({ app, request 
   await mockControl(request, { fail: true });
   await app.getByRole('button', { name: '+ New chat' }).first().click();
   await app.getByRole('dialog').getByRole('button', { name: 'Start' }).click();
-  await expect(app.locator('.error')).toContainText('mock model is down');
+  // Plain words first, with what to try; the model's own message under them.
+  await expect(app.locator('.error strong')).toHaveText('Your partner’s AI didn’t answer.');
+  await expect(app.locator('.error')).toContainText('Check that your model server');
+  await expect(app.locator('.error .error-detail')).toContainText('mock model is down');
   const retry = app.getByRole('button', { name: 'Get a reply' });
   await expect(retry).toBeVisible();
 

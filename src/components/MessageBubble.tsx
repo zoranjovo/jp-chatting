@@ -1,7 +1,8 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { Message } from '../../shared/types.ts';
 import { useAnnounce } from '../announce.ts';
-import { api } from '../api.ts';
+import { api, errorOf, type UiError } from '../api.ts';
+import { ErrorNote } from './ErrorNote.tsx';
 import { breakdownHintDone } from '../hints.ts';
 import { useT } from '../i18n.tsx';
 import { isAnalysisOpen, setAnalysisOpen } from '../openAnalyses.ts';
@@ -40,7 +41,7 @@ export function MessageBubble({
   const [mounted, setMounted] = useState(open);
   const [shown, setShown] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UiError | null>(null);
   const wrap = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const mine = message.role === 'user';
@@ -81,7 +82,7 @@ export function MessageBubble({
       onUpdated(await api.analyze(chatId, message.id, refresh));
       announce(mine ? t.feedbackReady : t.breakdownReady);
     } catch (err) {
-      setError((err as Error).message);
+      setError(errorOf(err));
     } finally {
       setBusy(false);
     }
@@ -169,11 +170,7 @@ export function MessageBubble({
             <div className="analysis-clip">
               <div className="analysis" ref={panel}>
                 {busy && <div className="analysis-busy">{t.analyzing}</div>}
-                {error && (
-                  <div className="error" role="alert">
-                    {t.errorPrefix} {error}
-                  </div>
-                )}
+                {error && <ErrorNote error={error} />}
                 {!busy && message.breakdown && !mine && <BreakdownView breakdown={message.breakdown} />}
                 {!busy && message.feedback && mine && <FeedbackView feedback={message.feedback} />}
                 {/* Kept while busy (aria-disabled, not disabled), so the keyboard focus on it isn't dropped to the page. */}

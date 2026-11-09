@@ -1,5 +1,29 @@
 import type { Chat, ChatSummary, Message, ModelList, ModelTest, Politeness, ProviderKind, ReplyStatus, Settings } from '../shared/types.ts';
 
+/** A failed API call, with the server's status: 502 is the AI model failing (an AiError on the server). */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
+
+/** What went wrong, for the learner: the kind leads in plain words, the detail is the technical message. */
+export interface UiError {
+  kind: 'model' | 'server' | 'other';
+  detail: string;
+}
+
+export function errorOf(err: unknown): UiError {
+  const detail = err instanceof Error ? err.message : String(err);
+  if (err instanceof ApiError) return { kind: err.status === 502 ? 'model' : 'other', detail };
+  // fetch() itself failed: the app's own server isn't answering (stopped, or the phone left the network).
+  if (err instanceof TypeError) return { kind: 'server', detail };
+  return { kind: 'other', detail };
+}
+
 async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
   const res = await fetch(url, {
     method,
@@ -7,7 +31,7 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((data as { error?: string }).error ?? `${res.status} ${res.statusText}`);
+  if (!res.ok) throw new ApiError((data as { error?: string }).error ?? `${res.status} ${res.statusText}`, res.status);
   return data as T;
 }
 

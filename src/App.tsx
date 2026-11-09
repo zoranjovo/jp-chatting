@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_SETTINGS, type Chat, type ChatSummary, type Message, type Politeness, type Settings } from '../shared/types.ts';
-import { api } from './api.ts';
+import { api, errorOf, type UiError } from './api.ts';
 import { ChatView } from './components/ChatView.tsx';
 import { ChatSettingsDialog, type ChatPatch } from './components/ChatSettingsDialog.tsx';
 import { KanjiDetails } from './components/KanjiDetails.tsx';
@@ -62,7 +62,7 @@ function Shell({ loadError }: { loadError: string | null }) {
   const [waiting, setWaiting] = useState<Set<string>>(new Set());
   /** Chats whose reply arrived while the learner was in another one, until they open it. */
   const [unread, setUnread] = useState<Set<string>>(new Set());
-  const [errors, setErrors] = useState<Record<string, string | null>>({});
+  const [errors, setErrors] = useState<Record<string, UiError | null>>({});
   const [dialog, setDialog] = useState<'new' | 'settings' | 'chat' | null>(null);
   const [navOpen, setNavOpen] = useState(false);
   /** The chat just started, whose composer should take focus once it shows; cleared once it has. */
@@ -164,7 +164,7 @@ function Shell({ loadError }: { loadError: string | null }) {
       show(await api.reply(id));
       if (activeId.current !== id) setUnread((u) => new Set(u).add(id));
     } catch (err) {
-      setErrors((e) => ({ ...e, [id]: (err as Error).message }));
+      setErrors((e) => ({ ...e, [id]: errorOf(err) }));
     } finally {
       pending.current.delete(id);
       setBusy(id, false);
@@ -185,7 +185,7 @@ function Shell({ loadError }: { loadError: string | null }) {
       selecting.current = null;
       const here = activeId.current;
       showInUrl(here, true);
-      if (here) setErrors((e) => ({ ...e, [here]: (err as Error).message }));
+      if (here) setErrors((e) => ({ ...e, [here]: errorOf(err) }));
       return;
     }
     if (selecting.current !== id) return;
@@ -253,7 +253,7 @@ function Shell({ loadError }: { loadError: string | null }) {
       requestReply(id);
       return true;
     } catch (err) {
-      setErrors((e) => ({ ...e, [id]: (err as Error).message }));
+      setErrors((e) => ({ ...e, [id]: errorOf(err) }));
       return false;
     }
   };
@@ -266,7 +266,7 @@ function Shell({ loadError }: { loadError: string | null }) {
       show(await api.updateChat(chat.id, patch));
       refreshList();
     } catch (err) {
-      setErrors((e) => ({ ...e, [chat.id]: (err as Error).message }));
+      setErrors((e) => ({ ...e, [chat.id]: errorOf(err) }));
     }
   };
 
@@ -284,7 +284,7 @@ function Shell({ loadError }: { loadError: string | null }) {
     } catch (err) {
       // The text typed meanwhile still needs saving.
       setDraft(id, getDraft(id));
-      setErrors((e) => ({ ...e, [id]: (err as Error).message }));
+      setErrors((e) => ({ ...e, [id]: errorOf(err) }));
       return false;
     }
   };
@@ -298,7 +298,7 @@ function Shell({ loadError }: { loadError: string | null }) {
       setErrors((e) => ({ ...e, [id]: null }));
       refreshList();
     } catch (err) {
-      setErrors((e) => ({ ...e, [id]: (err as Error).message }));
+      setErrors((e) => ({ ...e, [id]: errorOf(err) }));
     }
   };
 
