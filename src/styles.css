@@ -344,7 +344,8 @@ button[aria-disabled='true'] {
   gap: 8px;
 }
 
-/* A phone on its side: the language switch and Settings side by side, or they take half the drawer's height. */
+/* A short screen (a phone on its side, or the keyboard up): the language switch and Settings side by side,
+   or they take half the drawer's height. */
 @media (max-height: 500px) {
   .sidebar-footer {
     flex-direction: row;
@@ -1555,12 +1556,13 @@ ruby rt {
 }
 
 /* On a small phone the chip is just its gear: with the speech style in it, a title got eight characters. */
-@container (max-width: 360px) {
+@container (max-width: 340px) {
   .chat-settings-button > :first-child {
     display: none;
   }
 
-  .chat-settings-button {
+  /* Two classes, to outrank the touch-screen .chip padding. */
+  .chip.chat-settings-button {
     justify-content: center;
     min-width: 44px;
     padding-inline: 0;
@@ -1576,7 +1578,8 @@ ruby rt {
   display: none;
 }
 
-@container (max-width: 300px) {
+/* In em, so a larger text size switches sooner. The Japanese labels fit from the same width. */
+@container (max-width: 20em) {
   .style-long {
     display: none;
   }

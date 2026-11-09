@@ -299,6 +299,12 @@ test('a tablet on its side keeps its docked sidebar when the keyboard makes the 
   await expect(app.getByRole('button', { name: 'Menu' })).toBeHidden();
 });
 
+/** How many lines each speech-style label's shown text takes. */
+const styleLines = (dialog: Locator) =>
+  dialog.locator('.style-switch label').evaluateAll((labels) =>
+    labels.map((label) => [...label.querySelectorAll('span')].filter((span) => span.getClientRects().length).map((span) => span.getClientRects().length)[0]),
+  );
+
 test("at 320px the title gets the chip's room, the style switch keeps its labels whole, and feedback tags sit above their lines", async ({ app }) => {
   await app.setViewportSize({ width: 320, height: 568 });
   await startChat(app);
@@ -319,11 +325,21 @@ test("at 320px the title gets the chip's room, the style switch keeps its labels
   const dialog = app.getByRole('dialog');
   // The short labels, each on one line, and the radios named by them.
   await expect(dialog.getByRole('radio', { name: 'Polite', exact: true })).toBeChecked();
-  for (const label of await dialog.locator('.style-switch label').all()) {
-    const box = (await label.boundingBox())!;
-    const lineHeight = await label.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
-    expect(box.height).toBeLessThan(lineHeight * 2 + 12);
-  }
+  expect(await styleLines(dialog)).toEqual([1, 1]);
+});
+
+test("a 375px phone keeps the speech style in the top bar's chip", async ({ app }) => {
+  await app.setViewportSize({ width: 375, height: 667 });
+  await startChat(app);
+  await expect(app.locator('.chat-settings-button').getByText('Polite')).toBeVisible();
+});
+
+test('the Japanese style switch keeps its longer labels whole on a common phone width', async ({ app, request }) => {
+  await request.put('/api/settings', { data: { uiLanguage: 'ja' } });
+  await app.setViewportSize({ width: 360, height: 740 });
+  await app.reload();
+  await app.locator('.topbar-new').click();
+  expect(await styleLines(app.getByRole('dialog'))).toEqual([1, 1]);
 });
 
 test("a phone on its side puts the drawer's language switch and Settings side by side", async ({ app }) => {
