@@ -509,7 +509,8 @@ button[aria-disabled='true'] {
 .bubble-actions .icon-button:hover:not(:disabled),
 .bubble-actions .icon-button.active {
   color: var(--accent);
-  background: var(--accent-soft);
+  /* background-color, not the shorthand: that would reset the touch-screen background-clip below. */
+  background-color: var(--accent-soft);
 }
 
 .bubble-actions .icon-button:disabled {
@@ -523,7 +524,7 @@ button[aria-disabled='true'] {
 .mine .bubble-actions .icon-button:hover:not(:disabled),
 .mine .bubble-actions .icon-button.active {
   color: var(--mine-ink);
-  background: color-mix(in srgb, var(--mine-ink) 18%, transparent);
+  background-color: color-mix(in srgb, var(--mine-ink) 18%, transparent);
 }
 
 .tooltip-anchor {
@@ -1623,6 +1624,28 @@ ruby rt {
   .chip {
     min-height: 44px;
     padding: 2px 14px;
+  }
+
+  .primary,
+  .secondary,
+  .undo-toast button,
+  .check,
+  .field input:not([type='range']):not([type='radio']),
+  .field select {
+    min-height: 44px;
+  }
+
+  .segmented label,
+  .lang-switch label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+  }
+
+  /* The slider's whole box takes the touch, not just its thin track. */
+  .level-row input[type='range'] {
+    height: 44px;
   }
 }
 

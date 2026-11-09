@@ -1,4 +1,4 @@
-import { devices } from '@playwright/test';
+import { devices, type Locator } from '@playwright/test';
 import { composer, expect, expectTooltipBeside, mine, startChat, test, theirs } from './fixtures.ts';
 
 test.use({ viewport: devices['Pixel 7'].viewport, hasTouch: true });
@@ -324,6 +324,60 @@ test.describe('on a touch screen', () => {
     await composer(app).press('Control+Enter');
     await expect(mine(app)).toHaveCount(1);
     await expect(composer(app)).toHaveValue('');
+  });
+
+  test('the drawer, every dialog and the undo toast give each control 44px each way too', async ({ app }) => {
+    // Every visible control inside `scope` smaller than a fingertip. The hidden radios behind the switches
+    // and the checkboxes inside their labels are measured as the label the finger actually lands on.
+    const undersized = (scope: Locator) =>
+      scope.evaluate(async (root) => {
+        // A dialog rises and scales in: measure it settled.
+        await Promise.all(document.getAnimations().map((a) => a.finished));
+        const small: string[] = [];
+        const controls = root.querySelectorAll('button, select, input:not([type=radio]):not([type=checkbox]), .segmented label, .lang-switch label, .check');
+        for (const el of controls) {
+          const box = el.getBoundingClientRect();
+          if (!box.width || el.closest('.sr-only')) continue;
+          if (box.width < 43.5 || box.height < 43.5) small.push(`${el.className || el.tagName} "${el.textContent?.trim().slice(0, 20)}" ${Math.round(box.width)}x${Math.round(box.height)}`);
+        }
+        return small;
+      });
+
+    await startChat(app);
+    await composer(app).fill('はい');
+    await app.getByRole('button', { name: 'Send' }).tap();
+    await expect(theirs(app)).toHaveCount(2);
+    await mine(app).first().getByRole('button', { name: 'Check' }).tap();
+    await expect(mine(app).first().locator('.verdict')).toBeVisible();
+    await mine(app).first().getByRole('button', { name: /Rewind/ }).tap();
+    await expect(app.locator('.undo-toast')).toBeVisible();
+    expect(await undersized(app.locator('.composer-extras'))).toEqual([]);
+
+    const dialog = app.getByRole('dialog');
+    await app.locator('.topbar').getByRole('button', { name: 'New chat' }).tap();
+    expect(await undersized(dialog)).toEqual([]);
+    await dialog.getByRole('button', { name: 'Cancel' }).tap();
+    await expect(dialog).toHaveCount(0);
+
+    await app.locator('.chat-settings-button').tap();
+    expect(await undersized(dialog)).toEqual([]);
+    await dialog.getByRole('button', { name: 'Cancel' }).tap();
+    await expect(dialog).toHaveCount(0);
+
+    await app.getByRole('button', { name: 'Menu' }).tap();
+    await expect(app.locator('.sidebar')).toBeInViewport();
+    expect(await undersized(app.locator('.sidebar'))).toEqual([]);
+    await app.locator('.sidebar').getByRole('button', { name: 'Settings' }).tap();
+    await expect(dialog).toBeVisible();
+    expect(await undersized(dialog)).toEqual([]);
+  });
+
+  test('an open Breakdown keeps its highlight inside the bubble, as a 28px circle in its 44px target', async ({ app }) => {
+    await startChat(app);
+    await theirs(app).first().getByRole('button', { name: 'Breakdown' }).tap();
+    const button = theirs(app).first().locator('.bubble-actions .icon-button.active');
+    await expect(button).toHaveCount(1);
+    expect(await button.evaluate((el) => getComputedStyle(el).backgroundClip)).toBe('content-box');
   });
 
   test('a dialog opens without focusing a text field, so the keyboard stays down until a field is tapped', async ({ app }) => {
