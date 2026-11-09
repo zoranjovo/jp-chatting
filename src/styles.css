@@ -486,6 +486,12 @@ button[aria-disabled='true'] {
   overflow-wrap: anywhere;
 }
 
+/* Room between the lines for readings only where there are some: with furigana off, long replies stood
+   a quarter taller than they needed to. Tightened this way round, a browser without :has() keeps the room. */
+.bubble-text:not(:has(rt)) {
+  line-height: 1.7;
+}
+
 .bubble-actions {
   display: flex;
   justify-content: flex-end;
@@ -1629,10 +1635,15 @@ ruby rt {
   .primary,
   .secondary,
   .undo-toast button,
-  .check,
+  .check {
+    min-height: 44px;
+  }
+
+  /* 16px, or iOS zooms the page into every field that is tapped. */
   .field input:not([type='range']):not([type='radio']),
   .field select {
     min-height: 44px;
+    font-size: 16px;
   }
 
   .segmented label,
@@ -1744,5 +1755,14 @@ ruby rt {
 @media (max-height: 300px) {
   .main:has(.composer textarea:focus) .topbar {
     display: none;
+  }
+}
+
+/* Touch screens: text a phone held at arm's length can read -- the breakdown's word meanings and the
+   feedback's line tags up from 10.5-11px. */
+@media (pointer: coarse) {
+  .gloss-en,
+  .line-tag {
+    font-size: 12px;
   }
 }

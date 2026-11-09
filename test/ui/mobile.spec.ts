@@ -235,6 +235,19 @@ for (const [width, height, topbar] of [
   });
 }
 
+test('a bubble keeps room between its lines for readings only when it shows some', async ({ app, request }) => {
+  await startChat(app);
+  const text = theirs(app).first().locator('.bubble-text');
+  const ratio = () => text.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight) / parseFloat(getComputedStyle(el).fontSize));
+  await expect(text.locator('rt').first()).toBeAttached();
+  expect(await ratio()).toBeCloseTo(2, 1);
+  await request.put('/api/settings', { data: { furigana: false } });
+  await app.reload();
+  await expect(text).toBeVisible();
+  await expect(text.locator('rt')).toHaveCount(0);
+  expect(await ratio()).toBeCloseTo(1.7, 1);
+});
+
 test.describe('on a touch screen', () => {
   test.use({ isMobile: true });
 
@@ -407,6 +420,27 @@ test.describe('on a touch screen', () => {
     const check = mine(app).first().locator('.bubble-actions .icon-button.active');
     await expect(check).toHaveCount(1);
     expect(await check.evaluate((el) => getComputedStyle(el).backgroundClip)).toBe('content-box');
+  });
+
+  test('fields are 16px, so iOS zooms into none of them, and the small labels are at least 12px', async ({ app }) => {
+    await startChat(app);
+    await composer(app).fill('コーヒーがおねがいします。');
+    await app.getByRole('button', { name: 'Send' }).tap();
+    await expect(theirs(app)).toHaveCount(2);
+    await mine(app).first().getByRole('button', { name: 'Check' }).tap();
+    await theirs(app).first().getByRole('button', { name: 'Breakdown' }).tap();
+    await expect(app.locator('.line-tag').first()).toBeVisible();
+    await expect(app.locator('.gloss-en').first()).toBeVisible();
+    const sizes = (selector: string) =>
+      app.locator(selector).evaluateAll((els) => els.filter((el) => el.getBoundingClientRect().width).map((el) => parseFloat(getComputedStyle(el).fontSize)));
+    expect(Math.min(...(await sizes('.line-tag, .gloss-en')))).toBeGreaterThanOrEqual(12);
+
+    await app.getByRole('button', { name: 'Menu' }).tap();
+    await app.locator('.sidebar').getByRole('button', { name: 'Settings' }).tap();
+    await expect(app.getByRole('dialog')).toBeVisible();
+    const fields = await sizes('dialog .field input:not([type=range]):not([type=radio]), dialog .field select');
+    expect(fields.length).toBeGreaterThan(5);
+    expect(Math.min(...fields)).toBeGreaterThanOrEqual(16);
   });
 
   test('a dialog opens without focusing a text field, so the keyboard stays down until a field is tapped', async ({ app }) => {
