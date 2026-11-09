@@ -1,37 +1,44 @@
 import type { Chat, ChatSummary, Message, ModelList, ModelTest, Politeness, ProviderKind, ReplyStatus, Settings } from '../shared/types.ts';
 
-/** A failed API call, with the server's status: 502 is the AI model failing (an AiError on the server). */
+/** A failed API call. Status 0: the request never got an answer (the app's server stopped, or the network went). */
 export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    /** For an AI model's failure (502): which provider failed, and whether it could be reached at all. */
+    readonly ai?: { provider?: ProviderKind; unreachable?: boolean },
   ) {
     super(message);
+    this.name = 'ApiError';
   }
 }
 
 /** What went wrong, for the learner: the kind leads in plain words, the detail is the technical message. */
-export interface UiError {
-  kind: 'model' | 'server' | 'other';
-  detail: string;
-}
+export type UiError =
+  | { kind: 'model'; detail: string; provider?: ProviderKind; unreachable: boolean }
+  | { kind: 'server' | 'other'; detail: string };
 
 export function errorOf(err: unknown): UiError {
   const detail = err instanceof Error ? err.message : String(err);
-  if (err instanceof ApiError) return { kind: err.status === 502 ? 'model' : 'other', detail };
-  // fetch() itself failed: the app's own server isn't answering (stopped, or the phone left the network).
-  if (err instanceof TypeError) return { kind: 'server', detail };
+  if (!(err instanceof ApiError)) return { kind: 'other', detail };
+  if (err.status === 0) return { kind: 'server', detail };
+  if (err.ai) return { kind: 'model', detail, provider: err.ai.provider, unreachable: !!err.ai.unreachable };
   return { kind: 'other', detail };
 }
 
 async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
-  const res = await fetch(url, {
-    method,
-    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError((data as { error?: string }).error ?? `${res.status} ${res.statusText}`, res.status);
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method,
+      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch (err) {
+    throw new ApiError((err as Error).message, 0);
+  }
+  const data = (await res.json().catch(() => ({}))) as { error?: string; ai?: ApiError['ai'] };
+  if (!res.ok) throw new ApiError(data.error ?? `${res.status} ${res.statusText}`, res.status, data.ai);
   return data as T;
 }
 

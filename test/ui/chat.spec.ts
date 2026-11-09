@@ -108,9 +108,9 @@ test('a failed reply shows the error and can be retried', async ({ app, request 
   await mockControl(request, { fail: true });
   await app.getByRole('button', { name: '+ New chat' }).first().click();
   await app.getByRole('dialog').getByRole('button', { name: 'Start' }).click();
-  // Plain words first, with what to try; the model's own message under them.
-  await expect(app.locator('.error strong')).toHaveText('Your partner’s AI didn’t answer.');
-  await expect(app.locator('.error')).toContainText('Check that your model server');
+  // Plain words first; the model was reached, so no check-it-is-running hint, and its own message under them.
+  await expect(app.locator('.error strong')).toHaveText('Your partner’s AI ran into a problem.');
+  await expect(app.locator('.error')).not.toContainText('Check that');
   await expect(app.locator('.error .error-detail')).toContainText('mock model is down');
   const retry = app.getByRole('button', { name: 'Get a reply' });
   await expect(retry).toBeVisible();
@@ -120,6 +120,16 @@ test('a failed reply shows the error and can be retried', async ({ app, request 
   await expect(theirs(app)).toHaveCount(1);
   await expect(app.locator('.error')).toHaveCount(0);
   await expect(retry).toHaveCount(0);
+});
+
+test('a model server that is not running gets the check-it-is-running hint', async ({ app, request }) => {
+  await request.put('/api/settings', { data: { endpoint: { baseUrl: 'http://127.0.0.1:9/v1', apiKey: '', model: 'mock-small', reasoning: '' } } });
+  await app.reload();
+  await app.getByRole('button', { name: '+ New chat' }).first().click();
+  await app.getByRole('dialog').getByRole('button', { name: 'Start' }).click();
+  await expect(app.locator('.error strong')).toHaveText('Your partner’s AI didn’t answer.');
+  await expect(app.locator('.error')).toContainText('Check that your model server (LM Studio, Ollama…) is running');
+  await expect(app.locator('.error .error-detail')).toContainText('could not reach http://127.0.0.1:9/v1');
 });
 
 test('a failed reply keeps the learner\'s message', async ({ app, request }) => {

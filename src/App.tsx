@@ -3,6 +3,7 @@ import { DEFAULT_SETTINGS, type Chat, type ChatSummary, type Message, type Polit
 import { api, errorOf, type UiError } from './api.ts';
 import { ChatView } from './components/ChatView.tsx';
 import { ChatSettingsDialog, type ChatPatch } from './components/ChatSettingsDialog.tsx';
+import { ErrorNote } from './components/ErrorNote.tsx';
 import { KanjiDetails } from './components/KanjiDetails.tsx';
 import { NewChatDialog } from './components/NewChatDialog.tsx';
 import { SettingsDialog } from './components/SettingsDialog.tsx';
@@ -23,7 +24,7 @@ setDraftSaver((chatId, text) => {
 export function App() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [loaded, setLoaded] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<UiError | null>(null);
 
   useEffect(() => {
     api.settings().then(
@@ -31,7 +32,7 @@ export function App() {
         setSettings(s);
         setLoaded(true);
       },
-      (err: Error) => setLoadError(err.message),
+      (err: unknown) => setLoadError(errorOf(err)),
     );
   }, []);
 
@@ -55,7 +56,7 @@ export function App() {
   );
 }
 
-function Shell({ loadError }: { loadError: string | null }) {
+function Shell({ loadError }: { loadError: UiError | null }) {
   const t = useT();
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [chat, setChat] = useState<Chat | null>(null);
@@ -375,11 +376,7 @@ function Shell({ loadError }: { loadError: string | null }) {
             +
           </button>
         </header>
-        {loadError && (
-          <div className="error" role="alert">
-            {t.errorPrefix} {loadError}
-          </div>
-        )}
+        {loadError && <ErrorNote error={loadError} />}
         {chat ? (
           <ChatView
             // A fresh view per chat, so nothing typed or opened in one chat carries over to another.

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, test } from 'node:test';
 import { billingProblem, callClaude, claudeArgs, claudeEnv, CLAUDE_MODELS, isClaudeCommand, promptOf } from '../../server/ai/claude.ts';
-import type { AiRequest } from '../../server/ai/types.ts';
+import type { AiError, AiRequest } from '../../server/ai/types.ts';
 import { DEFAULT_SETTINGS } from '../../shared/types.ts';
 import { fakeSpawn, INIT_OK, resultEvent } from './helpers.ts';
 
@@ -211,7 +211,7 @@ describe('callClaude', () => {
   test('a missing executable is reported', async () => {
     const err = Object.assign(new Error('spawn claude ENOENT'), { code: 'ENOENT' });
     const fake = fakeSpawn({ error: err });
-    await assert.rejects(callClaude(textRequest, config, fake.spawn), /could not run "claude": spawn claude ENOENT/);
+    await assert.rejects(callClaude(textRequest, config, fake.spawn), (err: AiError) => /could not run "claude": spawn claude ENOENT/.test(err.message) && err.unreachable);
   });
 
   test('a run that exits without a result reports stderr', async () => {

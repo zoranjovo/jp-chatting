@@ -1,3 +1,5 @@
+import type { ProviderKind } from '../../shared/types.ts';
+
 export interface ChatTurn {
   role: 'user' | 'assistant';
   content: string;
@@ -16,7 +18,14 @@ export interface AiRequest {
 export type AiCall = (request: AiRequest) => Promise<unknown>;
 
 export class AiError extends Error {
-  constructor(message: string) {
+  /** The provider whose call failed, so the UI's hint names the one actually used (an analysis uses the message's). */
+  provider?: ProviderKind;
+
+  constructor(
+    message: string,
+    /** The model couldn't be reached at all (a server not running, a CLI not starting), as against failing once reached. */
+    readonly unreachable = false,
+  ) {
     super(message);
     this.name = 'AiError';
   }

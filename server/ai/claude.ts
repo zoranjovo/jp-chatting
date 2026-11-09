@@ -107,6 +107,7 @@ export function callClaude(request: AiRequest, config: ClaudeConfig, spawnProces
 
   return new Promise((resolve, reject) => {
     let failure: string | null = null;
+    let unreachable = false;
     let result: Record<string, unknown> | null = null;
     let apiKeySource: string | null = null;
     let rateLimit: Record<string, unknown> | null = null;
@@ -132,7 +133,7 @@ export function callClaude(request: AiRequest, config: ClaudeConfig, spawnProces
       settled = true;
       clearTimeout(timer);
       fs.rmSync(systemPromptFile, { force: true });
-      if (failure) return reject(new AiError(failure));
+      if (failure) return reject(new AiError(failure, unreachable));
       if (!result) return reject(new AiError(stderr.trim().slice(0, 500) || 'the Claude CLI exited without a result'));
       const text = typeof result.result === 'string' ? result.result : '';
       if (result.is_error === true || result.subtype !== 'success') {
@@ -181,6 +182,7 @@ export function callClaude(request: AiRequest, config: ClaudeConfig, spawnProces
     });
     child.on('error', (err) => {
       failure = `could not run "${command}": ${err.message}`;
+      unreachable = true;
       done();
     });
     child.on('close', () => {
